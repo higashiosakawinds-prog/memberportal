@@ -14,8 +14,8 @@
 
 // ── 設定値（本番前にここを変更） ──
 const SUPABASE_CONFIG = {
-  url:     'https://wfsbrtrjsqmivbzobznc.supabase.co',
-  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indmc2JydHJqc3FtaXZiem9iem5jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyMDA3ODYsImV4cCI6MjA5Mzc3Njc4Nn0.3c6gYwo5udgcCQu7yL3Q0UC83Z21mFW3LWtizuFy5HI',
+  url:     'https://iaqbkriorspsjldodhjy.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhcWJrcmlvcnNwc2psZG9kaGp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MDE1MjEsImV4cCI6MjA5NDA3NzUyMX0.vuwBn8D2cvLdLRQ3X7rOPtHEG5cglY5wkzpnqOBVoJ8',
 };
 
 // ── Supabaseクライアント ──
