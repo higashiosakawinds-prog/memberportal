@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン — 東大阪吹奏楽団</title>
+  <link rel="stylesheet" href="../../css/variables.css">
+  <link rel="stylesheet" href="../../css/common.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      background: var(--navy-900);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: var(--space-4);
+    }
+
+    /* 背景装飾 */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(201,168,76,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgba(37,77,122,0.3) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .login-container {
+      width: 100%;
+      max-width: 420px;
+      animation: fadeInUp 0.5s ease both;
+    }
+
+    .login-logo {
+      text-align: center;
+      margin-bottom: var(--space-8);
+    }
+
+    .login-logo__name {
+      font-family: var(--font-display);
+      font-size: var(--text-3xl);
+      font-weight: 700;
+      color: var(--white);
+      letter-spacing: 0.05em;
+      display: block;
+      margin-bottom: var(--space-1);
+    }
+
+    .login-logo__sub {
+      font-size: var(--text-xs);
+      color: var(--gold-400);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+    }
+
+    .login-logo__divider {
+      width: 40px;
+      height: 1px;
+      background: var(--gold-500);
+      margin: var(--space-3) auto;
+    }
+
+    .login-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(201,168,76,0.2);
+      border-radius: var(--radius-xl);
+      padding: var(--space-8);
+      backdrop-filter: blur(12px);
+    }
+
+    .login-card h2 {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      color: var(--white);
+      margin-bottom: var(--space-6);
+      text-align: center;
+    }
+
+    .login-card .form-label {
+      color: var(--gray-300);
+    }
+
+    .login-card .form-control {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.15);
+      color: var(--white);
+    }
+
+    .login-card .form-control::placeholder { color: rgba(255,255,255,0.3); }
+
+    .login-card .form-control:focus {
+      border-color: var(--gold-500);
+      box-shadow: 0 0 0 3px rgba(201,168,76,0.15);
+    }
+
+    .login-submit {
+      width: 100%;
+      padding: var(--space-4);
+      background: var(--gold-500);
+      color: var(--navy-900);
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: var(--text-base);
+      font-weight: 700;
+      cursor: pointer;
+      transition: background var(--transition-fast), box-shadow var(--transition-fast);
+      margin-top: var(--space-2);
+      font-family: var(--font-body);
+      letter-spacing: 0.05em;
+    }
+
+    .login-submit:hover {
+      background: var(--gold-400);
+      box-shadow: var(--shadow-gold);
+    }
+
+    .login-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .login-footer {
+      text-align: center;
+      margin-top: var(--space-6);
+    }
+
+    .login-footer a {
+      font-size: var(--text-sm);
+      color: var(--gold-400);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .error-box {
+      background: rgba(192,57,43,0.15);
+      border: 1px solid rgba(192,57,43,0.4);
+      border-radius: var(--radius-md);
+      padding: var(--space-3) var(--space-4);
+      color: #f1948a;
+      font-size: var(--text-sm);
+      margin-bottom: var(--space-4);
+      display: none;
+    }
+
+    .error-box.show { display: block; }
+
+    /* ★ 追加: 登録完了通知ボックス */
+    .success-box {
+      background: rgba(39,174,96,0.15);
+      border: 1px solid rgba(39,174,96,0.4);
+      border-radius: var(--radius-md);
+      padding: var(--space-3) var(--space-4);
+      color: #82e0aa;
+      font-size: var(--text-sm);
+      margin-bottom: var(--space-4);
+      display: none;
+    }
+    .success-box.show { display: block; }
+  </style>
+</head>
+<body>
+
+<div class="login-container">
+  <div class="login-logo">
+    <span class="login-logo__name">東大阪吹奏楽団</span>
+    <div class="login-logo__divider"></div>
+    <span class="login-logo__sub">HIGASUI WINDS · DX SYSTEM</span>
+  </div>
+
+  <div class="login-card">
+    <h2>ログイン</h2>
+
+    <!-- ★ 追加: 登録完了メッセージ（?registered=1 のとき表示） -->
+    <div class="success-box" id="success-box">
+      登録が完了しました。メールアドレスとパスワードでログインしてください。
+    </div>
+
+    <div class="error-box" id="error-box">
+      メールアドレスまたはパスワードが正しくありません。
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="email">メールアドレス <span class="required">*</span></label>
+      <input type="email" id="email" class="form-control" placeholder="example@mail.com" autocomplete="email">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="password">パスワード <span class="required">*</span></label>
+      <input type="password" id="password" class="form-control" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <button class="login-submit" id="login-btn" type="button">
+      ログイン
+    </button>
+
+    <div class="login-footer">
+      <a href="register.html">新規登録はこちら</a>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/supabase.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn        = document.getElementById('login-btn');
+    const errorBox   = document.getElementById('error-box');
+    const successBox = document.getElementById('success-box');
+
+    // ★ 登録完了フラグをURLパラメーターで受け取る
+    if (new URLSearchParams(window.location.search).get('registered') === '1') {
+      successBox.classList.add('show');
+    }
+
+    const doLogin = async () => {
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      errorBox.classList.remove('show');
+      successBox.classList.remove('show');
+
+      if (!email || !password) {
+        errorBox.textContent = 'メールアドレスとパスワードを入力してください。';
+        errorBox.classList.add('show');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '認証中…';
+
+      // ★ 修正: `typeof supabase === 'undefined'` は CDN のSDKロード失敗を検知するもの。
+      //   Supabaseクライアント（_sb）が初期化済みかどうかは `!_sb` で判定する。
+      if (!_sb) {
+        setTimeout(() => {
+          sessionStorage.setItem('hs_user', JSON.stringify({
+            id: 'demo', name: 'デモユーザー', roles: ['admin'], part: '—'
+          }));
+          window.location.href = '../../index.html';
+        }, 800);
+        return;
+      }
+
+      const { error } = await Auth.signIn(email, password);
+
+      if (error) {
+        btn.disabled = false;
+        btn.textContent = 'ログイン';
+        errorBox.textContent = 'メールアドレスまたはパスワードが正しくありません。';
+        errorBox.classList.add('show');
+        return;
+      }
+
+      window.location.href = '../../index.html';
+    };
+
+    btn.addEventListener('click', doLogin);
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+  });
+</script>
+</body>
+</html>

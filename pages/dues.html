@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>団費収入 — 東大阪吹奏楽団</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/common.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .dues-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-4); margin-bottom:var(--space-6); }
+    .dues-card { background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-lg); padding:var(--space-5); }
+    .dues-card__label { font-size:var(--text-xs); color:var(--gray-500); margin-bottom:var(--space-2); }
+    .dues-card__value { font-family:var(--font-display); font-size:var(--text-2xl); font-weight:700; }
+    .status-paid   { color:var(--success); }
+    .status-unpaid { color:var(--danger); }
+    .dues-table td.center { text-align:center; }
+    .toggle-btn {
+      display:inline-flex; align-items:center; justify-content:center;
+      width:28px; height:28px; border-radius:50%; border:2px solid var(--gray-300);
+      cursor:pointer; transition:all var(--transition-fast); background:var(--white);
+    }
+    .toggle-btn.paid   { border-color:var(--success); background:var(--success); color:var(--white); }
+    .toggle-btn.unpaid { border-color:var(--gray-300); color:var(--gray-300); }
+    .toolbar { display:flex; gap:var(--space-3); flex-wrap:wrap; margin-bottom:var(--space-4); align-items:center; }
+    .dues-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .dues-table-wrap .table { min-width:420px; }
+    @media(max-width:768px){
+      .dues-summary { grid-template-columns:1fr 1fr; gap:var(--space-3); }
+      .dues-card { padding:var(--space-3); }
+      .dues-card__value { font-size:var(--text-xl); }
+      .toolbar { flex-direction:column; align-items:stretch; }
+      .toolbar select, .toolbar input { width:100%; max-width:none; }
+    }
+  </style>
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main-content">
+
+    <div class="page-header fade-in">
+      <div>
+        <p class="page-header__eyebrow">ACCOUNTING</p>
+        <h1 class="page-header__title">団費収入</h1>
+      </div>
+      <div class="page-header__actions">
+        <button class="btn btn-outline" id="btn-mail-unpaid">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+          未納者にメール
+        </button>
+        <button class="btn btn-outline" id="btn-csv">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12M12 16.5V3"/></svg>
+          CSV
+        </button>
+      </div>
+    </div>
+
+    <!-- サマリー -->
+    <div class="dues-summary fade-in fade-in-1">
+      <div class="dues-card">
+        <p class="dues-card__label">対象団員数</p>
+        <p class="dues-card__value" id="total-members" style="color:var(--navy-800);">—</p>
+      </div>
+      <div class="dues-card">
+        <p class="dues-card__label">納入済み</p>
+        <p class="dues-card__value status-paid" id="paid-count">—</p>
+      </div>
+      <div class="dues-card">
+        <p class="dues-card__label">未納</p>
+        <p class="dues-card__value status-unpaid" id="unpaid-count">—</p>
+      </div>
+    </div>
+
+    <!-- ツールバー -->
+    <div class="toolbar fade-in fade-in-2">
+      <select id="filter-month" class="form-control" style="max-width:180px;"></select>
+      <select id="filter-status" class="form-control" style="max-width:160px;">
+        <option value="">全員表示</option>
+        <option value="paid">納入済みのみ</option>
+        <option value="unpaid">未納のみ</option>
+      </select>
+      <input type="text" id="filter-keyword" class="form-control" placeholder="氏名で検索…" style="flex:1;min-width:160px;">
+    </div>
+
+    <!-- テーブル -->
+    <div class="fade-in fade-in-3 dues-table-wrap" style="border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--gray-200);">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>氏名</th>
+            <th>パート</th>
+            <th>区分</th>
+            <th style="text-align:center;">納入状況</th>
+            <th style="text-align:center;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="dues-tbody"></tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<!-- 未納者メールモーダル -->
+<div class="modal-overlay" id="modal-mail">
+  <div class="modal">
+    <div class="modal__header">
+      <h2 class="modal__title">未納者へメール送信</h2>
+      <button class="modal__close" onclick="closeModal('modal-mail')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div class="alert alert-warning mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+        <div>メール送信はSupabase Edge Functionsまたは外部メールサービスとの連携が必要です。現在はメールアドレス一覧のみ表示します。</div>
+      </div>
+      <p style="font-size:var(--text-sm);font-weight:500;color:var(--navy-800);margin-bottom:var(--space-2);">未納者メールアドレス一覧：</p>
+      <textarea id="mail-list" class="form-control" rows="6" readonly style="font-size:var(--text-xs);font-family:monospace;"></textarea>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-mail')">閉じる</button>
+      <button class="btn btn-primary" onclick="copyMailList()">コピー</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<script src="../js/supabase.js"></script>
+<script src="../js/common.js"></script>
+<script>
+const PART_LABELS = {
+  flute:'Fl', oboe:'Ob', clarinet:'Cl', bassoon:'Fg', saxophone:'Sax',
+  horn:'Hr', trumpet:'Tp', trombone:'Tb', euphonium:'Euph', tuba:'Tuba',
+  percussion:'Perc', contrabass:'CB', other:'他',
+};
+const CATEGORY_LABELS = { regular:'正団員', trainee:'準団員', rest:'休団中', support:'賛助' };
+const CATEGORY_BADGE  = { regular:'badge-success', trainee:'badge-navy', rest:'badge-warning', support:'badge-gold' };
+
+// デモ団員データ
+const DEMO_MEMBERS = [
+  { id:'1', last_name:'山田', first_name:'太郎', part:'clarinet', category:'regular', email:'yamada@example.com' },
+  { id:'2', last_name:'鈴木', first_name:'花子', part:'flute',    category:'regular', email:'suzuki@example.com' },
+  { id:'3', last_name:'田中', first_name:'一郎', part:'trumpet',  category:'regular', email:'tanaka@example.com' },
+  { id:'4', last_name:'佐藤', first_name:'美咲', part:'horn',     category:'regular', email:'sato@example.com'   },
+  { id:'5', last_name:'伊藤', first_name:'健太', part:'trombone', category:'regular', email:'ito@example.com'    },
+  { id:'6', last_name:'渡辺', first_name:'さくら', part:'saxophone', category:'regular', email:'watanabe@example.com' },
+  { id:'7', last_name:'中村', first_name:'大輔', part:'tuba',     category:'regular', email:'nakamura@example.com' },
+  { id:'8', last_name:'小林', first_name:'恵',   part:'percussion', category:'trainee', email:'kobayashi@example.com' },
+];
+
+// 納入状況を month_key -> memberId -> bool で管理
+let paidStatus = {}; // { '2024-06': { '1': true, '2': false, ... } }
+let allMembers  = [];
+let currentMonth = '';
+
+function getKey() { return currentMonth; }
+
+function isPaid(memberId) {
+  return paidStatus[getKey()]?.[memberId] ?? false;
+}
+
+function togglePaid(memberId) {
+  if (!paidStatus[getKey()]) paidStatus[getKey()] = {};
+  paidStatus[getKey()][memberId] = !isPaid(memberId);
+  renderTable();
+}
+
+function updateSummary(filtered) {
+  const paid = filtered.filter(m => isPaid(m.id)).length;
+  document.getElementById('total-members').textContent = filtered.length + '名';
+  document.getElementById('paid-count').textContent    = paid + '名';
+  document.getElementById('unpaid-count').textContent  = (filtered.length - paid) + '名';
+}
+
+function getFiltered() {
+  const status  = document.getElementById('filter-status').value;
+  const kw      = document.getElementById('filter-keyword').value.toLowerCase();
+  // 対象は正団員・準団員（休団・賛助除外可能）
+  return allMembers.filter(m => {
+    if (m.category === 'rest') return false;
+    const name = `${m.last_name}${m.first_name}`.toLowerCase();
+    if (kw && !name.includes(kw)) return false;
+    if (status === 'paid'   && !isPaid(m.id)) return false;
+    if (status === 'unpaid' &&  isPaid(m.id)) return false;
+    return true;
+  });
+}
+
+function renderTable() {
+  const filtered = getFiltered();
+  updateSummary(filtered);
+  const tbody = document.getElementById('dues-tbody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:var(--space-10);color:var(--gray-500);">該当する団員がいません</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map(m => {
+    const paid = isPaid(m.id);
+    return `
+      <tr>
+        <td style="font-weight:600;color:var(--navy-800);">${m.last_name} ${m.first_name}</td>
+        <td>${PART_LABELS[m.part] ?? m.part}</td>
+        <td><span class="badge ${CATEGORY_BADGE[m.category] ?? 'badge-navy'}">${CATEGORY_LABELS[m.category] ?? m.category}</span></td>
+        <td class="center">
+          ${paid
+            ? '<span class="badge badge-success">納入済</span>'
+            : '<span class="badge badge-danger">未納</span>'}
+        </td>
+        <td class="center">
+          <button class="toggle-btn ${paid ? 'paid' : 'unpaid'}" onclick="togglePaid('${m.id}')" title="${paid ? '未納に戻す' : '納入済にする'}">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+            </svg>
+          </button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function copyMailList() {
+  const ta = document.getElementById('mail-list');
+  ta.select();
+  document.execCommand('copy');
+  showToast('コピーしました', 'success');
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  // 月セレクト生成（過去12ヶ月）
+  const sel = document.getElementById('filter-month');
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label = `${d.getFullYear()}年${d.getMonth()+1}月`;
+    sel.innerHTML += `<option value="${val}">${label}</option>`;
+  }
+  currentMonth = sel.value;
+
+  // データ取得
+  const { data: duesData, error: duesError } = await DB.profiles.list();
+  if (duesError) {
+    console.warn('[HighasuiDX] 団員データ取得失敗。デモデータを表示します。');
+  }
+  allMembers = (duesData && duesData.length > 0) ? duesData : DEMO_MEMBERS;
+  renderTable();
+
+  sel.addEventListener('change', () => { currentMonth = sel.value; renderTable(); });
+  document.getElementById('filter-status').addEventListener('change', renderTable);
+  document.getElementById('filter-keyword').addEventListener('input', renderTable);
+
+  // CSV
+  document.getElementById('btn-csv').addEventListener('click', () => {
+    const filtered = getFiltered();
+    const rows = [['氏名','パート','区分','納入状況']];
+    filtered.forEach(m => rows.push([
+      `${m.last_name} ${m.first_name}`,
+      PART_LABELS[m.part] ?? m.part,
+      CATEGORY_LABELS[m.category],
+      isPaid(m.id) ? '納入済' : '未納',
+    ]));
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+    a.download = `団費収入_${currentMonth}.csv`;
+    a.click();
+  });
+
+  // 未納者メール
+  document.getElementById('btn-mail-unpaid').addEventListener('click', () => {
+    const unpaid = allMembers.filter(m => m.category !== 'rest' && !isPaid(m.id));
+    document.getElementById('mail-list').value = unpaid.map(m => m.email || '（メール未登録）').join('\n');
+    openModal('modal-mail');
+  });
+});
+</script>
+</body>
+</html>

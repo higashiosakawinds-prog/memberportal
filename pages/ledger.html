@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>出納帳 — 東大阪吹奏楽団</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/common.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); }
+    .summary-row { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-4); margin-bottom:var(--space-6); }
+    .summary-card { background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-lg); padding:var(--space-5); }
+    .summary-card__label { font-size:var(--text-xs); color:var(--gray-500); margin-bottom:var(--space-2); }
+    .summary-card__value { font-family:var(--font-display); font-size:var(--text-2xl); font-weight:700; }
+    .income  { color:var(--success); }
+    .expense { color:var(--danger); }
+    .balance { color:var(--navy-800); }
+    .toolbar { display:flex; gap:var(--space-3); flex-wrap:wrap; margin-bottom:var(--space-4); align-items:center; }
+    .toolbar select, .toolbar input[type=number] { max-width:140px; }
+    .amount-cell { text-align:right; font-family:var(--font-display); font-weight:600; font-size:var(--text-base); white-space:nowrap; }
+    @media(max-width:768px){
+      .summary-row { grid-template-columns:1fr 1fr; gap:var(--space-3); }
+      .summary-card { padding:var(--space-3); }
+      .summary-card__value { font-size:var(--text-xl); }
+      .toolbar { flex-direction:column; align-items:stretch; }
+      .toolbar select, .toolbar input { max-width:none; width:100%; }
+      .form-grid-2 { grid-template-columns:1fr; }
+      .ledger-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+      .ledger-table-wrap .table { min-width:480px; }
+    }
+  </style>
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main-content">
+
+    <div class="page-header fade-in">
+      <div>
+        <p class="page-header__eyebrow">ACCOUNTING</p>
+        <h1 class="page-header__title">出納帳</h1>
+      </div>
+      <div class="page-header__actions">
+        <button class="btn btn-outline" id="btn-csv">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12M12 16.5V3"/></svg>
+          CSVダウンロード
+        </button>
+        <button class="btn btn-gold" onclick="openModal('modal-add')">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+          仕訳を追加
+        </button>
+      </div>
+    </div>
+
+    <!-- 集計サマリー -->
+    <div class="summary-row fade-in fade-in-1">
+      <div class="summary-card">
+        <p class="summary-card__label">収入合計</p>
+        <p class="summary-card__value income" id="total-income">¥0</p>
+      </div>
+      <div class="summary-card">
+        <p class="summary-card__label">支出合計</p>
+        <p class="summary-card__value expense" id="total-expense">¥0</p>
+      </div>
+      <div class="summary-card">
+        <p class="summary-card__label">残高</p>
+        <p class="summary-card__value balance" id="total-balance">¥0</p>
+      </div>
+    </div>
+
+    <!-- ツールバー -->
+    <div class="toolbar fade-in fade-in-2">
+      <select id="filter-year" class="form-control"></select>
+      <select id="filter-type" class="form-control" style="max-width:140px;">
+        <option value="">収支すべて</option>
+        <option value="income">収入のみ</option>
+        <option value="expense">支出のみ</option>
+      </select>
+      <select id="filter-category" class="form-control" style="max-width:180px;">
+        <option value="">すべてのカテゴリ</option>
+        <option value="団費">団費</option>
+        <option value="楽譜代">楽譜代</option>
+        <option value="演奏会費">演奏会費</option>
+        <option value="楽器費">楽器費</option>
+        <option value="会場費">会場費</option>
+        <option value="その他">その他</option>
+      </select>
+      <input type="text" id="filter-keyword" class="form-control" placeholder="摘要で検索…" style="flex:1;min-width:160px;">
+    </div>
+
+    <!-- テーブル -->
+    <div class="fade-in fade-in-3 ledger-table-wrap" style="border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--gray-200);">
+      <table class="table" id="ledger-table">
+        <thead>
+          <tr>
+            <th>日付</th>
+            <th>カテゴリ</th>
+            <th>摘要</th>
+            <th style="text-align:right;">収入</th>
+            <th style="text-align:right;">支出</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="ledger-tbody">
+          <tr><td colspan="6" style="text-align:center;padding:var(--space-10);">
+            <div class="loading-spinner" style="margin:0 auto var(--space-3);"></div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── 仕訳追加モーダル ── -->
+<div class="modal-overlay" id="modal-add">
+  <div class="modal">
+    <div class="modal__header">
+      <h2 class="modal__title">仕訳を追加</h2>
+      <button class="modal__close" onclick="closeModal('modal-add')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">日付 <span class="required">*</span></label>
+          <input type="date" id="add-date" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">収支区分 <span class="required">*</span></label>
+          <select id="add-type" class="form-control">
+            <option value="income">収入</option>
+            <option value="expense">支出</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">カテゴリ <span class="required">*</span></label>
+          <select id="add-category" class="form-control">
+            <option value="団費">団費</option>
+            <option value="楽譜代">楽譜代</option>
+            <option value="演奏会費">演奏会費</option>
+            <option value="楽器費">楽器費</option>
+            <option value="会場費">会場費</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">金額（円）<span class="required">*</span></label>
+          <input type="number" id="add-amount" class="form-control" placeholder="0" min="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">摘要 <span class="required">*</span></label>
+        <input type="text" id="add-description" class="form-control" placeholder="例：4月分団費 20名分">
+      </div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-add')">キャンセル</button>
+      <button class="btn btn-gold" id="btn-save-entry">保存する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<script src="../js/supabase.js"></script>
+<script src="../js/common.js"></script>
+<script>
+const DEMO_ENTRIES = [
+  { id:'1', date:'2024-04-01', category:'団費',   description:'4月分団費 20名分',     amount:100000, type:'income'  },
+  { id:'2', date:'2024-04-05', category:'楽譜代', description:'定演楽譜購入',          amount: 45000, type:'expense' },
+  { id:'3', date:'2024-04-10', category:'会場費', description:'4月練習会場費',         amount: 20000, type:'expense' },
+  { id:'4', date:'2024-05-01', category:'団費',   description:'5月分団費 20名分',     amount:100000, type:'income'  },
+  { id:'5', date:'2024-05-08', category:'楽器費', description:'チューナー購入',        amount:  8000, type:'expense' },
+  { id:'6', date:'2024-05-10', category:'会場費', description:'5月練習会場費',         amount: 20000, type:'expense' },
+  { id:'7', date:'2024-06-01', category:'団費',   description:'6月分団費 20名分',     amount:100000, type:'income'  },
+  { id:'8', date:'2024-06-15', category:'演奏会費','description':'定演チラシ印刷代', amount: 35000, type:'expense' },
+];
+
+let allEntries = [];
+
+function fmt(n) {
+  return '¥' + Number(n).toLocaleString('ja-JP');
+}
+
+function updateSummary(entries) {
+  const income  = entries.filter(e => e.type === 'income').reduce((s,e) => s + e.amount, 0);
+  const expense = entries.filter(e => e.type === 'expense').reduce((s,e) => s + e.amount, 0);
+  document.getElementById('total-income').textContent  = fmt(income);
+  document.getElementById('total-expense').textContent = fmt(expense);
+  const bal = document.getElementById('total-balance');
+  bal.textContent = fmt(income - expense);
+  bal.className = `summary-card__value ${income - expense >= 0 ? 'balance' : 'expense'}`;
+}
+
+function getFiltered() {
+  const year    = document.getElementById('filter-year').value;
+  const type    = document.getElementById('filter-type').value;
+  const cat     = document.getElementById('filter-category').value;
+  const kw      = document.getElementById('filter-keyword').value.toLowerCase();
+  return allEntries.filter(e => {
+    if (year && !e.date.startsWith(year)) return false;
+    if (type && e.type !== type) return false;
+    if (cat  && e.category !== cat) return false;
+    if (kw   && !e.description.toLowerCase().includes(kw)) return false;
+    return true;
+  });
+}
+
+function renderTable() {
+  const filtered = getFiltered();
+  updateSummary(filtered);
+
+  const tbody = document.getElementById('ledger-tbody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:var(--space-10);color:var(--gray-500);">該当する仕訳がありません</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(e => `
+    <tr>
+      <td style="white-space:nowrap;">${e.date}</td>
+      <td><span class="badge badge-navy">${e.category}</span></td>
+      <td>${e.description}</td>
+      <td class="amount-cell income">${e.type === 'income' ? fmt(e.amount) : ''}</td>
+      <td class="amount-cell expense">${e.type === 'expense' ? fmt(e.amount) : ''}</td>
+      <td>
+        <button class="btn btn-sm btn-outline" onclick="deleteEntry('${e.id}')" style="color:var(--danger);border-color:var(--danger);">削除</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function deleteEntry(id) {
+  if (!confirm('この仕訳を削除しますか？')) return;
+  allEntries = allEntries.filter(e => e.id !== id);
+  if (_sb) _sb.from('ledger_entries').delete().eq('id', id);
+  showToast('削除しました', 'success');
+  renderTable();
+}
+
+// CSV出力
+function downloadCSV() {
+  const filtered = getFiltered();
+  const rows = [['日付','カテゴリ','摘要','収入','支出']];
+  filtered.forEach(e => rows.push([
+    e.date, e.category, e.description,
+    e.type === 'income'  ? e.amount : '',
+    e.type === 'expense' ? e.amount : '',
+  ]));
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+  a.download = `出納帳_${document.getElementById('filter-year').value || '全期間'}.csv`;
+  a.click();
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  // 年度セレクトを動的生成
+  const yearSel = document.getElementById('filter-year');
+  const curYear = new Date().getFullYear();
+  yearSel.innerHTML = `<option value="">全期間</option>` +
+    [0,1,2].map(i => `<option value="${curYear-i}">${curYear-i}年</option>`).join('');
+
+  // データ取得
+  const { data: ledgerData, error: ledgerError } = await DB.ledger.list();
+  if (ledgerError) {
+    console.warn('[HighasuiDX] 出納帳データ取得失敗。デモデータを表示します。');
+  }
+  allEntries = (ledgerData && ledgerData.length > 0) ? ledgerData : DEMO_ENTRIES;
+  renderTable();
+
+  // フィルターイベント
+  ['filter-year','filter-type','filter-category'].forEach(id =>
+    document.getElementById(id).addEventListener('change', renderTable));
+  document.getElementById('filter-keyword').addEventListener('input', renderTable);
+  document.getElementById('btn-csv').addEventListener('click', downloadCSV);
+
+  // 今日の日付をデフォルト
+  document.getElementById('add-date').valueAsDate = new Date();
+
+  // 保存
+  document.getElementById('btn-save-entry').addEventListener('click', async () => {
+    const date    = document.getElementById('add-date').value;
+    const type    = document.getElementById('add-type').value;
+    const cat     = document.getElementById('add-category').value;
+    const amount  = parseInt(document.getElementById('add-amount').value);
+    const desc    = document.getElementById('add-description').value.trim();
+
+    if (!date || !cat || !desc || isNaN(amount) || amount <= 0) {
+      showToast('すべての必須項目を入力してください', 'error'); return;
+    }
+
+    const entry = { id: Date.now().toString(), date, type, category: cat, amount, description: desc };
+
+    if (_sb) {
+      const { data, error } = await _sb.from('ledger_entries').insert({
+        date, type, category: cat, amount, description: desc
+      }).select().single();
+      if (error) { showToast('保存に失敗しました', 'error'); return; }
+      entry.id = data.id;
+    }
+
+    allEntries.unshift(entry);
+    renderTable();
+    closeModal('modal-add');
+    showToast('仕訳を追加しました', 'success');
+
+    document.getElementById('add-amount').value = '';
+    document.getElementById('add-description').value = '';
+    document.getElementById('add-date').valueAsDate = new Date();
+  });
+});
+</script>
+</body>
+</html>

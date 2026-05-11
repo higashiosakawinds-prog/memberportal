@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>東大阪吹奏楽団 DXシステム</title>
+  <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/common.css">
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<header class="site-header" id="site-header"></header>
+
+<!-- サイドバーオーバーレイ（モバイル） -->
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<!-- アプリレイアウト -->
+<div class="app-layout">
+  <!-- サイドバー -->
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <!-- メインコンテンツ -->
+  <main class="main-content">
+
+    <!-- ページヘッダー -->
+    <div class="page-header fade-in">
+      <div>
+        <p class="page-header__eyebrow">DASHBOARD</p>
+        <h1 class="page-header__title">ダッシュボード</h1>
+      </div>
+      <div class="page-header__actions">
+        <span id="current-date" style="font-size:var(--text-sm);color:var(--gray-500);"></span>
+      </div>
+    </div>
+
+    <!-- 統計カード -->
+    <div class="grid grid-3 mb-8">
+      <div class="stat-card fade-in fade-in-1">
+        <p class="stat-card__number" id="stat-members">—</p>
+        <p class="stat-card__label">登録団員数</p>
+      </div>
+      <div class="stat-card fade-in fade-in-2">
+        <p class="stat-card__number" id="stat-scores">—</p>
+        <p class="stat-card__label">登録楽譜数</p>
+      </div>
+      <div class="stat-card fade-in fade-in-3">
+        <p class="stat-card__number" id="stat-requests">—</p>
+        <p class="stat-card__label">未処理申請</p>
+      </div>
+    </div>
+
+    <!-- お知らせ -->
+    <div class="alert alert-info mb-8 fade-in fade-in-4">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/>
+      </svg>
+      <div>
+        <strong>蔵書委員会の主な役割：</strong>
+        楽譜の登録・PDF管理・パート別配布設定・貸出申請の承認。
+        配布設定した楽譜は、団員のマイページに自動表示されます（ウォーターマーク付き）。
+      </div>
+    </div>
+
+    <!-- 配布中の楽譜 -->
+    <div class="mb-6 fade-in fade-in-4">
+      <p class="page-header__eyebrow">SCORES</p>
+      <h2 class="page-header__title" style="font-size:var(--text-2xl);">配布中の楽譜</h2>
+    </div>
+    <div id="distributed-scores-wrap" class="mb-8 fade-in fade-in-4">
+      <div style="text-align:center;padding:var(--space-8);color:var(--gray-500);">
+        <div class="loading-spinner" style="margin:0 auto var(--space-3);"></div>
+        <p style="font-size:var(--text-sm);">楽譜データを読み込み中…</p>
+      </div>
+    </div>
+
+    <!-- 機能メニュー -->
+    <div class="mb-6 fade-in fade-in-5">
+      <p class="page-header__eyebrow">MENU</p>
+      <h2 class="page-header__title" style="font-size:var(--text-2xl);">機能メニュー</h2>
+    </div>
+
+    <div class="grid grid-3" id="menu-grid">
+
+      <!-- 楽譜管理 -->
+      <a href="pages/scores.html" class="card card--elevated fade-in fade-in-1" style="display:block;transition:transform var(--transition-base),box-shadow var(--transition-base);"
+         onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='var(--shadow-lg)'"
+         onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div class="card__body">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:var(--space-4);">
+            <div style="width:48px;height:48px;background:var(--navy-800);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--gold-400)" stroke-width="1.5" width="26" height="26">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z"/>
+              </svg>
+            </div>
+            <span class="badge badge-navy" style="font-size:10px;letter-spacing:.1em;">SCORES</span>
+          </div>
+          <h3 style="font-size:var(--text-lg);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-2);">楽譜管理</h3>
+          <p style="font-size:var(--text-sm);color:var(--gray-500);line-height:1.6;margin-bottom:var(--space-4);">曲目の登録・PDFアップロード・パートタグの管理。ファイル名からパートを自動判定します。</p>
+          <span style="font-size:var(--text-sm);color:var(--navy-600);font-weight:500;">管理する →</span>
+        </div>
+      </a>
+
+      <!-- 配布・貸出管理 -->
+      <a href="pages/distribution.html" class="card card--elevated fade-in fade-in-2" style="display:block;transition:transform var(--transition-base),box-shadow var(--transition-base);"
+         onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='var(--shadow-lg)'"
+         onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div class="card__body">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:var(--space-4);">
+            <div style="width:48px;height:48px;background:var(--navy-800);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--gold-400)" stroke-width="1.5" width="26" height="26">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z"/>
+              </svg>
+            </div>
+            <span class="badge badge-navy" style="font-size:10px;letter-spacing:.1em;">DISTRIBUTION</span>
+          </div>
+          <h3 style="font-size:var(--text-lg);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-2);">配布・貸出管理</h3>
+          <p style="font-size:var(--text-sm);color:var(--gray-500);line-height:1.6;margin-bottom:var(--space-4);">パート別の配布設定・表示期間の管理・レンタル申請の承認。貸出ログも確認できます。</p>
+          <span style="font-size:var(--text-sm);color:var(--navy-600);font-weight:500;">管理する →</span>
+        </div>
+      </a>
+
+      <!-- 曲目リスト -->
+      <a href="pages/repertoire.html" class="card card--elevated fade-in fade-in-3" style="display:block;transition:transform var(--transition-base),box-shadow var(--transition-base);"
+         onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='var(--shadow-lg)'"
+         onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div class="card__body">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:var(--space-4);">
+            <div style="width:48px;height:48px;background:var(--gray-200);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--gray-500)" stroke-width="1.5" width="26" height="26">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"/>
+              </svg>
+            </div>
+            <span class="badge badge-navy" style="font-size:10px;letter-spacing:.1em;">REPERTOIRE</span>
+          </div>
+          <h3 style="font-size:var(--text-lg);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-2);">曲目リスト</h3>
+          <p style="font-size:var(--text-sm);color:var(--gray-500);line-height:1.6;margin-bottom:var(--space-4);">演奏会候補曲・レパートリーの管理。難易度・編成・演奏時間などを記録できます。</p>
+          <span style="font-size:var(--text-sm);color:var(--navy-600);font-weight:500;">管理する →</span>
+        </div>
+      </a>
+
+      <!-- 会計 -->
+      <a href="pages/ledger.html" class="card card--elevated fade-in fade-in-1" style="display:block;transition:transform var(--transition-base),box-shadow var(--transition-base);"
+         onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='var(--shadow-lg)'"
+         onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div class="card__body">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:var(--space-4);">
+            <div style="width:48px;height:48px;background:var(--navy-800);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--gold-400)" stroke-width="1.5" width="26" height="26">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/>
+              </svg>
+            </div>
+            <span class="badge badge-gold" style="font-size:10px;letter-spacing:.1em;">ACCOUNTING</span>
+          </div>
+          <h3 style="font-size:var(--text-lg);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-2);">会計</h3>
+          <p style="font-size:var(--text-sm);color:var(--gray-500);line-height:1.6;margin-bottom:var(--space-4);">出納帳・収支報告書・団費収入管理。CSVダウンロードや未払い者へのメール送信も可能。</p>
+          <span style="font-size:var(--text-sm);color:var(--navy-600);font-weight:500;">管理する →</span>
+        </div>
+      </a>
+
+      <!-- 楽器管理 -->
+      <a href="pages/instruments.html" class="card card--elevated fade-in fade-in-2" style="display:block;transition:transform var(--transition-base),box-shadow var(--transition-base);"
+         onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='var(--shadow-lg)'"
+         onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div class="card__body">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:var(--space-4);">
+            <div style="width:48px;height:48px;background:var(--navy-800);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--gold-400)" stroke-width="1.5" width="26" height="26">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"/>
+              </svg>
+            </div>
+            <span class="badge badge-navy" style="font-size:10px;letter-spacing:.1em;">INSTRUMENTS</span>
+          </div>
+          <h3 style="font-size:var(--text-lg);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-2);">楽器管理</h3>
+          <p style="font-size:var(--text-sm);color:var(--gray-500);line-height:1.6;margin-bottom:var(--space-4);">団所有楽器の一覧・QRコード読み取り検索・外部貸出管理・QRコードラベル印刷。</p>
+          <span style="font-size:var(--text-sm);color:var(--navy-600);font-weight:500;">管理する →</span>
+        </div>
+      </a>
+
+      <!-- 連絡網 -->
+      <a href="pages/contact.html" class="card card--elevated fade-in fade-in-3" style="display:block;transition:transform var(--transition-base),box-shadow var(--transition-base);"
+         onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='var(--shadow-lg)'"
+         onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div class="card__body">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:var(--space-4);">
+            <div style="width:48px;height:48px;background:var(--navy-800);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--gold-400)" stroke-width="1.5" width="26" height="26">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>
+              </svg>
+            </div>
+            <span class="badge badge-navy" style="font-size:10px;letter-spacing:.1em;">CONTACT</span>
+          </div>
+          <h3 style="font-size:var(--text-lg);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-2);">連絡網</h3>
+          <p style="font-size:var(--text-sm);color:var(--gray-500);line-height:1.6;margin-bottom:var(--space-4);">役職別のメールアドレスに一斉送信。役職を選択して本文を書き、送信するだけ。</p>
+          <span style="font-size:var(--text-sm);color:var(--navy-600);font-weight:500;">管理する →</span>
+        </div>
+      </a>
+
+      <!-- 団員申請 -->
+      <a href="pages/requests.html" class="card card--elevated fade-in fade-in-1" style="display:block;transition:transform var(--transition-base),box-shadow var(--transition-base);grid-column: span 3 / auto;"
+         onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='var(--shadow-lg)'"
+         onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div class="card__body" style="display:flex;align-items:center;gap:var(--space-6);">
+          <div style="flex-shrink:0;width:48px;height:48px;background:var(--navy-800);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--gold-400)" stroke-width="1.5" width="26" height="26">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"/>
+            </svg>
+          </div>
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-1);">
+              <h3 style="font-size:var(--text-lg);font-weight:700;color:var(--navy-800);">団員申請</h3>
+              <span class="badge badge-danger">2件 未処理</span>
+            </div>
+            <p style="font-size:var(--text-sm);color:var(--gray-500);">楽譜・楽器の貸出申請、休団・復団・退団申請の受付と管理。</p>
+          </div>
+          <span style="font-size:var(--text-sm);color:var(--navy-600);font-weight:500;flex-shrink:0;">確認する →</span>
+        </div>
+      </a>
+
+    </div><!-- /grid -->
+
+  </main><!-- /main-content -->
+</div><!-- /app-layout -->
+
+<!-- トースト通知コンテナ -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- JS -->
+<script src="js/supabase.js"></script>
+<script src="js/scorelib-fetch.js"></script>
+<script src="js/common.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  // 日付表示
+  const d = new Date();
+  document.getElementById('current-date').textContent =
+    `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+
+  const user     = getSessionUser();
+  const userPart = user?.part ?? null;
+
+  // ─── 統計カード（Supabase接続時）───
+  if (_sb) {
+    const [{ count: mc }, { count: sc }, { count: rc }] = await Promise.all([
+      _sb.from('profiles').select('*', { count:'exact', head:true }),
+      _sb.from('scores').select('*', { count:'exact', head:true }).eq('is_distributed', true),
+      _sb.from('requests').select('*', { count:'exact', head:true }).eq('status', 'pending'),
+    ]);
+    document.getElementById('stat-members').textContent  = mc ?? '—';
+    document.getElementById('stat-scores').textContent   = sc ?? '—';
+    document.getElementById('stat-requests').textContent = rc ?? '—';
+  }
+
+  // ─── 配布中の楽譜を一覧表示 ───
+  const wrap = document.getElementById('distributed-scores-wrap');
+
+  try {
+    // GASからデータ取得
+    const { songs: gasSongs = [] } = await fetchSongs();
+
+    // Supabaseから配布フラグ付きデータ取得
+    let supaScores = [];
+    if (_sb) {
+      const { data } = await _sb.from('scores').select('*').eq('is_distributed', true);
+      supaScores = data ?? [];
+    }
+
+    // マージ（配布中のみ）
+    const merged = mergeScoresData(gasSongs, supaScores)
+      .filter(s => s.is_distributed);
+
+    if (merged.length === 0) {
+      wrap.innerHTML = `
+        <div style="text-align:center;padding:var(--space-8);color:var(--gray-500);background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--gray-200);">
+          <p style="font-size:var(--text-sm);">現在配布中の楽譜はありません。</p>
+        </div>`;
+      return;
+    }
+
+    // テーブル描画
+    const rows = merged.map(s => {
+      // ログインユーザーのパートに一致するPDFを探す
+      const myPart = s.gasparts?.find(p => p.key === userPart);
+      const hasPdf = !!myPart?.fileId;
+
+      return `
+        <tr>
+          <td style="font-weight:600;color:var(--navy-800);">${s.title}</td>
+          <td style="font-size:var(--text-xs);color:var(--gray-500);">
+            ${s.gasparts?.length ?? s.parts.length}パート
+          </td>
+          <td>
+            ${hasPdf
+              ? `<button class="btn btn-sm btn-gold"
+                   onclick="openDashPdf('${myPart.fileId}','${s.title}')">
+                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="13" height="13">
+                     <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z"/>
+                   </svg>
+                   印刷
+                 </button>`
+              : `<a href="pages/scores.html" class="btn btn-sm btn-outline">詳細を見る</a>`}
+          </td>
+        </tr>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <div style="border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--gray-200);">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>曲名</th>
+              <th>パート数</th>
+              <th style="width:130px;">あなたのパート</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+
+  } catch (e) {
+    console.warn('[HighasuiDX] 配布中楽譜の取得失敗:', e.message);
+    wrap.innerHTML = `
+      <div style="text-align:center;padding:var(--space-6);color:var(--gray-500);background:var(--white);border-radius:var(--radius-lg);border:1px dashed var(--gray-300);">
+        <p style="font-size:var(--text-sm);">楽譜データの取得に失敗しました。</p>
+      </div>`;
+  }
+});
+
+// ダッシュボードからPDFプレビューを開く（新タブで直接開く）
+function openDashPdf(fileId, title) {
+  window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank', 'noopener');
+}
+</script>
+</body>
+</html>

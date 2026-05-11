@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>団員一覧 — 東大阪吹奏楽団</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/common.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .search-bar { display:flex; gap:var(--space-3); margin-bottom:var(--space-6); flex-wrap:wrap; }
+    .search-bar input, .search-bar select { flex:1; min-width:160px; }
+    .member-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:var(--space-4); }
+    .member-card {
+      background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-lg);
+      padding:var(--space-5); display:flex; align-items:center; gap:var(--space-4);
+      transition:box-shadow var(--transition-base), transform var(--transition-base);
+    }
+    .member-card:hover { box-shadow:var(--shadow-md); transform:translateY(-2px); }
+    .member-avatar {
+      width:48px; height:48px; border-radius:50%;
+      background:var(--navy-800); color:var(--gold-400);
+      display:flex; align-items:center; justify-content:center;
+      font-family:var(--font-display); font-size:var(--text-lg); font-weight:700; flex-shrink:0;
+    }
+    .member-name { font-weight:700; color:var(--navy-800); margin-bottom:2px; }
+    .member-meta { font-size:var(--text-xs); color:var(--gray-500); }
+    .part-filter { display:flex; gap:var(--space-2); flex-wrap:wrap; margin-bottom:var(--space-4); }
+    .part-chip {
+      padding:var(--space-1) var(--space-3); border-radius:var(--radius-full);
+      font-size:var(--text-xs); font-weight:500; cursor:pointer;
+      border:1px solid var(--gray-300); background:var(--white); color:var(--gray-600);
+      transition:all var(--transition-fast);
+    }
+    .part-chip.active { background:var(--navy-800); color:var(--gold-300); border-color:var(--navy-800); }
+  </style>
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main-content">
+    <div class="page-header fade-in">
+      <div>
+        <p class="page-header__eyebrow">MEMBERS</p>
+        <h1 class="page-header__title">団員一覧</h1>
+      </div>
+      <div class="page-header__actions">
+        <span id="member-count" style="font-size:var(--text-sm);color:var(--gray-500);"></span>
+        <a href="auth/register.html" class="btn btn-gold">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+          新規登録
+        </a>
+      </div>
+    </div>
+
+    <!-- 検索・フィルター -->
+    <div class="card fade-in fade-in-1 mb-6">
+      <div class="card__body">
+        <div class="search-bar">
+          <input type="text" id="search-input" class="form-control" placeholder="氏名・フリガナで検索…">
+          <select id="filter-category" class="form-control" style="max-width:160px;">
+            <option value="">すべての区分</option>
+            <option value="regular">正団員</option>
+            <option value="trainee">準団員</option>
+            <option value="rest">休団中</option>
+            <option value="support">賛助</option>
+          </select>
+          <select id="filter-role" class="form-control" style="max-width:160px;">
+            <option value="">すべての役職</option>
+            <option value="admin">管理者</option>
+            <option value="conductor">指揮者</option>
+            <option value="manager">運営委員</option>
+            <option value="treasurer">会計</option>
+            <option value="librarian">蔵書委員</option>
+            <option value="member">一般団員</option>
+          </select>
+        </div>
+        <div class="part-filter" id="part-filter"></div>
+      </div>
+    </div>
+
+    <!-- 団員グリッド -->
+    <div class="member-grid fade-in fade-in-2" id="member-grid">
+      <div style="grid-column:1/-1;text-align:center;padding:var(--space-16);color:var(--gray-500);">
+        <div class="loading-spinner" style="margin:0 auto var(--space-4);"></div>
+        <p>読み込み中…</p>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="toast-container" id="toast-container"></div>
+<script src="../js/supabase.js"></script>
+<script src="../js/common.js"></script>
+<script>
+const PART_LABELS = {
+  flute:'フルート', oboe:'オーボエ', clarinet:'クラリネット', bassoon:'ファゴット',
+  saxophone:'サクソフォーン', horn:'ホルン', trumpet:'トランペット', trombone:'トロンボーン',
+  euphonium:'ユーフォニアム', tuba:'テューバ', percussion:'打楽器', contrabass:'コントラバス',
+  piano:'ピアノ', staff:'スタッフ', other:'その他',
+};
+const CATEGORY_LABELS = { regular:'正団員', trainee:'準団員', rest:'休団中', support:'賛助' };
+const CATEGORY_BADGE  = { regular:'badge-success', trainee:'badge-navy', rest:'badge-warning', support:'badge-gold' };
+
+// ★ 修正: DEMO_MEMBERS を roles 配列形式に統一（旧 role 単数形から変更）
+const DEMO_MEMBERS = [
+  { id:'1', last_name:'山田', first_name:'太郎', last_kana:'ヤマダ', first_kana:'タロウ', part:'clarinet', roles:['admin'], category:'regular' },
+  { id:'2', last_name:'鈴木', first_name:'花子', last_kana:'スズキ', first_kana:'ハナコ', part:'flute', roles:['conductor'], category:'regular' },
+  { id:'3', last_name:'田中', first_name:'一郎', last_kana:'タナカ', first_kana:'イチロウ', part:'trumpet', roles:['manager'], category:'regular' },
+  { id:'4', last_name:'佐藤', first_name:'美咲', last_kana:'サトウ', first_kana:'ミサキ', part:'horn', roles:['treasurer'], category:'regular' },
+  { id:'5', last_name:'伊藤', first_name:'健太', last_kana:'イトウ', first_kana:'ケンタ', part:'trombone', roles:['librarian'], category:'regular' },
+  { id:'6', last_name:'渡辺', first_name:'さくら', last_kana:'ワタナベ', first_kana:'サクラ', part:'saxophone', roles:['member'], category:'regular' },
+  { id:'7', last_name:'中村', first_name:'大輔', last_kana:'ナカムラ', first_kana:'ダイスケ', part:'tuba', roles:['member'], category:'regular' },
+  { id:'8', last_name:'小林', first_name:'恵', last_kana:'コバヤシ', first_kana:'メグミ', part:'percussion', roles:['member'], category:'trainee' },
+  { id:'9', last_name:'加藤', first_name:'浩二', last_kana:'カトウ', first_kana:'コウジ', part:'euphonium', roles:['member'], category:'rest' },
+];
+
+let allMembers = [];
+let activePartFilter = '';
+
+function buildPartFilter(members) {
+  const parts = [...new Set(members.map(m => m.part).filter(Boolean))].sort();
+  const wrap = document.getElementById('part-filter');
+  wrap.innerHTML = `<button class="part-chip active" data-part="">すべて</button>` +
+    parts.map(p => `<button class="part-chip" data-part="${p}">${PART_LABELS[p] ?? p}</button>`).join('');
+  wrap.querySelectorAll('.part-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activePartFilter = btn.dataset.part;
+      wrap.querySelectorAll('.part-chip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderGrid();
+    });
+  });
+}
+
+function renderGrid() {
+  const keyword  = document.getElementById('search-input').value.trim().toLowerCase();
+  const category = document.getElementById('filter-category').value;
+  const roleFilter = document.getElementById('filter-role').value;
+
+  const filtered = allMembers.filter(m => {
+    const name = `${m.last_name}${m.first_name}${m.last_kana}${m.first_kana}`.toLowerCase();
+    if (keyword && !name.includes(keyword)) return false;
+    if (category && m.category !== category) return false;
+
+    // ★ 修正: roles は text[] 配列。旧形式（role: 文字列）との互換性も維持する
+    if (roleFilter) {
+      const memberRoles = Array.isArray(m.roles) ? m.roles : [m.role].filter(Boolean);
+      if (!memberRoles.includes(roleFilter)) return false;
+    }
+
+    if (activePartFilter && m.part !== activePartFilter) return false;
+    return true;
+  });
+
+  document.getElementById('member-count').textContent = `${filtered.length}名`;
+
+  const grid = document.getElementById('member-grid');
+  if (filtered.length === 0) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:var(--space-16);color:var(--gray-500);">該当する団員が見つかりません</div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(m => {
+    const initial = m.last_name?.[0] ?? '?';
+    const catCls  = CATEGORY_BADGE[m.category] ?? 'badge-navy';
+    // ★ 修正: roles 配列から表示用バッジを生成（renderRoleBadges は common.js で定義）
+    const roleBadges = typeof renderRoleBadges === 'function'
+      ? renderRoleBadges(Array.isArray(m.roles) ? m.roles : [m.role].filter(Boolean))
+      : '';
+    return `
+      <div class="member-card">
+        <div class="member-avatar">${initial}</div>
+        <div>
+          <div class="member-name">${m.last_name} ${m.first_name}
+            <span style="font-size:var(--text-xs);font-weight:400;color:var(--gray-500);margin-left:4px;">${m.last_kana} ${m.first_kana}</span>
+          </div>
+          <div class="member-meta" style="margin-bottom:4px;">${PART_LABELS[m.part] ?? '—'} ／ <span style="display:inline-flex;gap:3px;">${roleBadges}</span></div>
+          <span class="badge ${catCls}">${CATEGORY_LABELS[m.category] ?? '—'}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const { data: membersData, error: membersError } = await DB.profiles.list();
+  if (membersError) {
+    console.warn('[HighasuiDX] 団員データ取得失敗。デモデータを表示します。');
+  }
+  allMembers = (membersData && membersData.length > 0) ? membersData : DEMO_MEMBERS;
+  buildPartFilter(allMembers);
+  renderGrid();
+
+  document.getElementById('search-input').addEventListener('input', renderGrid);
+  document.getElementById('filter-category').addEventListener('change', renderGrid);
+  document.getElementById('filter-role').addEventListener('change', renderGrid);
+});
+</script>
+</body>
+</html>
