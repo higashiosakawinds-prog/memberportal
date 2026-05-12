@@ -33,6 +33,16 @@
     }
     .readonly-notice svg { flex-shrink:0; margin-top:2px; }
 
+    /* ── GAS連携エラー通知 ── */
+    .gas-error-notice {
+      display:none; gap:var(--space-3); align-items:flex-start;
+      background:#fff0f0; border:1px solid #fcc;
+      border-radius:var(--radius-md); padding:var(--space-3) var(--space-4);
+      font-size:var(--text-sm); color:#c0392b; margin-bottom:var(--space-6);
+    }
+    .gas-error-notice svg { flex-shrink:0; margin-top:2px; }
+    .gas-error-notice.visible { display:flex; }
+
     /* ── 詳細モーダル パートリスト ── */
     .part-pdf-row {
       display:flex; align-items:center; gap:var(--space-3);
@@ -65,6 +75,15 @@
 
     /* ── 登録モーダル ── */
     .form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); }
+
+    /* ── datalist 補完インジケータ ── */
+    .title-input-wrap { position:relative; }
+    .title-match-badge {
+      display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%);
+      font-size:10px; background:rgba(26,140,100,0.12); color:#1a7a55;
+      padding:2px 8px; border-radius:var(--radius-full); font-weight:600; pointer-events:none;
+    }
+    .title-match-badge.visible { display:block; }
 
     @media(max-width:768px){
       .toolbar { flex-direction:column; }
@@ -102,6 +121,18 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/>
       </svg>
       <span>楽譜の閲覧・印刷が行えます。配布設定・楽譜の追加は管理者または蔵書委員が行います。</span>
+    </div>
+
+    <!-- GAS連携エラー通知 -->
+    <div class="gas-error-notice fade-in" id="gas-error-notice">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+      </svg>
+      <div>
+        <strong>スプレッドシートからのデータ取得に失敗しました。</strong><br>
+        <span id="gas-error-detail"></span><br>
+        <small>スプレッドシートが「ウェブに公開」済みであること、GASで <code>updateJsonOutput()</code> を実行済みであることを確認してください。</small>
+      </div>
     </div>
 
     <!-- 検索ツールバー -->
@@ -211,32 +242,44 @@
 </div>
 
 <!-- ══════════════════════════════════════
-     楽譜登録モーダル（管理者・蔵書委員のみ）
+     楽譜情報登録・編集モーダル（管理者・蔵書委員のみ）
      ══════════════════════════════════════ -->
 <div class="modal-overlay" id="modal-add">
   <div class="modal" style="max-width:600px;">
     <div class="modal__header">
-      <h2 class="modal__title">楽譜情報を登録</h2>
+      <h2 class="modal__title" id="modal-add-title">楽譜情報を登録</h2>
       <button class="modal__close" onclick="closeModal('modal-add')">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
     </div>
     <div class="modal__body">
+
       <!-- GASとの連携説明 -->
-      <div class="alert alert-info mb-6" style="font-size:var(--text-xs);line-height:1.7;">
+      <div class="alert alert-info" style="font-size:var(--text-xs);line-height:1.7;margin-bottom:var(--space-5);">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
         <div>
           <strong>PDFファイルはGASで管理されます。</strong><br>
-          楽譜PDFのアップロードはGoogle Apps Script側で行ってください。<br>
-          ここでは配布設定・作曲者情報などの補足情報を登録します。
+          楽譜PDFのアップロードはGASの管理画面で行ってください。<br>
+          ここでは配布設定・作曲者情報などの<strong>補足情報をSupabaseに登録</strong>します。<br>
+          曲名の入力欄では、GASに登録済みの曲名が候補として表示されます。
         </div>
       </div>
 
+      <!-- 曲名（datalist補完付き） -->
       <div class="form-group">
         <label class="form-label">曲名 <span class="required">*</span></label>
-        <input type="text" id="add-title" class="form-control" placeholder="例：吹奏楽のための第一組曲">
-        <span class="form-hint">GASのスプレッドシートの曲名と完全一致させてください。</span>
+        <div class="title-input-wrap">
+          <input type="text" id="add-title" class="form-control"
+            placeholder="曲名を入力（または候補から選択）…"
+            list="gas-songs-datalist" autocomplete="off">
+          <span class="title-match-badge" id="title-match-badge">GAS一致</span>
+        </div>
+        <datalist id="gas-songs-datalist"></datalist>
+        <span class="form-hint" id="add-title-hint">
+          GASに登録済みの曲名と一致させると、PDFと自動的に紐づきます。
+        </span>
       </div>
+
       <div class="form-grid-2">
         <div class="form-group">
           <label class="form-label">作曲者</label>
@@ -283,8 +326,10 @@ const PART_LABEL_MAP = {
 // ═══════════════════════════════════════════
 //  状態
 // ═══════════════════════════════════════════
-let allScores = [];  // 内部形式の楽曲配列（mergeScoresData の戻り値）
-let isEditor  = false;
+let allScores   = [];   // 内部形式の楽曲配列
+let gasSongTitles = []; // GASから取得した曲名一覧（datalist用）
+let isEditor    = false;
+let editingScoreId = null; // 編集中の楽曲ID（新規登録時はnull）
 
 // ═══════════════════════════════════════════
 //  権限チェック
@@ -322,7 +367,7 @@ function renderTable() {
 
   tbody.innerHTML = filtered.map(s => `
     <tr style="cursor:pointer;" onclick="openDetail('${s.id}')">
-      <td style="font-weight:600;color:var(--navy-800);">${s.title}</td>
+      <td style="font-weight:600;color:var(--navy-800);">${escHtml(s.title)}</td>
       <td style="font-size:var(--text-xs);color:var(--gray-500);">
         ${s.created_at ? s.created_at.slice(0,10) : '—'}
       </td>
@@ -338,6 +383,12 @@ function renderTable() {
   `).join('');
 }
 
+// XSS対策
+function escHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 // ═══════════════════════════════════════════
 //  詳細モーダル
 // ═══════════════════════════════════════════
@@ -349,27 +400,24 @@ function openDetail(id) {
   const userPart = user?.part ?? null;
   const gasparts = s.gasparts ?? [];
 
-  // パートリスト（PDFが紐づいているもの）
+  // パートリスト
   const pdfRows = gasparts.length > 0
     ? gasparts.map(p => {
         const labelDisp = PART_LABEL_MAP[p.key] ?? p.name;
         const isMyPart  = p.key === userPart;
         const hasFile   = !!p.fileId;
-
         return `
           <div class="part-pdf-row">
             <div style="flex:1;min-width:0;">
               <div class="part-pdf-row__label">
-                ${labelDisp}
+                ${escHtml(labelDisp)}
                 ${isMyPart ? '<span class="my-part-badge">あなたのパート</span>' : ''}
               </div>
-              ${p.fileName
-                ? `<div class="part-pdf-row__filename">${p.fileName}</div>`
-                : ''}
+              ${p.fileName ? `<div class="part-pdf-row__filename">${escHtml(p.fileName)}</div>` : ''}
             </div>
             ${hasFile
               ? `<button class="btn btn-sm btn-primary"
-                   onclick="openPdfPreview('${p.fileId}','${s.title} — ${labelDisp}')">
+                   onclick="openPdfPreview('${escHtml(p.fileId)}','${escHtml(s.title + ' — ' + labelDisp)}')">
                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="13" height="13">
                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.641 0-8.573-3.007-9.963-7.178z"/>
                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -377,20 +425,31 @@ function openDetail(id) {
                    開く・印刷
                  </button>`
               : `<span style="font-size:var(--text-xs);color:var(--gray-400);">PDF未登録</span>`}
-          </div>
-        `;
+          </div>`;
       }).join('')
     : `<p style="font-size:var(--text-sm);color:var(--gray-400);padding:var(--space-4) 0;">
          GASにパートデータがありません。スプレッドシートを確認してください。
        </p>`;
 
+  // GASマッチ状況
+  const hasGasData = gasparts.length > 0;
+  const gasStatusBadge = hasGasData
+    ? `<span style="font-size:10px;background:rgba(26,140,100,0.12);color:#1a7a55;padding:1px 8px;border-radius:var(--radius-full);font-weight:600;">GAS連携済み</span>`
+    : `<span style="font-size:10px;background:rgba(160,160,160,0.12);color:#888;padding:1px 8px;border-radius:var(--radius-full);">GAS未連携</span>`;
+
   document.getElementById('detail-title').textContent = s.title;
   document.getElementById('detail-body').innerHTML = `
+    <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-4);">
+      ${s.supaId
+        ? `<span style="font-size:10px;background:rgba(26,46,74,0.08);color:var(--navy-700);padding:1px 8px;border-radius:var(--radius-full);">Supabase登録済み</span>`
+        : `<span style="font-size:10px;background:rgba(201,168,76,0.15);color:#8a6f1e;padding:1px 8px;border-radius:var(--radius-full);">Supabase未登録</span>`}
+      ${gasStatusBadge}
+    </div>
     ${s.composer || s.arranger || s.notes ? `
       <dl style="display:grid;grid-template-columns:80px 1fr;gap:var(--space-2) var(--space-4);font-size:var(--text-sm);margin-bottom:var(--space-5);">
-        ${s.composer ? `<dt style="color:var(--gray-500);">作曲者</dt><dd>${s.composer}</dd>` : ''}
-        ${s.arranger ? `<dt style="color:var(--gray-500);">編曲者</dt><dd>${s.arranger}</dd>` : ''}
-        ${s.notes    ? `<dt style="color:var(--gray-500);">備考</dt><dd>${s.notes}</dd>`    : ''}
+        ${s.composer ? `<dt style="color:var(--gray-500);">作曲者</dt><dd>${escHtml(s.composer)}</dd>` : ''}
+        ${s.arranger ? `<dt style="color:var(--gray-500);">編曲者</dt><dd>${escHtml(s.arranger)}</dd>` : ''}
+        ${s.notes    ? `<dt style="color:var(--gray-500);">備考</dt><dd>${escHtml(s.notes)}</dd>`    : ''}
       </dl>
     ` : ''}
     <p style="font-size:var(--text-xs);font-weight:700;color:var(--navy-800);letter-spacing:.1em;text-transform:uppercase;margin-bottom:var(--space-3);">
@@ -399,12 +458,16 @@ function openDetail(id) {
     ${pdfRows}
   `;
 
-  // フッターボタン（編集権限あり：配布切替・削除）
+  // フッターボタン（編集権限あり：補足情報編集・配布切替・削除）
   const footer = document.getElementById('detail-footer');
   footer.innerHTML = isEditor
     ? `<button class="btn btn-danger btn-sm" onclick="deleteScore('${id}')">削除</button>
        <span style="flex:1;"></span>
        <button class="btn btn-outline" onclick="closeModal('modal-detail')">閉じる</button>
+       <button class="btn btn-outline" onclick="openEditModal('${id}')">
+         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/></svg>
+         補足情報を編集
+       </button>
        <button class="btn btn-primary" onclick="toggleDistribution('${id}')">
          ${s.is_distributed ? '配布を停止する' : '配布を開始する'}
        </button>`
@@ -420,7 +483,6 @@ function openPdfPreview(fileId, label) {
   const previewUrl = getPdfPreviewUrl(fileId);
   const openUrl    = `https://drive.google.com/file/d/${fileId}/view`;
 
-  // ローディング状態をリセット
   document.getElementById('pdf-loading').style.display = 'flex';
   const iframe = document.getElementById('pdf-iframe');
   iframe.style.display = 'none';
@@ -428,8 +490,6 @@ function openPdfPreview(fileId, label) {
 
   document.getElementById('pdf-modal-title').textContent = label;
   document.getElementById('pdf-open-link').href = openUrl;
-
-  // iframeをセット（loadイベントでローディングを非表示）
   iframe.src = previewUrl;
 
   closeModal('modal-detail');
@@ -437,24 +497,22 @@ function openPdfPreview(fileId, label) {
 }
 
 // ═══════════════════════════════════════════
-//  配布切替・削除（編集者のみ呼び出し可）
+//  配布切替・削除（編集者のみ）
 // ═══════════════════════════════════════════
 async function toggleDistribution(id) {
   const s = allScores.find(x => x.id === id);
   if (!s) return;
   s.is_distributed = !s.is_distributed;
 
-  // Supabaseにsupabase IDが存在する場合は更新、なければ新規insert
   if (_sb) {
     if (s.supaId) {
       await _sb.from('scores').update({ is_distributed: s.is_distributed }).eq('id', s.supaId);
     } else {
-      // GASにしかない曲をSupabaseに新規登録
       const { data } = await _sb.from('scores').insert({
         title: s.title, is_distributed: s.is_distributed,
         composer: s.composer, arranger: s.arranger, notes: s.notes,
       }).select().single();
-      if (data) s.supaId = data.id;
+      if (data) { s.supaId = data.id; s.id = data.id; }
     }
   }
 
@@ -470,15 +528,76 @@ async function deleteScore(id) {
   if (!confirm('この楽譜のSupabase登録情報を削除しますか？\n※Google Drive・GASのデータは削除されません。')) return;
   const s = allScores.find(x => x.id === id);
   if (s?.supaId && _sb) await _sb.from('scores').delete().eq('id', s.supaId);
-  // GASデータは残るが is_distributed を false に戻す
-  if (s) s.is_distributed = false;
+  if (s) {
+    s.is_distributed = false;
+    s.supaId = null;
+    s.composer = ''; s.arranger = ''; s.notes = '';
+    // supaIdなし＝GASのみの曲はリストに残す
+    if (!s.folderId) {
+      // Supabaseのみの曲は配列から除去
+      const idx = allScores.indexOf(s);
+      if (idx !== -1) allScores.splice(idx, 1);
+    }
+  }
   showToast('登録情報を削除しました', 'success');
   closeModal('modal-detail');
   renderTable();
 }
 
 // ═══════════════════════════════════════════
-//  楽譜情報をSupabaseに保存（補足情報登録）
+//  補足情報編集モーダルを開く（既存曲の編集）
+// ═══════════════════════════════════════════
+function openEditModal(id) {
+  const s = allScores.find(x => x.id === id);
+  if (!s) return;
+
+  editingScoreId = id;
+  document.getElementById('modal-add-title').textContent = '楽譜情報を編集';
+  document.getElementById('add-title').value       = s.title;
+  document.getElementById('add-title').readOnly    = true; // 編集時は曲名変更不可
+  document.getElementById('add-title').style.background = 'var(--gray-100)';
+  document.getElementById('add-composer').value    = s.composer  ?? '';
+  document.getElementById('add-arranger').value    = s.arranger  ?? '';
+  document.getElementById('add-notes').value       = s.notes     ?? '';
+  document.getElementById('add-distributed').checked = s.is_distributed ?? false;
+  document.getElementById('add-title-hint').textContent = '編集中は曲名を変更できません。';
+  document.getElementById('title-match-badge').classList.remove('visible');
+
+  closeModal('modal-detail');
+  openModal('modal-add');
+}
+
+// ═══════════════════════════════════════════
+//  新規登録モーダルを開く
+// ═══════════════════════════════════════════
+function openAddModal() {
+  editingScoreId = null;
+  document.getElementById('modal-add-title').textContent = '楽譜情報を登録';
+  document.getElementById('add-title').value       = '';
+  document.getElementById('add-title').readOnly    = false;
+  document.getElementById('add-title').style.background = '';
+  document.getElementById('add-composer').value    = '';
+  document.getElementById('add-arranger').value    = '';
+  document.getElementById('add-notes').value       = '';
+  document.getElementById('add-distributed').checked = false;
+  document.getElementById('add-title-hint').textContent = 'GASに登録済みの曲名と一致させると、PDFと自動的に紐づきます。';
+  document.getElementById('title-match-badge').classList.remove('visible');
+  openModal('modal-add');
+}
+
+// ═══════════════════════════════════════════
+//  曲名入力：GAS一致チェック
+// ═══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('add-title').addEventListener('input', function() {
+    const val = this.value.trim();
+    const matched = gasSongTitles.includes(val);
+    document.getElementById('title-match-badge').classList.toggle('visible', matched && val !== '');
+  });
+});
+
+// ═══════════════════════════════════════════
+//  Supabaseへ保存（新規登録 or 編集）
 // ═══════════════════════════════════════════
 document.getElementById('btn-save-score').addEventListener('click', async () => {
   const title = document.getElementById('add-title').value.trim();
@@ -496,14 +615,33 @@ document.getElementById('btn-save-score').addEventListener('click', async () => 
   };
 
   if (_sb) {
-    // 既存レコードがあればupdate、なければinsert
-    const { data: existing } = await _sb.from('scores').select('id').eq('title', title).maybeSingle();
     let error;
-    if (existing) {
-      ({ error } = await _sb.from('scores').update(payload).eq('id', existing.id));
+
+    if (editingScoreId) {
+      // ── 編集モード：supaId で update ──
+      const s = allScores.find(x => x.id === editingScoreId);
+      if (s?.supaId) {
+        ({ error } = await _sb.from('scores').update(payload).eq('id', s.supaId));
+        if (!error) {
+          // ローカル状態も更新
+          Object.assign(s, payload);
+        }
+      } else {
+        // Supabaseに未登録の曲を新規insert（編集モードでも初回はinsert）
+        const { data, error: insertErr } = await _sb.from('scores').insert(payload).select().single();
+        error = insertErr;
+        if (data && s) { s.supaId = data.id; s.id = data.id; Object.assign(s, payload); }
+      }
     } else {
-      ({ error } = await _sb.from('scores').insert(payload));
+      // ── 新規登録モード ──
+      const { data: existing } = await _sb.from('scores').select('id').eq('title', title).maybeSingle();
+      if (existing) {
+        ({ error } = await _sb.from('scores').update(payload).eq('id', existing.id));
+      } else {
+        ({ error } = await _sb.from('scores').insert(payload));
+      }
     }
+
     if (error) {
       showToast(`保存失敗: ${error.message}`, 'error');
       btn.disabled = false; btn.textContent = '保存する';
@@ -512,20 +650,22 @@ document.getElementById('btn-save-score').addEventListener('click', async () => 
   }
 
   closeModal('modal-add');
-  showToast('保存しました。データを再読み込みします…', 'success');
+  showToast(editingScoreId ? '補足情報を更新しました' : '保存しました。データを再読み込みします…', 'success');
   btn.disabled = false; btn.textContent = '保存する';
-  ['add-title','add-composer','add-arranger','add-notes'].forEach(i => document.getElementById(i).value = '');
-  document.getElementById('add-distributed').checked = false;
 
-  // データ再取得
-  await loadScores();
+  if (!editingScoreId) {
+    // 新規の場合のみ再ロード（編集はローカル反映済みのため不要）
+    await loadScores();
+  } else {
+    renderTable();
+  }
+  editingScoreId = null;
 });
 
 // ═══════════════════════════════════════════
 //  データ読み込み（GAS + Supabase をマージ）
 // ═══════════════════════════════════════════
 async function loadScores(forceRefresh = false) {
-  // ローディング表示
   document.getElementById('scores-tbody').innerHTML = `
     <tr><td colspan="5" style="text-align:center;padding:var(--space-10);color:var(--gray-500);">
       <div class="loading-spinner" style="margin:0 auto var(--space-3);"></div>読み込み中…
@@ -533,32 +673,43 @@ async function loadScores(forceRefresh = false) {
 
   if (forceRefresh) clearSongsCache();
 
-  // GASからデータ取得
+  // ── GASからデータ取得 ──
   let gasSongs = [];
+  const gasErrorEl = document.getElementById('gas-error-notice');
+  const gasErrorDetail = document.getElementById('gas-error-detail');
+
   try {
     const result = await fetchSongs();
     gasSongs = result.songs ?? [];
+    gasErrorEl.classList.remove('visible');
+
+    // datalist に曲名を登録
+    gasSongTitles = gasSongs.map(s => s.title);
+    const datalist = document.getElementById('gas-songs-datalist');
+    datalist.innerHTML = gasSongTitles
+      .map(t => `<option value="${escHtml(t)}">`)
+      .join('');
+
   } catch (e) {
     console.warn('[memberportal] GASデータ取得失敗:', e.message);
-    showToast('楽譜データの取得に失敗しました。GASの設定を確認してください。', 'error');
+    gasErrorDetail.textContent = e.message;
+    gasErrorEl.classList.add('visible');
+    // エラー時はtoastではなくインライン通知のみ表示（操作継続可能）
   }
 
-  // Supabaseから補足情報取得
+  // ── Supabaseから補足情報取得 ──
   let supaScores = [];
   if (_sb) {
-    const { data } = await _sb.from('scores').select('*');
-    supaScores = data ?? [];
+    const { data, error } = await _sb.from('scores').select('*');
+    if (error) {
+      console.warn('[memberportal] Supabaseデータ取得失敗:', error.message);
+    } else {
+      supaScores = data ?? [];
+    }
   }
 
-  // マージ
-  if (gasSongs.length > 0) {
-    allScores = mergeScoresData(gasSongs, supaScores);
-  } else {
-    // GASデータがない場合はSupabaseのみ表示（フォールバック）
-    allScores = supaScores.map(s => ({
-      ...s, gasparts: [], supaId: s.id,
-    }));
-  }
+  // ── マージ ──
+  allScores = mergeScoresData(gasSongs, supaScores);
 
   renderTable();
 }
@@ -568,12 +719,11 @@ async function loadScores(forceRefresh = false) {
 // ═══════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
 
-  // 権限チェック
   isEditor = checkEditorRole();
 
   // 編集ボタン（管理者・蔵書委員のみ）
   document.getElementById('page-actions').innerHTML = isEditor
-    ? `<button class="btn btn-gold" onclick="openModal('modal-add')">
+    ? `<button class="btn btn-gold" onclick="openAddModal()">
          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16">
            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
          </svg>
@@ -581,22 +731,18 @@ document.addEventListener('DOMContentLoaded', async () => {
        </button>`
     : '';
 
-  // 閲覧者通知
   if (!isEditor) {
     document.getElementById('readonly-notice').style.display = 'flex';
   }
 
-  // フィルターイベント
   document.getElementById('search-input').addEventListener('input', renderTable);
   document.getElementById('filter-part').addEventListener('change', renderTable);
   document.getElementById('filter-dist').addEventListener('change', renderTable);
-
-  // 更新ボタン
   document.getElementById('btn-reload').addEventListener('click', () => loadScores(true));
 
-  // データ読み込み
   await loadScores();
 });
 </script>
 </body>
 </html>
+
