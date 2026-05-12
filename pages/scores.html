@@ -539,7 +539,7 @@ async function loadScores(forceRefresh = false) {
     const result = await fetchSongs();
     gasSongs = result.songs ?? [];
   } catch (e) {
-    console.warn('[HighasuiDX] GASデータ取得失敗:', e.message);
+    console.warn('[memberportal] GASデータ取得失敗:', e.message);
     showToast('楽譜データの取得に失敗しました。GASの設定を確認してください。', 'error');
   }
 
