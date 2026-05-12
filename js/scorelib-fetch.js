@@ -34,8 +34,10 @@ async function fetchSongs() {
 
   // Spreadsheet の「ウェブに公開」URLからデータを取得
   // 公開URLは gviz/tq エンドポイントでJSONPとして返ってくる
-  const url = SHEET_PUBLISH_URL.replace(/\/pub.*/, '/gviz/tq')
-    + '?tq=select+A&sheet=JSON出力&tqx=out:json';
+const base = SHEET_PUBLISH_URL.replace('pubhtml', 'pub');
+const url = base.includes('?')
+  ? base + '&tqx=out:json&tq=select+A&sheet=JSON%E5%87%BA%E5%8A%9B'
+  : base + '?tqx=out:json&tq=select+A&sheet=JSON%E5%87%BA%E5%8A%9B';
 
   const res = await fetch(url);
   const text = await res.text();
