@@ -2,7 +2,7 @@
 //fetchSongs() を呼ぶと楽曲データが取得できます
 
 // ▼ pubhtml の URL をそのまま貼ってください（gid= が含まれているものでOK）
-const SHEET_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRI4F0AYNKACIWikC9bukK6-eBpX8Kz1_3xbSD-ZyNza9zYplGrZt6dMbmY6X8jldvNfKS76-V0I6Y8/pubhtml?gid=1730739195&single=true';
+const SHEET_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRI4F0AYNKACIWikC9bukK6-eBpX8Kz1_3xbSD-ZyNza9zYplGrZt6dMbmY6X8jldvNfKS76-V0I6Y8/pubhtml?gid=1136046773&single=true';
 
 /**
  * 楽曲データを取得する
@@ -34,28 +34,23 @@ async function fetchSongs() {
   }
 
   // ── URL 構築 ────────────────────────────────────────────────
-  // SHEET_PUBLISH_URL は pubhtml 形式:
-  //   https://docs.google.com/spreadsheets/d/e/{publishedId}/pubhtml?gid=XXXX&single=true
+  // SHEET_PUBLISH_URL は ScoreOutput シートの pubhtml 形式:
+  //   https://docs.google.com/spreadsheets/d/e/{publishedId}/pubhtml?gid={ScoreOutputのgid}&single=true
   //
   // gviz/tq エンドポイントの形式:
-  //   https://docs.google.com/spreadsheets/d/e/{publishedId}/pub?gid={jsonSheetGid}&tqx=out:json
+  //   https://docs.google.com/spreadsheets/d/e/{publishedId}/pub?gid={ScoreOutputのgid}&tqx=out:json
   //
-  // JSON出力シートの gid は GAS の updateJsonOutput() で作られるシートのものです。
-  // 既知の gid がある場合は JSON_OUTPUT_GID に設定してください。
-  // 不明な場合は 0 (先頭シート) ではなく sheet= パラメータでシート名指定を試みます。
+  // SHEET_PUBLISH_URL に含まれる gid= を ScoreOutput シートのものにすることで
+  // シート名指定（日本語）を使わず確実にアクセスできます。
   // ─────────────────────────────────────────────────────────────
 
-  // pubhtml → pub に変換し、gid・single パラメータを除去してベースURLを作る
+  // pubhtml → pub に変換し、single パラメータのみ除去（gid はそのまま保持）
   const publishedBase = SHEET_PUBLISH_URL
     .replace('/pubhtml', '/pub')
-    .replace(/[?&](gid|single)=[^&]*/g, '')
+    .replace(/[?&]single=[^&]*/g, '')
     .replace(/[?&]$/, '');
 
-  // JSON出力シートをシート名で指定（GAS側のシート名と合わせること）
-  // encodeURIComponent('JSON出力') = 'JSON%E5%87%BA%E5%8A%9B'
-  const JSON_SHEET_NAME = encodeURIComponent('JSON出力');
-
-  const url = `${publishedBase}?tqx=out:json&tq=${encodeURIComponent('select A')}&sheet=${JSON_SHEET_NAME}`;
+  const url = `${publishedBase}&tqx=out:json&tq=${encodeURIComponent('select A')}`;
 
   let res;
   try {
@@ -75,7 +70,7 @@ async function fetchSongs() {
   if (!jsonStr) {
     // gviz/tq が HTML を返す場合 → シートが見つからないか未公開
     if (text.includes('<html')) {
-      throw new Error('JSON出力シートが見つかりません。GASで updateJsonOutput() を一度実行してから、スプレッドシートを「ウェブに公開」してください。');
+      throw new Error('ScoreOutput シートが見つかりません。GASで updateJsonOutput() を一度実行後、SHEET_PUBLISH_URL を ScoreOutput シートの gid に更新してください。');
     }
     throw new Error('スプレッドシートのデータ取得に失敗しました（レスポンス形式が想定外です）');
   }
@@ -88,7 +83,7 @@ async function fetchSongs() {
   try {
     data = JSON.parse(cellValue);
   } catch (e) {
-    throw new Error('JSON出力シートのデータが壊れています。GASで updateJsonOutput() を再実行してください。');
+    throw new Error('ScoreOutput シートのデータが壊れています。GASで updateJsonOutput() を再実行してください。');
   }
 
   // キャッシュに保存
