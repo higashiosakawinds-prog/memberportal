@@ -2,7 +2,7 @@
 //fetchSongs() を呼ぶと楽曲データが取得できます
 
 // ▼ pubhtml の URL をそのまま貼ってください（gid= が含まれているものでOK）
-const SHEET_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRI4F0AYNKACIWikC9bukK6-eBpX8Kz1_3xbSD-ZyNza9zYplGrZt6dMbmY6X8jldvNfKS76-V0I6Y8/pubhtml';
+const SHEET_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRI4F0AYNKACIWikC9bukK6-eBpX8Kz1_3xbSD-ZyNza9zYplGrZt6dMbmY6X8jldvNfKS76-V0I6Y8/pubhtml?gid=1754023041&single=true';
 
 /**
  * 楽曲データを取得する
