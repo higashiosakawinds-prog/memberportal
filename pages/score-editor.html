@@ -1039,18 +1039,18 @@ async function loadScores() {
 document.addEventListener('DOMContentLoaded', async () => {
 
   // ── ロール確認 ──
-  if (!checkEditorRole()) {
-    document.getElementById('lock-overlay').innerHTML = `
-      <div class="lock-card">
-        <svg class="lock-card__icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="48" height="48">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-        </svg>
-        <p class="lock-card__title">アクセス権限がありません</p>
-        <p class="lock-card__sub">このページはGM・幹部・蔵書委員のみ<br>アクセスできます。</p>
-        <a href="scores.html" class="btn btn-outline" style="margin-top:var(--space-4);color:var(--white);border-color:rgba(255,255,255,0.3);">楽譜一覧に戻る</a>
-      </div>`;
-    return;
-  }
+//  if (!checkEditorRole()) {
+//    document.getElementById('lock-overlay').innerHTML = `
+//      <div class="lock-card">
+//        <svg class="lock-card__icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="48" height="48">
+//          <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+//        </svg>
+//        <p class="lock-card__title">アクセス権限がありません</p>
+//        <p class="lock-card__sub">このページはGM・幹部・蔵書委員のみ<br>アクセスできます。</p>
+//        <a href="scores.html" class="btn btn-outline" style="margin-top:var(--space-4);color:var(--white);border-color:rgba(255,255,255,0.3);">楽譜一覧に戻る</a>
+//      </div>`;
+//   return;
+//  }
 
   // ── セッション内でアンロック済みか確認 ──
   if (sessionStorage.getItem('score_editor_unlocked') === '1') {
