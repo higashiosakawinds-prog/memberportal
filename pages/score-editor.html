@@ -481,23 +481,22 @@ function autoKanaIndex(kana) {
   }
 
   const firstChar = kana.trim()[0];
-
-  // 濁音・半濁音を清音に正規化してから判定
-  const normalize = {
-    'が':'か','ぎ':'き','ぐ':'く','げ':'け','ご':'こ',
-    'ざ':'さ','じ':'し','ず':'す','ぜ':'せ','ぞ':'そ',
-    'だ':'た','ぢ':'ち','づ':'つ','で':'て','ど':'と',
-    'ば':'は','び':'ひ','ぶ':'ふ','べ':'へ','ぼ':'ほ',
-    'ぱ':'は','ぴ':'ひ','ぷ':'ふ','ぺ':'へ','ぽ':'ほ',
-    'ぁ':'あ','ぃ':'い','ぅ':'う','ぇ':'え','ぉ':'お',
-    'っ':'つ','ゃ':'や','ゅ':'ゆ','ょ':'よ','ゎ':'わ',
+  const kanaMap = {
+    'あ':'あ','い':'い','う':'う','え':'え','お':'お',
+    'かが':'か','きぎ':'き', 'くぐ':'く','けげ':'け','こご':'こ',
+    'さざ':'さ','しじ':'し', 'すず':'す','せぜ':'せ','そぞ':'そ',
+    'ただ':'た','ちぢ':'ち', 'つづ':'つ','てで':'て','とど':'と',
+    'な':'な','に':'に', 'ぬ':'ぬ','ね':'ね','の':'の',
+    'はばぱ':'は','ひびぴ':'ひ', 'ふぶぷ':'ふ','へべぺ':'へ','ほぼぽ':'ほ',
+    'ま':'ま','み':'み', 'む':'む','め':'め','も':'も',
+    'や':'や','ゆ':'ゆ', 'よ':'よ',
+    'ら':'ら','り':'り', 'る':'る','れ':'れ','ろ':'ろ',
+    'わ':'わ','を':'を', 'ん':'ん'
   };
-  const base = normalize[firstChar] ?? firstChar;
-
-  // 五十音50文字に含まれるかチェック
-  const gojuuon = 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん';
-  const kanaIndex = gojuuon.includes(base) ? base : 'その他';
-
+  let kanaIndex = 'その他';
+  for (const [chars, label] of Object.entries(kanaMap)) {
+    if (chars.includes(firstChar)) { kanaIndex = label; break; }
+  }
   document.getElementById('edit-index-kana').value = kanaIndex;
 }
 
@@ -736,20 +735,23 @@ async function loadPdfList(scoreId) {
 function buildPartOptions(selectedKey = '') {
   const opts = [
     ['', '選択してください'],
-    ['conductor', '指揮者譜'],
-    ['flute', 'フルート'],
-    ['oboe', 'オーボエ'],
-    ['clarinet', 'クラリネット'],
-    ['bassoon', 'ファゴット'],
-    ['saxophone', 'サクソフォーン'],
-    ['horn', 'ホルン'],
-    ['trumpet', 'トランペット'],
-    ['trombone', 'トロンボーン'],
-    ['euphonium', 'ユーフォニアム'],
-    ['tuba', 'テューバ'],
-    ['percussion', '打楽器'],
-    ['contrabass', 'コントラバス'],
-    ['other', 'その他'],
+    ['conductor', 'Score'],
+    ['flute', 'Flute'],
+    ['oboe', 'Oboe'],
+    ['clarinet', 'Clarinet'],
+    ['bassoon', 'Bassoon'],
+    ['Ssaxophone', 'S.Saxophone'],
+    ['Asaxophone', 'A.Saxophone'],
+    ['Tsaxophone', 'T.Saxophone'],
+    ['Bsaxophone', 'B.Saxophone'],
+    ['horn', 'Horn'],
+    ['trumpet', 'Trumpet'],
+    ['trombone', 'Trombone'],
+    ['euphonium', 'Euphonium'],
+    ['tuba', 'Tuba'],
+    ['percussion', 'Percussion'],
+    ['contrabass', 'Contrabass'],
+    ['other', 'Other'],
   ];
   return opts.map(([v, l]) =>
     `<option value="${v}" ${v === selectedKey ? 'selected' : ''}>${l}</option>`
