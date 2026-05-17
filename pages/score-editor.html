@@ -481,18 +481,23 @@ function autoKanaIndex(kana) {
   }
 
   const firstChar = kana.trim()[0];
-  const kanaMap = {
-    'あいうえお':'あ行', 'かきくけこ':'か行', 'さしすせそ':'さ行',
-    'たちつてと':'た行', 'なにぬねの':'な行', 'はひふへほ':'は行',
-    'まみむめも':'ま行', 'やゆよ':'や行', 'らりるれろ':'ら行',
-    'わをん':'わ行',
-    'がぎぐげご':'か行', 'ざじずぜぞ':'さ行', 'だぢづでど':'た行',
-    'ばびぶべぼ':'は行', 'ぱぴぷぺぽ':'は行',
+
+  // 濁音・半濁音を清音に正規化してから判定
+  const normalize = {
+    'が':'か','ぎ':'き','ぐ':'く','げ':'け','ご':'こ',
+    'ざ':'さ','じ':'し','ず':'す','ぜ':'せ','ぞ':'そ',
+    'だ':'た','ぢ':'ち','づ':'つ','で':'て','ど':'と',
+    'ば':'は','び':'ひ','ぶ':'ふ','べ':'へ','ぼ':'ほ',
+    'ぱ':'は','ぴ':'ひ','ぷ':'ふ','ぺ':'へ','ぽ':'ほ',
+    'ぁ':'あ','ぃ':'い','ぅ':'う','ぇ':'え','ぉ':'お',
+    'っ':'つ','ゃ':'や','ゅ':'ゆ','ょ':'よ','ゎ':'わ',
   };
-  let kanaIndex = 'その他';
-  for (const [chars, label] of Object.entries(kanaMap)) {
-    if (chars.includes(firstChar)) { kanaIndex = label; break; }
-  }
+  const base = normalize[firstChar] ?? firstChar;
+
+  // 五十音50文字に含まれるかチェック
+  const gojuuon = 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん';
+  const kanaIndex = gojuuon.includes(base) ? base : 'その他';
+
   document.getElementById('edit-index-kana').value = kanaIndex;
 }
 
