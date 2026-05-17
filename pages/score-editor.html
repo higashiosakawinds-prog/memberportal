@@ -878,11 +878,15 @@ async function uploadPdf() {
   const btn = document.getElementById('btn-upload-pdf');
   btn.disabled = true; btn.textContent = 'アップロード中…';
 
-  // ファイル名：曲名_パート名
+  // 表示ファイル名：曲名_パート名（DBに保存する表示用）
   const safeTitleJa = pdfTargetScore.title_ja.replace(/[\/\\:*?"<>|]/g, '_');
   const safeLabel   = partLabel.replace(/[\/\\:*?"<>|]/g, '_');
   const fileName    = `${safeTitleJa}_${safeLabel}`;
-  const storagePath = `${pdfTargetScore.id}/${fileName}.pdf`;
+
+  // ストレージパス：日本語を排除しASCII安全な形式にする
+  // 形式: {score_id}/{partKey}_{timestamp}.pdf
+  const storageFileName = `${partKey}_${Date.now()}.pdf`;
+  const storagePath = `${pdfTargetScore.id}/${storageFileName}`;
 
   // プログレスバー表示
   document.getElementById('upload-progress').style.display = 'block';
