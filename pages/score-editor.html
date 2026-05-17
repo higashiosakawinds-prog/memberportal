@@ -273,13 +273,14 @@
       <div class="form-grid-2">
         <div class="form-group">
           <label class="form-label">曲名（英語）</label>
-          <input type="text" id="edit-title-en" class="form-control" placeholder="例：Jupiter">
+          <input type="text" id="edit-title-en" class="form-control" placeholder="例：Jupiter"
+            oninput="autoAlphaIndex(this.value)">
         </div>
         <div class="form-group">
           <label class="form-label">曲名（ひらがな）</label>
           <input type="text" id="edit-title-kana" class="form-control" placeholder="例：くみきょくわくせいよりもくせい"
-            oninput="autoIndex(this.value)">
-          <span class="form-hint">50音索引・アルファベット索引が自動生成されます</span>
+            oninput="autoKanaIndex(this.value)">
+          <span class="form-hint">入力すると50音索引が自動生成されます</span>
         </div>
       </div>
       <div class="form-grid-2">
@@ -291,7 +292,7 @@
         <div class="form-group">
           <label class="form-label">アルファベット索引</label>
           <input type="text" id="edit-index-alpha" class="form-control" readonly
-            style="background:var(--gray-100);" placeholder="自動生成">
+            style="background:var(--gray-100);" placeholder="曲名(En)から自動生成">
         </div>
       </div>
 
@@ -467,17 +468,19 @@ function unlock() {
 }
 
 // ══════════════════════════════════════
-//  50音索引・アルファベット索引の自動生成
+//  索引の自動生成
+//  ・50音索引：曲名(ひらがな)の頭文字から判定
+//  ・アルファベット索引：曲名(En)の頭文字（未入力時は空欄のまま）
 // ══════════════════════════════════════
-function autoIndex(kana) {
-  if (!kana) {
-    document.getElementById('edit-index-kana').value  = '';
-    document.getElementById('edit-index-alpha').value = '';
+
+// 曲名(ひらがな)変更時 → 50音索引を更新
+function autoKanaIndex(kana) {
+  if (!kana.trim()) {
+    document.getElementById('edit-index-kana').value = '';
     return;
   }
 
-  // 50音索引：最初の文字から行を判定
-  const firstChar = kana.trim()[0] ?? '';
+  const firstChar = kana.trim()[0];
   const kanaMap = {
     'あいうえお':'あ行', 'かきくけこ':'か行', 'さしすせそ':'さ行',
     'たちつてと':'た行', 'なにぬねの':'な行', 'はひふへほ':'は行',
@@ -491,26 +494,17 @@ function autoIndex(kana) {
     if (chars.includes(firstChar)) { kanaIndex = label; break; }
   }
   document.getElementById('edit-index-kana').value = kanaIndex;
+}
 
-  // アルファベット索引：ひらがな→ローマ字の先頭1文字（簡易変換）
-  const romaMap = {
-    'あ':'A','い':'I','う':'U','え':'E','お':'O',
-    'か':'K','き':'K','く':'K','け':'K','こ':'K',
-    'さ':'S','し':'S','す':'S','せ':'S','そ':'S',
-    'た':'T','ち':'T','つ':'T','て':'T','と':'T',
-    'な':'N','に':'N','ぬ':'N','ね':'N','の':'N',
-    'は':'H','ひ':'H','ふ':'F','へ':'H','ほ':'H',
-    'ま':'M','み':'M','む':'M','め':'M','も':'M',
-    'や':'Y','ゆ':'Y','よ':'Y',
-    'ら':'R','り':'R','る':'R','れ':'R','ろ':'R',
-    'わ':'W','を':'W','ん':'N',
-    'が':'G','ぎ':'G','ぐ':'G','げ':'G','ご':'G',
-    'ざ':'Z','じ':'J','ず':'Z','ぜ':'Z','ぞ':'Z',
-    'だ':'D','ぢ':'D','づ':'D','で':'D','ど':'D',
-    'ば':'B','び':'B','ぶ':'B','べ':'B','ぼ':'B',
-    'ぱ':'P','ぴ':'P','ぷ':'P','ぺ':'P','ぽ':'P',
-  };
-  const alphaIndex = romaMap[firstChar] ?? '#';
+// 曲名(En)変更時 → アルファベット索引を更新（未入力なら空欄）
+function autoAlphaIndex(titleEn) {
+  if (!titleEn.trim()) {
+    document.getElementById('edit-index-alpha').value = '';
+    return;
+  }
+  const firstChar = titleEn.trim()[0].toUpperCase();
+  // A〜Z の場合はそのまま、それ以外は '#'
+  const alphaIndex = /^[A-Z]$/.test(firstChar) ? firstChar : '#';
   document.getElementById('edit-index-alpha').value = alphaIndex;
 }
 
