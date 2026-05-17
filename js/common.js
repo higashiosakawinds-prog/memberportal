@@ -49,7 +49,8 @@ const ROLE_PERMISSIONS = {
 // 役職定義（表示名・バッジ色）
 // ─────────────────────────────────────────
 const ROLE_DEFINITIONS = [
-  { value: 'admin',     label: '管理者',   badgeClass: 'badge-danger'  },
+  { value: 'gm',     label: 'GM',   badgeClass: 'badge-danger'  },
+  { value: 'admin',     label: '幹部',   badgeClass: 'badge-danger'  },
   { value: 'conductor', label: '指揮者',   badgeClass: 'badge-navy'    },
   { value: 'manager',   label: '運営委員', badgeClass: 'badge-navy'    },
   { value: 'treasurer', label: '会計',     badgeClass: 'badge-gold'    },
