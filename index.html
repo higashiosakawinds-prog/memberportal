@@ -234,7 +234,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (_sb) {
     const [{ count: mc }, { count: sc }, { count: rc }] = await Promise.all([
       _sb.from('profiles').select('*', { count:'exact', head:true }),
-      _sb.from('scores2').select('*', { count:'exact', head:true }).eq('is_public', true),
+      _sb.from('scores2').select('*', { count:'exact', head:true }),
       _sb.from('requests').select('*', { count:'exact', head:true }).eq('status', 'pending'),
     ]);
     document.getElementById('stat-members').textContent  = mc ?? '—';
