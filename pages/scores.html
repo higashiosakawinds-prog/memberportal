@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>楽譜一覧 — 東大阪吹奏楽団</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/common.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .toolbar {
+      display:flex; gap:var(--space-3); flex-wrap:wrap;
+      align-items:center; margin-bottom:var(--space-6);
+    }
+    .toolbar input { flex:1; min-width:160px; }
+    .score-table-wrap {
+      border-radius:var(--radius-lg); overflow:hidden;
+      border:1px solid var(--gray-200);
+      overflow-x:auto; -webkit-overflow-scrolling:touch;
+    }
+    .score-table-wrap .table { min-width:480px; }
+    .part-tag {
+      display:inline-flex; align-items:center;
+      padding:2px 8px; border-radius:var(--radius-full);
+      font-size:10px; font-weight:500;
+      background:rgba(26,46,74,0.08); color:var(--navy-700); margin:2px;
+    }
+    /* 詳細モーダル */
+    .detail-dl { display:grid; grid-template-columns:90px 1fr; gap:var(--space-2) var(--space-4); font-size:var(--text-sm); }
+    .detail-dl dt { color:var(--gray-500); }
+    .detail-dl dd { color:var(--gray-800); font-weight:500; }
+    .part-list { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:var(--space-2); }
+    /* PDFプレビュー */
+    #modal-pdf .modal { max-width:860px; width:calc(100vw - 32px); }
+    .pdf-iframe-wrap {
+      width:100%; height:70vh; min-height:400px;
+      border-radius:var(--radius-md); overflow:hidden;
+      background:var(--gray-200); position:relative;
+    }
+    .pdf-iframe-wrap iframe { width:100%; height:100%; border:none; }
+    .pdf-loading {
+      position:absolute; inset:0;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:var(--space-3); color:var(--gray-500); font-size:var(--text-sm);
+    }
+    @media(max-width:768px){
+      .toolbar { flex-direction:column; }
+      .toolbar input, .toolbar select { width:100%; max-width:none; }
+      #modal-pdf .modal { width:calc(100vw - 16px); }
+      .pdf-iframe-wrap { height:55vh; }
+    }
+  </style>
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main-content">
+
+    <div class="page-header fade-in">
+      <div>
+        <p class="page-header__eyebrow">LIBRARY</p>
+        <h1 class="page-header__title">楽譜一覧</h1>
+      </div>
+    </div>
+
+    <!-- 検索ツールバー -->
+    <div class="toolbar fade-in fade-in-1">
+      <input type="text" id="search-input" class="form-control" placeholder="曲名・作曲者で検索…">
+      <select id="filter-formation" class="form-control" style="max-width:200px;">
+        <option value="">すべての編成</option>
+        <option value="吹奏楽（大編成）">吹奏楽（大編成）</option>
+        <option value="吹奏楽（小編成）">吹奏楽（小編成）</option>
+        <option value="アンサンブル">アンサンブル</option>
+        <option value="ソロ">ソロ</option>
+        <option value="その他">その他</option>
+      </select>
+      <select id="filter-public" class="form-control" style="max-width:160px;">
+        <option value="">すべて表示</option>
+        <option value="1">PDF公開中のみ</option>
+      </select>
+    </div>
+
+    <!-- 楽譜テーブル -->
+    <div class="score-table-wrap fade-in fade-in-2">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:80px;">楽譜番号</th>
+            <th>曲名</th>
+            <th>作曲者／アーティスト</th>
+            <th>編成</th>
+            <th style="width:80px;">PDF</th>
+            <th style="width:80px;"></th>
+          </tr>
+        </thead>
+        <tbody id="scores-tbody">
+          <tr><td colspan="6" style="text-align:center;padding:var(--space-10);">
+            <div class="loading-spinner" style="margin:0 auto var(--space-3);"></div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── 詳細モーダル ── -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal__header">
+      <h2 class="modal__title" id="detail-title">—</h2>
+      <button class="modal__close" onclick="closeModal('modal-detail')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body" id="detail-body"></div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-detail')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PDFプレビューモーダル ── -->
+<div class="modal-overlay" id="modal-pdf">
+  <div class="modal">
+    <div class="modal__header">
+      <h2 class="modal__title" id="pdf-modal-title">—</h2>
+      <button class="modal__close" onclick="closeModal('modal-pdf')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body" style="padding:var(--space-4);">
+      <div class="pdf-iframe-wrap">
+        <div class="pdf-loading" id="pdf-loading">
+          <div class="loading-spinner"></div>
+          <span>PDFを読み込んでいます…</span>
+        </div>
+        <iframe id="pdf-iframe" src="" title="PDF" style="display:none;"
+          onload="document.getElementById('pdf-loading').style.display='none';this.style.display='block';">
+        </iframe>
+      </div>
+      <p style="font-size:var(--text-xs);color:var(--gray-400);margin-top:var(--space-2);text-align:center;">
+        ブラウザのPDFビューア内の印刷ボタン、またはCtrl+P（⌘+P）で印刷できます。
+      </p>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-pdf')">閉じる</button>
+      <button class="btn btn-primary" id="pdf-download-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12M12 16.5V3"/></svg>
+        ダウンロード
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<script src="../js/supabase.js"></script>
+<script src="../js/common.js"></script>
+<script>
+// ══════════════════════════════════════
+//  状態
+// ══════════════════════════════════════
+let allScores = [];
+
+// ══════════════════════════════════════
+//  XSS対策
+// ══════════════════════════════════════
+function escHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ══════════════════════════════════════
+//  テーブル描画
+// ══════════════════════════════════════
+function renderTable() {
+  const kw        = document.getElementById('search-input').value.toLowerCase();
+  const formation = document.getElementById('filter-formation').value;
+  const pubOnly   = document.getElementById('filter-public').value === '1';
+
+  const filtered = allScores.filter(s => {
+    const text = `${s.title_ja}${s.title_en}${s.title_kana}${s.composer}${s.artist}`.toLowerCase();
+    if (kw        && !text.includes(kw))          return false;
+    if (formation && s.formation !== formation)    return false;
+    if (pubOnly   && !s.is_public)                return false;
+    return true;
+  });
+
+  const tbody = document.getElementById('scores-tbody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:var(--space-10);color:var(--gray-500);">該当する楽譜がありません</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(s => `
+    <tr>
+      <td style="font-family:var(--font-display);font-weight:600;color:var(--gray-500);font-size:var(--text-sm);">
+        ${escHtml(String(s.score_number))}
+      </td>
+      <td>
+        <div style="font-weight:700;color:var(--navy-800);">${escHtml(s.title_ja)}</div>
+        ${s.title_en ? `<div style="font-size:var(--text-xs);color:var(--gray-400);">${escHtml(s.title_en)}</div>` : ''}
+      </td>
+      <td style="font-size:var(--text-sm);color:var(--gray-600);">
+        ${escHtml(s.composer || s.artist || '—')}
+      </td>
+      <td>
+        ${s.formation ? `<span class="badge badge-navy">${escHtml(s.formation)}</span>` : '—'}
+      </td>
+      <td style="text-align:center;">
+        ${s.is_public
+          ? `<span class="badge badge-success">公開中</span>`
+          : `<span class="badge" style="background:var(--gray-200);color:var(--gray-500);">非公開</span>`}
+      </td>
+      <td>
+        <button class="btn btn-sm btn-outline" onclick="openDetail('${s.id}')">詳細</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ══════════════════════════════════════
+//  詳細モーダル
+// ══════════════════════════════════════
+async function openDetail(id) {
+  const s = allScores.find(x => x.id === id);
+  if (!s) return;
+
+  // パートとPDFを取得
+  let parts = [];
+  let pdfs  = [];
+  if (_sb) {
+    const [{ data: partsData }, { data: pdfsData }] = await Promise.all([
+      _sb.from('score_parts').select('*').eq('score_id', id).order('sort_order'),
+      _sb.from('score_pdfs').select('*').eq('score_id', id),
+    ]);
+    parts = partsData ?? [];
+    pdfs  = pdfsData  ?? [];
+  }
+
+  document.getElementById('detail-title').textContent = s.title_ja;
+  document.getElementById('detail-body').innerHTML = `
+    <dl class="detail-dl mb-6">
+      <dt>楽譜番号</dt><dd>${escHtml(String(s.score_number))}</dd>
+      ${s.title_en   ? `<dt>曲名（英語）</dt><dd>${escHtml(s.title_en)}</dd>`   : ''}
+      ${s.title_kana ? `<dt>曲名（読み）</dt><dd>${escHtml(s.title_kana)}</dd>` : ''}
+      ${s.composer   ? `<dt>作曲者</dt><dd>${escHtml(s.composer)}</dd>`         : ''}
+      ${s.artist     ? `<dt>アーティスト</dt><dd>${escHtml(s.artist)}</dd>`     : ''}
+      ${s.formation  ? `<dt>編成</dt><dd>${escHtml(s.formation)}</dd>`          : ''}
+      ${s.notes      ? `<dt>備考</dt><dd style="white-space:pre-wrap;">${escHtml(s.notes)}</dd>` : ''}
+    </dl>
+
+    ${parts.length > 0 ? `
+      <p style="font-size:var(--text-xs);font-weight:700;color:var(--navy-800);letter-spacing:.1em;text-transform:uppercase;margin-bottom:var(--space-3);">パート一覧</p>
+      <div class="part-list mb-6">
+        ${parts.map(p => `<span class="part-tag">${escHtml(p.part_label)}</span>`).join('')}
+      </div>
+    ` : ''}
+
+    ${s.is_public && pdfs.length > 0 ? `
+      <p style="font-size:var(--text-xs);font-weight:700;color:var(--navy-800);letter-spacing:.1em;text-transform:uppercase;margin-bottom:var(--space-3);">パート譜 PDF</p>
+      <div>
+        ${pdfs.map(pdf => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--gray-200);">
+            <span style="font-size:var(--text-sm);font-weight:500;color:var(--navy-800);">${escHtml(pdf.file_name)}</span>
+            <button class="btn btn-sm btn-primary"
+              onclick="openPdfPreview('${escHtml(pdf.storage_path)}','${escHtml(pdf.file_name)}')">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="13" height="13">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.641 0-8.573-3.007-9.963-7.178z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+              開く・印刷
+            </button>
+          </div>
+        `).join('')}
+      </div>
+    ` : s.is_public ? `
+      <p style="font-size:var(--text-sm);color:var(--gray-400);padding:var(--space-3) 0;">PDFはまだ登録されていません。</p>
+    ` : `
+      <div class="alert alert-info" style="margin-top:var(--space-4);">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
+        <span>この楽譜のPDFは現在非公開です。</span>
+      </div>
+    `}
+  `;
+
+  openModal('modal-detail');
+}
+
+// ══════════════════════════════════════
+//  PDFプレビュー
+// ══════════════════════════════════════
+async function openPdfPreview(storagePath, fileName) {
+  if (!_sb) { showToast('Supabase未接続です', 'error'); return; }
+
+  document.getElementById('pdf-loading').style.display = 'flex';
+  const iframe = document.getElementById('pdf-iframe');
+  iframe.style.display = 'none';
+  iframe.src = '';
+  document.getElementById('pdf-modal-title').textContent = fileName;
+
+  // 署名付きURL取得（60分有効）
+  const { data, error } = await _sb.storage
+    .from('scores')
+    .createSignedUrl(storagePath, 3600);
+
+  if (error || !data?.signedUrl) {
+    showToast('PDFの取得に失敗しました', 'error');
+    return;
+  }
+
+  const signedUrl = data.signedUrl;
+  iframe.src = signedUrl;
+
+  document.getElementById('pdf-download-btn').onclick = () => {
+    const a = document.createElement('a');
+    a.href = signedUrl;
+    a.download = fileName;
+    a.click();
+  };
+
+  closeModal('modal-detail');
+  openModal('modal-pdf');
+}
+
+// ══════════════════════════════════════
+//  データ読み込み
+// ══════════════════════════════════════
+async function loadScores() {
+  if (!_sb) {
+    document.getElementById('scores-tbody').innerHTML =
+      `<tr><td colspan="6" style="text-align:center;padding:var(--space-10);color:var(--gray-500);">Supabase未接続のためデータを取得できません。</td></tr>`;
+    return;
+  }
+
+  const { data, error } = await _sb
+    .from('scores2')
+    .select('*')
+    .order('score_number', { ascending: true });
+
+  if (error) {
+    console.error('[HighasuiDX] 楽譜一覧取得エラー:', error.message);
+    document.getElementById('scores-tbody').innerHTML =
+      `<tr><td colspan="6" style="text-align:center;padding:var(--space-10);color:var(--danger);">データの取得に失敗しました。</td></tr>`;
+    return;
+  }
+
+  allScores = data ?? [];
+  renderTable();
+}
+
+// ══════════════════════════════════════
+//  初期化
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('search-input').addEventListener('input', renderTable);
+  document.getElementById('filter-formation').addEventListener('change', renderTable);
+  document.getElementById('filter-public').addEventListener('change', renderTable);
+  await loadScores();
+});
+</script>
+</body>
+</html>
