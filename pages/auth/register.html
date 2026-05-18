@@ -35,6 +35,10 @@
     .register-card .form-control::placeholder { color:rgba(255,255,255,0.3); }
     .register-card .form-control:focus { border-color:var(--gold-500); box-shadow:0 0 0 3px rgba(201,168,76,0.15); }
     .register-card select.form-control option { background:var(--navy-800); color:var(--white); }
+    /* フィールドエラー表示 */
+    .register-card .form-control.field-error { border-color:var(--danger); box-shadow:0 0 0 3px rgba(192,57,43,0.15); }
+    .field-error-msg { font-size:var(--text-xs); color:#f1948a; margin-top:var(--space-1); display:none; }
+    .field-error-msg.show { display:block; }
     .submit-btn { width:100%; padding:var(--space-4); background:var(--gold-500); color:var(--navy-900); border:none; border-radius:var(--radius-md); font-size:var(--text-base); font-weight:700; cursor:pointer; transition:all var(--transition-fast); font-family:var(--font-body); margin-top:var(--space-6); }
     .submit-btn:hover { background:var(--gold-400); box-shadow:var(--shadow-gold); }
     .submit-btn:disabled { opacity:.6; cursor:not-allowed; }
@@ -61,20 +65,24 @@
       <div class="form-group">
         <label class="form-label" for="last-name">姓 <span class="required">*</span></label>
         <input type="text" id="last-name" class="form-control" placeholder="東大阪">
+        <span class="field-error-msg" id="err-last-name"></span>
       </div>
       <div class="form-group">
         <label class="form-label" for="first-name">名 <span class="required">*</span></label>
         <input type="text" id="first-name" class="form-control" placeholder="太郎">
+        <span class="field-error-msg" id="err-first-name"></span>
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label" for="last-kana">姓（フリガナ）<span class="required">*</span></label>
         <input type="text" id="last-kana" class="form-control" placeholder="ヒガシオオサカ">
+        <span class="field-error-msg" id="err-last-kana"></span>
       </div>
       <div class="form-group">
         <label class="form-label" for="first-kana">名（フリガナ）<span class="required">*</span></label>
         <input type="text" id="first-kana" class="form-control" placeholder="タロウ">
+        <span class="field-error-msg" id="err-first-kana"></span>
       </div>
     </div>
 
@@ -84,31 +92,9 @@
         <span style="font-size:var(--text-xs);color:var(--gray-500);font-weight:400;">（複数選択可）</span>
       </label>
       <div class="role-checkbox-group" id="role-group">
-        <label class="role-checkbox-item">
-          <input type="checkbox" name="role" value="member" checked>
-          <span>一般団員</span>
-        </label>
-        <label class="role-checkbox-item">
-          <input type="checkbox" name="role" value="conductor">
-          <span>指揮者</span>
-        </label>
-        <label class="role-checkbox-item">
-          <input type="checkbox" name="role" value="manager">
-          <span>運営委員</span>
-        </label>
-        <label class="role-checkbox-item">
-          <input type="checkbox" name="role" value="treasurer">
-          <span>会計</span>
-        </label>
-        <label class="role-checkbox-item">
-          <input type="checkbox" name="role" value="librarian">
-          <span>蔵書委員</span>
-        </label>
-        <label class="role-checkbox-item">
-          <input type="checkbox" name="role" value="admin">
-          <span>管理者</span>
-        </label>
+        <!-- common.js の ROLE_DEFINITIONS から動的生成 -->
       </div>
+      <span class="field-error-msg" id="err-role"></span>
     </div>
 
     <div class="form-row">
@@ -140,6 +126,7 @@
             <option value="other">その他</option>
           </optgroup>
         </select>
+        <span class="field-error-msg" id="err-part"></span>
       </div>
       <div class="form-group">
         <label class="form-label" for="category">区分 <span class="required">*</span></label>
@@ -150,12 +137,14 @@
           <option value="rest">休団中</option>
           <option value="support">賛助</option>
         </select>
+        <span class="field-error-msg" id="err-category"></span>
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label class="form-label" for="joined-date">在籍開始年月日 <span class="required">*</span></label>
         <input type="date" id="joined-date" class="form-control">
+        <span class="field-error-msg" id="err-joined-date"></span>
       </div>
     </div>
 
@@ -164,11 +153,18 @@
     <div class="form-group">
       <label class="form-label" for="email">メールアドレス <span class="required">*</span></label>
       <input type="email" id="email" class="form-control" placeholder="example@mail.com" autocomplete="email">
+      <span class="field-error-msg" id="err-email"></span>
     </div>
     <div class="form-group">
       <label class="form-label" for="password">パスワード <span class="required">*</span></label>
       <input type="password" id="password" class="form-control" placeholder="8文字以上" autocomplete="new-password">
       <span class="form-hint" style="color:rgba(255,255,255,0.4);">英字・数字を含む8文字以上で設定してください。</span>
+      <span class="field-error-msg" id="err-password"></span>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="password-confirm">パスワード（確認）<span class="required">*</span></label>
+      <input type="password" id="password-confirm" class="form-control" placeholder="もう一度入力してください" autocomplete="new-password">
+      <span class="field-error-msg" id="err-password-confirm"></span>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -192,120 +188,202 @@
 </div>
 
 <script src="../../js/supabase.js"></script>
+<script src="../../js/common.js"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const btn      = document.getElementById('register-btn');
+document.addEventListener('DOMContentLoaded', () => {
+
+  // ── 役職チェックボックスを ROLE_DEFINITIONS から動的生成 ──
+  const roleGroup = document.getElementById('role-group');
+  ROLE_DEFINITIONS.forEach(def => {
+    const label = document.createElement('label');
+    label.className = 'role-checkbox-item';
+    label.innerHTML = `
+      <input type="checkbox" name="role" value="${def.value}"${def.value === 'member' ? ' checked' : ''}>
+      <span>${def.label}</span>
+    `;
+    roleGroup.appendChild(label);
+  });
+
+  // ── バリデーションヘルパー ──
+  const KATAKANA_RE = /^[ァ-ヶー　\s]+$/;
+
+  function setFieldError(fieldId, errId, message) {
+    const field = document.getElementById(fieldId);
+    const errEl = document.getElementById(errId);
+    if (field) field.classList.add('field-error');
+    if (errEl) { errEl.textContent = message; errEl.classList.add('show'); }
+  }
+
+  function clearFieldError(fieldId, errId) {
+    const field = document.getElementById(fieldId);
+    const errEl = document.getElementById(errId);
+    if (field) field.classList.remove('field-error');
+    if (errEl) { errEl.textContent = ''; errEl.classList.remove('show'); }
+  }
+
+  function clearAllErrors() {
     const errorBox = document.getElementById('error-box');
+    errorBox.textContent = '';
+    errorBox.classList.remove('show');
+    [
+      ['last-name','err-last-name'],
+      ['first-name','err-first-name'],
+      ['last-kana','err-last-kana'],
+      ['first-kana','err-first-kana'],
+      ['part','err-part'],
+      ['category','err-category'],
+      ['joined-date','err-joined-date'],
+      ['email','err-email'],
+      ['password','err-password'],
+      ['password-confirm','err-password-confirm'],
+    ].forEach(([f,e]) => clearFieldError(f, e));
+    const errRole = document.getElementById('err-role');
+    if (errRole) { errRole.textContent = ''; errRole.classList.remove('show'); }
+  }
 
-    btn.addEventListener('click', async () => {
-      errorBox.classList.remove('show');
+  // ── 登録ボタン ──
+  const btn      = document.getElementById('register-btn');
+  const errorBox = document.getElementById('error-box');
 
-      // 役職チェックボックスから選択済みを取得
-      const selectedRoles = [...document.querySelectorAll('input[name="role"]:checked')]
-        .map(cb => cb.value);
+  btn.addEventListener('click', async () => {
+    clearAllErrors();
+    let hasError = false;
 
-      if (selectedRoles.length === 0) {
-        errorBox.textContent = '役職を1つ以上選択してください。';
-        errorBox.classList.add('show');
-        return;
-      }
+    // 必須テキスト項目
+    const lastName   = document.getElementById('last-name').value.trim();
+    const firstName  = document.getElementById('first-name').value.trim();
+    const lastKana   = document.getElementById('last-kana').value.trim();
+    const firstKana  = document.getElementById('first-kana').value.trim();
+    const part       = document.getElementById('part').value;
+    const category   = document.getElementById('category').value;
+    const joinedDate = document.getElementById('joined-date').value;
+    const email      = document.getElementById('email').value.trim();
+    const password   = document.getElementById('password').value;
+    const passwordConfirm = document.getElementById('password-confirm').value;
 
-      // 必須項目チェック
-      const requiredFields = ['last-name','first-name','last-kana','first-kana','part','category','joined-date','email','password'];
-      const missing = requiredFields.filter(id => !document.getElementById(id).value.trim());
-      if (missing.length > 0) {
-        errorBox.textContent = '必須項目をすべて入力してください。';
-        errorBox.classList.add('show');
-        return;
-      }
+    if (!lastName)   { setFieldError('last-name','err-last-name','姓を入力してください。'); hasError = true; }
+    if (!firstName)  { setFieldError('first-name','err-first-name','名を入力してください。'); hasError = true; }
 
-      const password = document.getElementById('password').value;
-      if (password.length < 8) {
-        errorBox.textContent = 'パスワードは8文字以上で設定してください。';
-        errorBox.classList.add('show');
-        return;
-      }
+    // フリガナ：未入力チェック → カタカナチェック
+    if (!lastKana) {
+      setFieldError('last-kana','err-last-kana','姓（フリガナ）を入力してください。'); hasError = true;
+    } else if (!KATAKANA_RE.test(lastKana)) {
+      setFieldError('last-kana','err-last-kana','フリガナはカタカナで入力してください。'); hasError = true;
+    }
+    if (!firstKana) {
+      setFieldError('first-kana','err-first-kana','名（フリガナ）を入力してください。'); hasError = true;
+    } else if (!KATAKANA_RE.test(firstKana)) {
+      setFieldError('first-kana','err-first-kana','フリガナはカタカナで入力してください。'); hasError = true;
+    }
 
-      btn.disabled = true;
-      btn.textContent = '登録中…';
+    // 役職
+    const selectedRoles = [...document.querySelectorAll('input[name="role"]:checked')].map(cb => cb.value);
+    if (selectedRoles.length === 0) {
+      const errRole = document.getElementById('err-role');
+      errRole.textContent = '役職を1つ以上選択してください。';
+      errRole.classList.add('show');
+      hasError = true;
+    }
 
-      const formData = {
-        last_name:         document.getElementById('last-name').value.trim(),
-        first_name:        document.getElementById('first-name').value.trim(),
-        last_kana:         document.getElementById('last-kana').value.trim(),
-        first_kana:        document.getElementById('first-kana').value.trim(),
-        roles:             selectedRoles,
-        part:              document.getElementById('part').value,
-        category:          document.getElementById('category').value,
-        joined_date:       document.getElementById('joined-date').value,
-        email:             document.getElementById('email').value.trim(),
-        phone:             document.getElementById('phone').value.trim(),
-        birthday:          document.getElementById('birthday').value || null,
-        emergency_contact: document.getElementById('emergency-contact').value.trim(),
+    if (!part)       { setFieldError('part','err-part','パートを選択してください。'); hasError = true; }
+    if (!category)   { setFieldError('category','err-category','区分を選択してください。'); hasError = true; }
+    if (!joinedDate) { setFieldError('joined-date','err-joined-date','在籍開始年月日を入力してください。'); hasError = true; }
+
+    // メール
+    if (!email) {
+      setFieldError('email','err-email','メールアドレスを入力してください。'); hasError = true;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setFieldError('email','err-email','正しいメールアドレスを入力してください。'); hasError = true;
+    }
+
+    // パスワード
+    if (!password) {
+      setFieldError('password','err-password','パスワードを入力してください。'); hasError = true;
+    } else if (password.length < 8) {
+      setFieldError('password','err-password','パスワードは8文字以上で設定してください。'); hasError = true;
+    }
+
+    // パスワード確認
+    if (!passwordConfirm) {
+      setFieldError('password-confirm','err-password-confirm','確認用パスワードを入力してください。'); hasError = true;
+    } else if (password && password !== passwordConfirm) {
+      setFieldError('password-confirm','err-password-confirm','パスワードが一致しません。'); hasError = true;
+    }
+
+    if (hasError) return;
+
+    btn.disabled = true;
+    btn.textContent = '登録中…';
+
+    const formData = {
+      last_name:         lastName,
+      first_name:        firstName,
+      last_kana:         lastKana,
+      first_kana:        firstKana,
+      roles:             selectedRoles,
+      part,
+      category,
+      joined_date:       joinedDate,
+      email,
+      phone:             document.getElementById('phone').value.trim(),
+      birthday:          document.getElementById('birthday').value || null,
+      emergency_contact: document.getElementById('emergency-contact').value.trim(),
+    };
+
+    // Supabase未接続時はデモ遷移
+    if (!_sb) {
+      window.location.href = 'login.html?registered=1';
+      return;
+    }
+
+    // Supabase Auth でアカウント作成
+    const { data, error } = await _sb.auth.signUp({ email: formData.email, password });
+
+    if (error) {
+      btn.disabled = false;
+      btn.textContent = '登録する';
+      const MSG = {
+        'User already registered': 'このメールアドレスはすでに登録されています。',
+        'Password should be at least 6 characters': 'パスワードは6文字以上必要です。',
       };
+      errorBox.textContent = MSG[error.message] ?? error.message;
+      errorBox.classList.add('show');
+      return;
+    }
 
-      // ★ 修正: Supabase未接続時はデモ遷移（!_sb で判定）
-      if (!_sb) {
-        // ★ 修正: 存在しない register-complete.html ではなく login.html へリダイレクト
-        window.location.href = 'login.html?registered=1';
-        return;
-      }
-
-      // Supabase Auth でアカウント作成
-      const { data, error } = await _sb.auth.signUp({
-        email: formData.email,
-        password,
+    // profiles テーブルに保存
+    if (data?.user) {
+      const { error: profileError } = await _sb.from('profiles').insert({
+        id:                data.user.id,
+        last_name:         formData.last_name,
+        first_name:        formData.first_name,
+        last_kana:         formData.last_kana,
+        first_kana:        formData.first_kana,
+        roles:             formData.roles,
+        part:              formData.part,
+        category:          formData.category,
+        email:             formData.email,
+        phone:             formData.phone,
+        birthday:          formData.birthday,
+        emergency_contact: formData.emergency_contact,
+        joined_date:       formData.joined_date,
       });
 
-      if (error) {
+      if (profileError) {
+        console.error('[HighasuiDX] プロフィール保存エラー:', profileError.message, profileError);
         btn.disabled = false;
         btn.textContent = '登録する';
-        // よくあるエラーを日本語化
-        const MSG = {
-          'User already registered': 'このメールアドレスはすでに登録されています。',
-          'Password should be at least 6 characters': 'パスワードは6文字以上必要です。',
-        };
-        errorBox.textContent = MSG[error.message] ?? error.message;
+        errorBox.textContent =
+          'プロフィール情報の保存に失敗しました。管理者にお問い合わせください。' +
+          '（認証アカウントは作成されています）';
         errorBox.classList.add('show');
         return;
       }
+    }
 
-      // profiles テーブルに保存
-      if (data?.user) {
-        const { error: profileError } = await _sb.from('profiles').insert({
-          id:                data.user.id,
-          last_name:         formData.last_name,
-          first_name:        formData.first_name,
-          last_kana:         formData.last_kana,
-          first_kana:        formData.first_kana,
-          roles:             formData.roles,       // text[] 配列で保存
-          part:              formData.part,
-          category:          formData.category,
-          email:             formData.email,
-          phone:             formData.phone,
-          birthday:          formData.birthday,
-          emergency_contact: formData.emergency_contact,
-          joined_date:       formData.joined_date,
-        });
-
-        if (profileError) {
-          // ★ 修正: anon キーでは auth.admin が使えないため deleteUser は削除。
-          //   代わりに登録失敗をユーザーに伝え、管理者への連絡を促す。
-          console.error('[HighasuiDX] プロフィール保存エラー:', profileError.message, profileError);
-          btn.disabled = false;
-          btn.textContent = '登録する';
-          errorBox.textContent =
-            'プロフィール情報の保存に失敗しました。管理者にお問い合わせください。' +
-            '（認証アカウントは作成されています）';
-          errorBox.classList.add('show');
-          return;
-        }
-      }
-
-      // ★ 修正: 存在しない register-complete.html ではなく login.html へリダイレクト
-      window.location.href = 'login.html?registered=1';
-    });
+    window.location.href = 'login.html?registered=1';
   });
+});
 </script>
 </body>
 </html>
