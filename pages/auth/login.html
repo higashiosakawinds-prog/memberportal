@@ -67,18 +67,18 @@
   </style>
 </head>
 <body>
-
+ 
 <div class="login-container">
   <div class="login-logo">
     <span class="login-logo__name">東大阪吹奏楽団</span>
     <div class="login-logo__divider"></div>
     <span class="login-logo__sub">HIGASUI WINDS · DX SYSTEM</span>
   </div>
-
+ 
   <div class="login-card">
     <h2>ログイン</h2>
     <div class="error-box" id="error-box"></div>
-
+ 
     <div class="form-group">
       <label class="form-label" for="email">メールアドレス <span class="required">*</span></label>
       <input type="email" id="email" class="form-control" placeholder="example@mail.com" autocomplete="email">
@@ -87,36 +87,36 @@
       <label class="form-label" for="password">パスワード <span class="required">*</span></label>
       <input type="password" id="password" class="form-control" placeholder="••••••••" autocomplete="current-password">
     </div>
-
+ 
     <button class="login-submit" id="login-btn" type="button">ログイン</button>
-
+ 
     <div class="login-footer">
       <a href="register.html">新規登録はこちら</a>
     </div>
   </div>
 </div>
-
+ 
 <script src="../../js/supabase.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const btn      = document.getElementById('login-btn');
   const errorBox = document.getElementById('error-box');
-
+ 
   const doLogin = async () => {
     const email    = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
-
+ 
     errorBox.classList.remove('show');
-
+ 
     if (!email || !password) {
       errorBox.textContent = 'メールアドレスとパスワードを入力してください。';
       errorBox.classList.add('show');
       return;
     }
-
+ 
     btn.disabled = true;
     btn.textContent = '認証中…';
-
+ 
     // Supabase未接続時はデモログイン
     if (!_sb) {
       setTimeout(() => {
@@ -127,9 +127,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 800);
       return;
     }
-
+ 
     const { data, error } = await _sb.auth.signInWithPassword({ email, password });
-
+ 
     if (error) {
       btn.disabled = false;
       btn.textContent = 'ログイン';
@@ -137,20 +137,30 @@ document.addEventListener('DOMContentLoaded', () => {
       errorBox.classList.add('show');
       return;
     }
-
+ 
     // profiles レコードの有無を確認
-    const { data: profile } = await _sb
+    const { data: profile, error: profileError } = await _sb
       .from('profiles')
       .select('id, last_name, first_name, roles, part')
       .eq('id', data.user.id)
       .maybeSingle();
-
+ 
+    // DBエラー（500など）の場合はログイン失敗として扱い、profile-setupには飛ばない
+    if (profileError) {
+      console.error('[HighasuiDX] profiles取得エラー:', profileError.message, profileError);
+      btn.disabled = false;
+      btn.textContent = 'ログイン';
+      errorBox.textContent = 'ログイン処理中にエラーが発生しました。しばらく経ってから再度お試しください。';
+      errorBox.classList.add('show');
+      return;
+    }
+ 
     if (!profile) {
-      // 未登録 → プロフィール入力画面へ
+      // profilesにレコードなし → プロフィール入力画面へ
       window.location.href = 'profile-setup.html';
       return;
     }
-
+ 
     // セッションに保存
     const roles = Array.isArray(profile.roles) && profile.roles.length > 0
       ? profile.roles
@@ -161,10 +171,10 @@ document.addEventListener('DOMContentLoaded', () => {
       roles,
       part:  profile.part,
     }));
-
+ 
     window.location.href = '../../index.html';
   };
-
+ 
   btn.addEventListener('click', doLogin);
   document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 });
