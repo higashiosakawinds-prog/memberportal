@@ -254,16 +254,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   try {
-    // scores2から公開中の楽譜を取得
-    const { data: publicScores, error } = await _sb
+    // scores2から全楽譜を取得し、フロントでスケジュール含む公開判定を行う
+    const { data: allScoresData, error } = await _sb
       .from('scores2')
-      .select('id, title_ja, score_number')
-      .eq('is_public', true)
+      .select('id, title_ja, score_number, is_public, publish_start, publish_end')
       .order('score_number', { ascending: true });
 
     if (error) throw error;
 
-    if (!publicScores || publicScores.length === 0) {
+    // 実効公開状態の判定（手動公開 OR スケジュール期間内）
+    const now = new Date();
+    function isEffectivelyPublic(s) {
+      if (s.is_public) return true;
+      const start = s.publish_start ? new Date(s.publish_start) : null;
+      const end   = s.publish_end   ? new Date(s.publish_end)   : null;
+      if (!start && !end) return false;
+      const afterStart = start ? now >= start : true;
+      const beforeEnd  = end   ? now <= end   : true;
+      return afterStart && beforeEnd;
+    }
+
+    const publicScores = (allScoresData ?? []).filter(isEffectivelyPublic);
+
+    if (publicScores.length === 0) {
       wrap.innerHTML = `
         <div style="text-align:center;padding:var(--space-8);color:var(--gray-500);background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--gray-200);">
           <p style="font-size:var(--text-sm);">現在公開中の楽譜はありません。</p>
@@ -284,13 +297,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       pdfMap[pdf.score_id].push(pdf);
     });
 
+    // 日時フォーマット
+    const fmtDate = isoStr => {
+      if (!isoStr) return null;
+      return new Date(isoStr).toLocaleString('ja-JP', {
+        year:'numeric', month:'2-digit', day:'2-digit',
+        hour:'2-digit', minute:'2-digit',
+      });
+    };
+
     // テーブル描画
     const rows = publicScores.map(s => {
-      const pdfs = pdfMap[s.id] ?? [];
+      const pdfs    = pdfMap[s.id] ?? [];
+      const endDate = s.publish_end ? fmtDate(s.publish_end) : null;
       return `
         <tr>
           <td style="font-weight:600;color:var(--navy-800);">${escHtml(s.title_ja)}</td>
           <td style="font-size:var(--text-xs);color:var(--gray-500);">${pdfs.length}パート</td>
+          <td style="font-size:var(--text-xs);color:var(--gray-500);">
+            ${endDate ? `〜 ${escHtml(endDate)}` : '—'}
+          </td>
           <td>
             <a href="pages/scores.html" class="btn btn-sm btn-outline">詳細・印刷</a>
           </td>
@@ -304,6 +330,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <tr>
               <th>曲名</th>
               <th>パート数</th>
+              <th>公開終了</th>
               <th style="width:130px;"></th>
             </tr>
           </thead>
