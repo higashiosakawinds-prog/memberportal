@@ -68,6 +68,18 @@
       </div>
     </div>
 
+    <!-- 連絡 -->
+    <div class="mb-6 fade-in fade-in-5">
+      <p class="page-header__eyebrow">CONTACT</p>
+      <h2 class="page-header__title" style="font-size:var(--text-2xl);">連絡</h2>
+    </div>
+    <div id="contact-messages-wrap" class="mb-8 fade-in fade-in-5">
+      <div style="text-align:center;padding:var(--space-8);color:var(--gray-500);">
+        <div class="loading-spinner" style="margin:0 auto var(--space-3);"></div>
+        <p style="font-size:var(--text-sm);">連絡データを読み込み中…</p>
+      </div>
+    </div>
+
     <!-- 機能メニュー -->
     <div class="mb-6 fade-in fade-in-5">
       <p class="page-header__eyebrow">MENU</p>
@@ -216,6 +228,22 @@
   </main><!-- /main-content -->
 </div><!-- /app-layout -->
 
+<!-- 連絡詳細モーダル（全体連絡の本文表示用） -->
+<div class="modal-overlay" id="modal-contact-detail">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal__header">
+      <h2 class="modal__title" id="contact-detail-title">連絡内容</h2>
+      <button class="modal__close" onclick="closeModal('modal-contact-detail')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body" id="contact-detail-body"></div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-contact-detail')">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <!-- トースト通知コンテナ -->
 <div class="toast-container" id="toast-container"></div>
 
@@ -345,7 +373,198 @@ document.addEventListener('DOMContentLoaded', async () => {
         <p style="font-size:var(--text-sm);">楽譜データの取得に失敗しました。</p>
       </div>`;
   }
+
+  // ─── 連絡セクション ───
+  await loadContactMessages();
 });
+
+// ── 連絡メッセージの取得・表示 ──
+async function loadContactMessages() {
+  const contactWrap = document.getElementById('contact-messages-wrap');
+  if (!_sb) {
+    contactWrap.innerHTML = `
+      <div style="text-align:center;padding:var(--space-8);color:var(--gray-500);background:var(--white);border-radius:var(--radius-lg);border:1px dashed var(--gray-300);">
+        <p style="font-size:var(--text-sm);">Supabase未接続のため連絡データを取得できません。</p>
+      </div>`;
+    return;
+  }
+
+  try {
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    const { data: msgs, error: msgsError } = await _sb
+      .from('contact_messages')
+      .select('id, type, subject, body, sender_name, sent_at, target_member_names')
+      .gte('sent_at', oneMonthAgo.toISOString())
+      .order('sent_at', { ascending: false });
+
+    if (msgsError) throw msgsError;
+
+    if (!msgs || msgs.length === 0) {
+      contactWrap.innerHTML = `
+        <div style="text-align:center;padding:var(--space-8);color:var(--gray-500);background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--gray-200);">
+          <p style="font-size:var(--text-sm);">過去1か月の連絡はありません。</p>
+        </div>`;
+      return;
+    }
+
+    const fmtDate = isoStr => {
+      if (!isoStr) return '—';
+      return new Date(isoStr).toLocaleString('ja-JP', {
+        year:'numeric', month:'2-digit', day:'2-digit',
+        hour:'2-digit', minute:'2-digit',
+      });
+    };
+
+    const rows = msgs.map(msg => {
+      const typeLabel = msg.type === 'broadcast'
+        ? '<span class="badge badge-danger" style="font-size:10px;">全体連絡</span>'
+        : '<span class="badge badge-navy" style="font-size:10px;">個別連絡</span>';
+
+      let summary;
+      if (msg.type === 'broadcast') {
+        summary = `<button class="btn btn-sm btn-outline" onclick="openContactDetail('${escHtml(msg.id)}')">内容を確認</button>`;
+      } else {
+        const names = Array.isArray(msg.target_member_names) && msg.target_member_names.length > 0
+          ? msg.target_member_names.join('、')
+          : '—';
+        summary = `<span style="font-size:var(--text-xs);color:var(--gray-600);">${escHtml(names)} さんへ連絡が届いています</span>`;
+      }
+
+      return `
+        <tr>
+          <td>${typeLabel}</td>
+          <td style="font-weight:600;color:var(--navy-800);">${escHtml(msg.subject)}</td>
+          <td style="font-size:var(--text-sm);color:var(--gray-600);">${escHtml(msg.sender_name ?? '—')}</td>
+          <td style="font-size:var(--text-xs);color:var(--gray-500);white-space:nowrap;">${escHtml(fmtDate(msg.sent_at))}</td>
+          <td>${summary}</td>
+        </tr>`;
+    }).join('');
+
+    contactWrap.innerHTML = `
+      <div style="border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--gray-200);overflow-x:auto;">
+        <table class="table" style="min-width:500px;">
+          <thead>
+            <tr>
+              <th>種別</th>
+              <th>件名</th>
+              <th>送信者</th>
+              <th>送信日時</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div style="margin-top:var(--space-4);text-align:right;">
+        <button class="btn btn-sm btn-outline" onclick="openPastContacts()" style="font-size:var(--text-xs);">
+          過去の連絡を確認する →
+        </button>
+      </div>`;
+
+  } catch (e) {
+    console.warn('[HighasuiDX] 連絡データの取得失敗:', e.message);
+    contactWrap.innerHTML = `
+      <div style="text-align:center;padding:var(--space-6);color:var(--gray-500);background:var(--white);border-radius:var(--radius-lg);border:1px dashed var(--gray-300);">
+        <p style="font-size:var(--text-sm);">連絡データの取得に失敗しました。</p>
+      </div>`;
+  }
+}
+
+// ── 全体連絡の詳細をモーダルで表示 ──
+async function openContactDetail(id) {
+  if (!_sb) return;
+  const { data, error } = await _sb
+    .from('contact_messages')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error || !data) return;
+
+  const sentDate = data.sent_at
+    ? new Date(data.sent_at).toLocaleString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
+    : '—';
+
+  document.getElementById('contact-detail-title').textContent = data.subject ?? '連絡内容';
+  document.getElementById('contact-detail-body').innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);margin-bottom:var(--space-4);">
+      <span class="badge badge-danger">全体連絡</span>
+      <span class="badge badge-navy">送信者：${escHtml(data.sender_name ?? '—')}</span>
+      <span class="badge badge-navy">${escHtml(sentDate)}</span>
+    </div>
+    <p style="font-size:var(--text-xs);font-weight:700;color:var(--navy-800);letter-spacing:.1em;text-transform:uppercase;margin-bottom:var(--space-2);">件名</p>
+    <p style="font-size:var(--text-sm);font-weight:600;color:var(--navy-800);margin-bottom:var(--space-4);">${escHtml(data.subject)}</p>
+    <p style="font-size:var(--text-xs);font-weight:700;color:var(--navy-800);letter-spacing:.1em;text-transform:uppercase;margin-bottom:var(--space-2);">本文</p>
+    <div style="background:var(--gray-100);border-radius:var(--radius-md);padding:var(--space-4);font-size:var(--text-sm);line-height:1.9;white-space:pre-wrap;word-break:break-all;max-height:320px;overflow-y:auto;">${escHtml(data.body ?? '')}</div>
+  `;
+  openModal('modal-contact-detail');
+}
+
+// ── 過去の連絡（1年分）モーダル ──
+async function openPastContacts() {
+  if (!_sb) return;
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+  const { data, error } = await _sb
+    .from('contact_messages')
+    .select('id, type, subject, sender_name, sent_at')
+    .gte('sent_at', oneYearAgo.toISOString())
+    .order('sent_at', { ascending: false });
+
+  if (error || !data) return;
+
+  const fmtDate = isoStr => {
+    if (!isoStr) return '—';
+    return new Date(isoStr).toLocaleString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' });
+  };
+
+  const rows = data.length === 0
+    ? '<p style="font-size:var(--text-sm);color:var(--gray-500);padding:var(--space-4);">過去1年の連絡はありません。</p>'
+    : data.map(msg => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--gray-200);gap:var(--space-3);flex-wrap:wrap;">
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-1);flex-wrap:wrap;">
+              ${msg.type === 'broadcast'
+                ? '<span class="badge badge-danger" style="font-size:10px;">全体連絡</span>'
+                : '<span class="badge badge-navy" style="font-size:10px;">個別連絡</span>'}
+              <span style="font-size:var(--text-xs);color:var(--gray-500);">${escHtml(fmtDate(msg.sent_at))}</span>
+            </div>
+            <p style="font-size:var(--text-sm);font-weight:600;color:var(--navy-800);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(msg.subject)}</p>
+            <p style="font-size:var(--text-xs);color:var(--gray-500);">${escHtml(msg.sender_name ?? '—')}</p>
+          </div>
+          ${msg.type === 'broadcast'
+            ? `<button class="btn btn-sm btn-outline" onclick="openContactDetail('${escHtml(msg.id)}');closeModal('modal-past-contacts');">内容を確認</button>`
+            : ''}
+        </div>`).join('');
+
+  // モーダルがなければ動的生成
+  if (!document.getElementById('modal-past-contacts')) {
+    const el = document.createElement('div');
+    el.className = 'modal-overlay';
+    el.id = 'modal-past-contacts';
+    el.innerHTML = `
+      <div class="modal" style="max-width:560px;">
+        <div class="modal__header">
+          <h2 class="modal__title">過去の連絡（直近1年）</h2>
+          <button class="modal__close" onclick="closeModal('modal-past-contacts')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="modal__body" id="past-contacts-body" style="max-height:60vh;overflow-y:auto;"></div>
+        <div class="modal__footer">
+          <button class="btn btn-outline" onclick="closeModal('modal-past-contacts')">閉じる</button>
+        </div>
+      </div>`;
+    el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+    document.body.appendChild(el);
+  }
+
+  document.getElementById('past-contacts-body').innerHTML = rows;
+  document.getElementById('modal-past-contacts').classList.add('open');
+}
 
 function escHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, c =>
@@ -354,3 +573,4 @@ function escHtml(str) {
 </script>
 </body>
 </html>
+
