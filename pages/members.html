@@ -180,10 +180,10 @@
 <script src="../js/common.js"></script>
 <script>
 const PART_LABELS = {
-  flute:'フルート', oboe:'オーボエ', clarinet:'クラリネット', bassoon:'ファゴット',
-  saxophone:'サクソフォーン', horn:'ホルン', trumpet:'トランペット', trombone:'トロンボーン',
-  euphonium:'ユーフォニアム', tuba:'テューバ', percussion:'打楽器', contrabass:'コントラバス',
-  piano:'ピアノ', staff:'スタッフ', other:'その他',
+  piccolo:'Piccolo',flute:'Flute', oboe:'Oboe', clarinet:'Clarinet', bassoon:'Bassoon',
+  ssaxophone:'S.Sax', asaxophone:'A.Sax', tsaxophone:'T.Sax', bsaxophone:'B.Sax', horn:'Horn', trumpet:'Trumpet', trombone:'Trombone',
+  euphonium:'Euphonium', tuba:'Tuba', percussion:'Percussion', contrabass:'Contrabass',
+  piano:'Piano', staff:'Staff', other:'Other',
 };
 const CATEGORY_LABELS = { regular:'正団員', trainee:'準団員', rest:'休団中', support:'賛助' };
 const CATEGORY_BADGE  = { regular:'badge-success', trainee:'badge-navy', rest:'badge-warning', support:'badge-gold' };
@@ -192,7 +192,7 @@ const CATEGORY_BADGE  = { regular:'badge-success', trainee:'badge-navy', rest:'b
 const DETAIL_ROLES = ['gm', 'admin'];
 
 const DEMO_MEMBERS = [
-  { id:'1', last_name:'山田', first_name:'太郎', last_kana:'ヤマダ', first_kana:'タロウ', part:'clarinet', roles:['admin'], category:'regular', joined_date:'2020-04-01', email:'yamada@example.com', phone:'090-0000-0001', birthday:'1995-08-15', emergency_contact:'山田 花子：母：090-0000-0099', created_at:'2020-04-01T00:00:00Z' },
+  { id:'1', last_name:'デモ', first_name:'データ', last_kana:'デモ', first_kana:'データ', part:'clarinet', roles:['admin'], category:'regular', joined_date:'2020-04-01', email:'yamada@example.com', phone:'090-0000-0001', birthday:'1995-08-15', emergency_contact:'山田 花子：母：090-0000-0099', created_at:'2020-04-01T00:00:00Z' },
   { id:'2', last_name:'鈴木', first_name:'花子', last_kana:'スズキ', first_kana:'ハナコ', part:'flute', roles:['conductor'], category:'regular', joined_date:'2019-04-01', email:'suzuki@example.com', phone:'090-0000-0002', birthday:'1990-03-22', emergency_contact:'', created_at:'2019-04-01T00:00:00Z' },
   { id:'3', last_name:'田中', first_name:'一郎', last_kana:'タナカ', first_kana:'イチロウ', part:'trumpet', roles:['manager'], category:'regular', joined_date:'2021-09-01', email:'tanaka@example.com', phone:'', birthday:'', emergency_contact:'', created_at:'2021-09-01T00:00:00Z' },
   { id:'4', last_name:'佐藤', first_name:'美咲', last_kana:'サトウ', first_kana:'ミサキ', part:'horn', roles:['treasurer'], category:'regular', joined_date:'2022-04-01', email:'sato@example.com', phone:'090-0000-0004', birthday:'1998-12-01', emergency_contact:'', created_at:'2022-04-01T00:00:00Z' },
