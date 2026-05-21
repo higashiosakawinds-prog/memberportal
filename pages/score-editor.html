@@ -377,7 +377,7 @@
      閲覧設定モーダル
      ══════════════════════════════════ -->
 <div class="modal-overlay" id="modal-visibility">
-  <div class="modal" style="max-width:480px;">
+  <div class="modal" style="max-width:520px;">
     <div class="modal__header">
       <h2 class="modal__title" id="visibility-modal-title">閲覧設定</h2>
       <button class="modal__close" onclick="closeModal('modal-visibility')">
@@ -385,6 +385,9 @@
       </button>
     </div>
     <div class="modal__body">
+
+      <!-- 手動公開トグル -->
+      <p style="font-size:var(--text-xs);font-weight:700;color:var(--gold-500);letter-spacing:.15em;text-transform:uppercase;border-bottom:1px solid var(--gray-200);padding-bottom:var(--space-2);margin-bottom:var(--space-4);">手動公開</p>
       <div class="visibility-toggle">
         <label class="toggle-switch" style="cursor:pointer;">
           <input type="checkbox" id="visibility-toggle-input" onchange="onVisibilityChange()">
@@ -393,13 +396,29 @@
         </label>
         <div>
           <p style="font-weight:700;color:var(--navy-800);" id="visibility-status-label">非公開</p>
-          <p style="font-size:var(--text-sm);color:var(--gray-500);">公開すると一般団員が楽譜一覧でPDFを閲覧・ダウンロードできます。</p>
+          <p style="font-size:var(--text-sm);color:var(--gray-500);">ONにすると一般団員がPDFを閲覧・ダウンロードできます。</p>
         </div>
       </div>
-      <div class="alert alert-info" style="margin-top:var(--space-4);">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
-        <span>公開設定はいつでも変更できます。</span>
+
+      <!-- スケジュール公開 -->
+      <p style="font-size:var(--text-xs);font-weight:700;color:var(--gold-500);letter-spacing:.15em;text-transform:uppercase;border-bottom:1px solid var(--gray-200);padding-bottom:var(--space-2);margin-top:var(--space-6);margin-bottom:var(--space-4);">スケジュール公開</p>
+      <div class="form-grid-2">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">公開開始日時</label>
+          <input type="datetime-local" id="visibility-start" class="form-control">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">公開終了日時</label>
+          <input type="datetime-local" id="visibility-end" class="form-control">
+        </div>
       </div>
+      <p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:var(--space-2);">
+        開始・終了日時を設定すると、期間中は自動的に公開されます。手動公開との併用も可能です。クリアする場合は空欄にして保存してください。
+      </p>
+
+      <!-- 現在の公開状態 -->
+      <div id="visibility-current-status" style="margin-top:var(--space-4);"></div>
+
     </div>
     <div class="modal__footer">
       <button class="btn btn-outline" onclick="closeModal('modal-visibility')">閉じる</button>
@@ -481,22 +500,23 @@ function autoKanaIndex(kana) {
   }
 
   const firstChar = kana.trim()[0];
-  const kanaMap = {
-    'あ':'あ','い':'い','う':'う','え':'え','お':'お',
-    'かが':'か','きぎ':'き', 'くぐ':'く','けげ':'け','こご':'こ',
-    'さざ':'さ','しじ':'し', 'すず':'す','せぜ':'せ','そぞ':'そ',
-    'ただ':'た','ちぢ':'ち', 'つづ':'つ','てで':'て','とど':'と',
-    'な':'な','に':'に', 'ぬ':'ぬ','ね':'ね','の':'の',
-    'はばぱ':'は','ひびぴ':'ひ', 'ふぶぷ':'ふ','へべぺ':'へ','ほぼぽ':'ほ',
-    'ま':'ま','み':'み', 'む':'む','め':'め','も':'も',
-    'や':'や','ゆ':'ゆ', 'よ':'よ',
-    'ら':'ら','り':'り', 'る':'る','れ':'れ','ろ':'ろ',
-    'わ':'わ','を':'を', 'ん':'ん'
+
+  // 濁音・半濁音を清音に正規化してから判定
+  const normalize = {
+    'が':'か','ぎ':'き','ぐ':'く','げ':'け','ご':'こ',
+    'ざ':'さ','じ':'し','ず':'す','ぜ':'せ','ぞ':'そ',
+    'だ':'た','ぢ':'ち','づ':'つ','で':'て','ど':'と',
+    'ば':'は','び':'ひ','ぶ':'ふ','べ':'へ','ぼ':'ほ',
+    'ぱ':'は','ぴ':'ひ','ぷ':'ふ','ぺ':'へ','ぽ':'ほ',
+    'ぁ':'あ','ぃ':'い','ぅ':'う','ぇ':'え','ぉ':'お',
+    'っ':'つ','ゃ':'や','ゅ':'ゆ','ょ':'よ','ゎ':'わ',
   };
-  let kanaIndex = 'その他';
-  for (const [chars, label] of Object.entries(kanaMap)) {
-    if (chars.includes(firstChar)) { kanaIndex = label; break; }
-  }
+  const base = normalize[firstChar] ?? firstChar;
+
+  // 五十音50文字に含まれるかチェック
+  const gojuuon = 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん';
+  const kanaIndex = gojuuon.includes(base) ? base : 'その他';
+
   document.getElementById('edit-index-kana').value = kanaIndex;
 }
 
@@ -735,23 +755,20 @@ async function loadPdfList(scoreId) {
 function buildPartOptions(selectedKey = '') {
   const opts = [
     ['', '選択してください'],
-    ['conductor', 'Score'],
-    ['flute', 'Flute'],
-    ['oboe', 'Oboe'],
-    ['clarinet', 'Clarinet'],
-    ['bassoon', 'Bassoon'],
-    ['Ssaxophone', 'S.Saxophone'],
-    ['Asaxophone', 'A.Saxophone'],
-    ['Tsaxophone', 'T.Saxophone'],
-    ['Bsaxophone', 'B.Saxophone'],
-    ['horn', 'Horn'],
-    ['trumpet', 'Trumpet'],
-    ['trombone', 'Trombone'],
-    ['euphonium', 'Euphonium'],
-    ['tuba', 'Tuba'],
-    ['percussion', 'Percussion'],
-    ['contrabass', 'Contrabass'],
-    ['other', 'Other'],
+    ['conductor', '指揮者譜'],
+    ['flute', 'フルート'],
+    ['oboe', 'オーボエ'],
+    ['clarinet', 'クラリネット'],
+    ['bassoon', 'ファゴット'],
+    ['saxophone', 'サクソフォーン'],
+    ['horn', 'ホルン'],
+    ['trumpet', 'トランペット'],
+    ['trombone', 'トロンボーン'],
+    ['euphonium', 'ユーフォニアム'],
+    ['tuba', 'テューバ'],
+    ['percussion', '打楽器'],
+    ['contrabass', 'コントラバス'],
+    ['other', 'その他'],
   ];
   return opts.map(([v, l]) =>
     `<option value="${v}" ${v === selectedKey ? 'selected' : ''}>${l}</option>`
@@ -952,16 +969,82 @@ async function deletePdf(pdfId, storagePath) {
 // ══════════════════════════════════════
 //  閲覧設定モーダル
 // ══════════════════════════════════════
+
+// datetime-local の入力値（ローカル時刻）を ISO 文字列（UTC）に変換
+function localToIso(localStr) {
+  if (!localStr) return null;
+  return new Date(localStr).toISOString();
+}
+
+// ISO 文字列を datetime-local の入力値形式に変換
+function isoToLocal(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  // YYYY-MM-DDTHH:mm（秒以下を切り捨て）
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// スケジュールが現在有効かを判定
+function isScheduleActive(publishStart, publishEnd) {
+  const now = new Date();
+  const start = publishStart ? new Date(publishStart) : null;
+  const end   = publishEnd   ? new Date(publishEnd)   : null;
+  if (!start && !end) return false;
+  const afterStart = start ? now >= start : true;
+  const beforeEnd  = end   ? now <= end   : true;
+  return afterStart && beforeEnd;
+}
+
+// モーダルを開く際の現在の公開状態サマリーを更新
+function updateCurrentStatus(isPublic, publishStart, publishEnd) {
+  const el = document.getElementById('visibility-current-status');
+  const scheduleActive = isScheduleActive(publishStart, publishEnd);
+  const effectivelyPublic = isPublic || scheduleActive;
+
+  const fmt = isoStr => {
+    if (!isoStr) return '—';
+    return new Date(isoStr).toLocaleString('ja-JP', {
+      year:'numeric', month:'2-digit', day:'2-digit',
+      hour:'2-digit', minute:'2-digit',
+    });
+  };
+
+  el.innerHTML = `
+    <div class="alert ${effectivelyPublic ? 'alert-success' : 'alert-info'}" style="margin-top:0;">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+        ${effectivelyPublic
+          ? `<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.641 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>`
+          : `<path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>`}
+      </svg>
+      <div>
+        <p style="font-weight:700;">現在の状態：${effectivelyPublic ? '公開中' : '非公開'}</p>
+        ${publishStart || publishEnd ? `
+          <p style="font-size:var(--text-xs);margin-top:2px;">
+            スケジュール：${fmt(publishStart)} 〜 ${fmt(publishEnd)}
+            ${scheduleActive ? '（期間中）' : '（期間外）'}
+          </p>` : ''}
+      </div>
+    </div>`;
+}
+
 function openVisibilityModal(id) {
   visibilityTarget = allScores.find(x => x.id === id);
   if (!visibilityTarget) return;
 
   document.getElementById('visibility-modal-title').textContent
     = `閲覧設定 — ${visibilityTarget.title_ja}`;
-  const isPublic = visibilityTarget.is_public ?? false;
+
+  const isPublic     = visibilityTarget.is_public     ?? false;
+  const publishStart = visibilityTarget.publish_start ?? null;
+  const publishEnd   = visibilityTarget.publish_end   ?? null;
+
   document.getElementById('visibility-toggle-input').checked = isPublic;
   document.getElementById('visibility-status-label').textContent = isPublic ? '公開中' : '非公開';
+  document.getElementById('visibility-start').value = isoToLocal(publishStart);
+  document.getElementById('visibility-end').value   = isoToLocal(publishEnd);
 
+  updateCurrentStatus(isPublic, publishStart, publishEnd);
   openModal('modal-visibility');
 }
 
@@ -974,22 +1057,37 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-save-visibility').addEventListener('click', async () => {
     if (!visibilityTarget || !_sb) return;
 
-    const isPublic = document.getElementById('visibility-toggle-input').checked;
+    const isPublic     = document.getElementById('visibility-toggle-input').checked;
+    const publishStart = localToIso(document.getElementById('visibility-start').value);
+    const publishEnd   = localToIso(document.getElementById('visibility-end').value);
+
+    // 終了日時が開始日時より前の場合はエラー
+    if (publishStart && publishEnd && new Date(publishStart) >= new Date(publishEnd)) {
+      showToast('公開終了日時は開始日時より後に設定してください', 'error'); return;
+    }
+
     const { error } = await _sb
       .from('scores2')
-      .update({ is_public: isPublic })
+      .update({ is_public: isPublic, publish_start: publishStart, publish_end: publishEnd })
       .eq('id', visibilityTarget.id);
 
     if (error) {
       showToast(`更新失敗: ${error.message}`, 'error'); return;
     }
 
-    visibilityTarget.is_public = isPublic;
+    // ローカルの allScores を更新
+    visibilityTarget.is_public     = isPublic;
+    visibilityTarget.publish_start = publishStart;
+    visibilityTarget.publish_end   = publishEnd;
     const idx = allScores.findIndex(x => x.id === visibilityTarget.id);
-    if (idx !== -1) allScores[idx].is_public = isPublic;
+    if (idx !== -1) {
+      allScores[idx].is_public     = isPublic;
+      allScores[idx].publish_start = publishStart;
+      allScores[idx].publish_end   = publishEnd;
+    }
 
     closeModal('modal-visibility');
-    showToast(isPublic ? 'PDFを公開しました' : '非公開にしました', 'success');
+    showToast('閲覧設定を保存しました', 'success');
     renderTable();
   });
 });
