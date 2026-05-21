@@ -30,6 +30,8 @@ const ROLE_PERMISSIONS = {
   nav_qrcode:             ['all'],
   nav_contact:            ['all'],
   nav_requests:           ['all'],
+  nav_contact:  ['gm', 'admin', 'manager'],
+contact_send: ['gm', 'admin', 'manager'],
 
   // ── 各ページの操作（編集・追加・削除）権限 ──
   // ページ内で canDo('scores_edit') を呼び出して判定します
