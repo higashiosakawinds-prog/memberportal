@@ -174,6 +174,21 @@ function escHtml(str) {
 }
 
 // ══════════════════════════════════════
+//  公開状態の実効判定
+//  手動公開 OR スケジュール期間内 → true
+// ══════════════════════════════════════
+function isEffectivelyPublic(score) {
+  if (score.is_public) return true;
+  const now   = new Date();
+  const start = score.publish_start ? new Date(score.publish_start) : null;
+  const end   = score.publish_end   ? new Date(score.publish_end)   : null;
+  if (!start && !end) return false;
+  const afterStart = start ? now >= start : true;
+  const beforeEnd  = end   ? now <= end   : true;
+  return afterStart && beforeEnd;
+}
+
+// ══════════════════════════════════════
 //  テーブル描画
 // ══════════════════════════════════════
 function renderTable() {
@@ -185,7 +200,7 @@ function renderTable() {
     const text = `${s.title_ja}${s.title_en}${s.title_kana}${s.composer}${s.artist}`.toLowerCase();
     if (kw        && !text.includes(kw))          return false;
     if (formation && s.formation !== formation)    return false;
-    if (pubOnly   && !s.is_public)                return false;
+    if (pubOnly   && !isEffectivelyPublic(s))      return false;
     return true;
   });
 
@@ -211,7 +226,7 @@ function renderTable() {
         ${s.formation ? `<span class="badge badge-navy">${escHtml(s.formation)}</span>` : '—'}
       </td>
       <td style="text-align:center;">
-        ${s.is_public
+        ${isEffectivelyPublic(s)
           ? `<span class="badge badge-success">公開中</span>`
           : `<span class="badge" style="background:var(--gray-200);color:var(--gray-500);">非公開</span>`}
       </td>
@@ -294,8 +309,8 @@ async function openDetail(id) {
     partName: extractPartName(pdf.file_name, s.title_ja),
   }));
 
-  // 閲覧可能なPDFを絞り込み（公開中かつログイン済みかつ担当楽器一致）
-  const accessiblePdfs = (s.is_public && userPart)
+  // 閲覧可能なPDFを絞り込み（実効公開中かつログイン済みかつ担当楽器一致）
+  const accessiblePdfs = (isEffectivelyPublic(s) && userPart)
     ? pdfsWithPartName.filter(pdf => isAccessiblePdf(pdf.partName, userPart))
     : [];
 
@@ -318,7 +333,7 @@ async function openDetail(id) {
       </div>
     ` : ''}
 
-    ${!s.is_public ? `
+    ${!isEffectivelyPublic(s) ? `
       <div class="alert alert-info" style="margin-top:var(--space-4);">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
         <span>この楽譜のPDFは現在非公開です。</span>
