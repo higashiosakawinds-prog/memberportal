@@ -282,10 +282,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div style="text-align:center;padding:var(--space-8);color:var(--gray-500);background:var(--white);border-radius:var(--radius-lg);border:1px dashed var(--gray-300);">
         <p style="font-size:var(--text-sm);">Supabase未接続のため楽譜データを取得できません。</p>
       </div>`;
-    return;
-  }
-
-  try {
+  } else try {
     // scores2から全楽譜を取得し、フロントでスケジュール含む公開判定を行う
     const { data: allScoresData, error } = await _sb
       .from('scores2')
@@ -313,8 +310,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div style="text-align:center;padding:var(--space-8);color:var(--gray-500);background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--gray-200);">
           <p style="font-size:var(--text-sm);">現在公開中の楽譜はありません。</p>
         </div>`;
-      return;
-    }
+    } else {
 
     // 各楽曲のPDFを一括取得
     const scoreIds = publicScores.map(s => s.id);
@@ -370,6 +366,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         </table>
       </div>`;
 
+    } // end else (publicScores > 0)
   } catch (e) {
     console.warn('[HighasuiDX] 公開中楽譜の取得失敗:', e.message);
     wrap.innerHTML = `
@@ -377,10 +374,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         <p style="font-size:var(--text-sm);">楽譜データの取得に失敗しました。</p>
       </div>`;
   }
-});
+
   // ─── 連絡セクション ───
   await loadContactMessages();
-
+});
 
 // ── 連絡メッセージの取得・表示 ──
 async function loadContactMessages() {
@@ -577,4 +574,5 @@ function escHtml(str) {
 </script>
 </body>
 </html>
+
 
