@@ -9,13 +9,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     /* ── パスワードロック画面 ── */
-    #lock-screen {
+    .lock-overlay {
       position: fixed; inset: 0; z-index: 9000;
       background: var(--navy-900);
       display: flex; align-items: center; justify-content: center;
       padding: var(--space-4);
     }
-    #lock-screen::before {
+    .lock-overlay.hidden { display: none; }
+    .lock-overlay::before {
       content: '';
       position: absolute; inset: 0;
       background:
@@ -190,7 +191,7 @@
 <body>
 
 <!-- ── パスワードロック画面 ── -->
-<div id="lock-screen">
+<div class="lock-overlay" id="lock-overlay">
   <div class="lock-card">
     <div class="lock-logo">
       <div class="lock-logo__icon">
@@ -463,10 +464,11 @@ function escHtml(str) {
 // ══════════════════════════════════════════════════
 //  パスワードロック
 // ══════════════════════════════════════════════════
-function checkPassword() {
-  const pw = document.getElementById('lock-password').value;
-  if (pw === CONTACT_PASSWORD) {
-    document.getElementById('lock-screen').style.display = 'none';
+function unlock() {
+  const val = document.getElementById('lock-password').value;
+  if (val === CONTACT_PASSWORD) {
+    document.getElementById('lock-overlay').classList.add('hidden');
+    sessionStorage.setItem('contact_unlocked', '1');
     initPage();
   } else {
     document.getElementById('lock-error').classList.add('show');
@@ -476,11 +478,17 @@ function checkPassword() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // セッション内でアンロック済みか確認
+  if (sessionStorage.getItem('contact_unlocked') === '1') {
+    document.getElementById('lock-overlay').classList.add('hidden');
+    initPage();
+    return;
+  }
   // Enterキー対応
   document.getElementById('lock-password').addEventListener('keydown', e => {
-    if (e.key === 'Enter') checkPassword();
+    if (e.key === 'Enter') unlock();
   });
-  document.getElementById('lock-submit').addEventListener('click', checkPassword);
+  document.getElementById('lock-submit').addEventListener('click', unlock);
 });
 
 // ══════════════════════════════════════════════════
