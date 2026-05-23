@@ -246,16 +246,16 @@
         </div>
         <div class="card__body">
           <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-4);">
-            宛先と送信者を設定し、その両者のメールアドレスにメッセージを送信します。
+            宛先を選択し、メッセージを送信します。
           </p>
 
-          <p class="compose-section-title">送信者設定</p>
+          <p class="compose-section-title">送信者</p>
           <div class="form-group">
-            <label class="form-label">送信者（あなた）<span class="required">*</span></label>
-            <select id="ind-sender" class="form-control">
-              <option value="">選択してください</option>
-            </select>
-            <span class="form-hint">送信者のメールアドレスにもBCCで同じ内容が届きます。</span>
+            <div id="ind-sender-display" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);background:var(--gray-100);border:1px solid var(--gray-200);border-radius:var(--radius-md);">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--gray-400)" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+              <span id="ind-sender-name" style="font-size:var(--text-sm);font-weight:500;color:var(--navy-800);">—</span>
+              <span id="ind-sender-email" style="font-size:var(--text-xs);color:var(--gray-500);"></span>
+            </div>
           </div>
 
           <p class="compose-section-title">宛先設定</p>
@@ -312,12 +312,13 @@
             <span>登録されているすべての団員に一斉送信します。送信後はダッシュボードに1か月間表示されます。</span>
           </div>
 
-          <p class="compose-section-title">送信者設定</p>
+          <p class="compose-section-title">送信者</p>
           <div class="form-group">
-            <label class="form-label">送信者（あなた）<span class="required">*</span></label>
-            <select id="bc-sender" class="form-control">
-              <option value="">選択してください</option>
-            </select>
+            <div id="bc-sender-display" style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);background:var(--gray-100);border:1px solid var(--gray-200);border-radius:var(--radius-md);">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--gray-400)" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+              <span id="bc-sender-name" style="font-size:var(--text-sm);font-weight:500;color:var(--navy-800);">—</span>
+              <span id="bc-sender-email" style="font-size:var(--text-xs);color:var(--gray-500);"></span>
+            </div>
           </div>
 
           <p class="compose-section-title">メール内容</p>
@@ -531,26 +532,18 @@ async function loadMembers() {
 
   allMembers = data ?? [];
 
-  // 送信者セレクト（両タブ共通）
-  const senderOptions = allMembers
-    .filter(m => m.email)
-    .map(m => `<option value="${escHtml(m.id)}">${escHtml(m.last_name + m.first_name)} (${escHtml(m.email)})</option>`)
-    .join('');
-
-  document.getElementById('ind-sender').innerHTML =
-    '<option value="">選択してください</option>' + senderOptions;
-  document.getElementById('bc-sender').innerHTML =
-    '<option value="">選択してください</option>' + senderOptions;
-
-  // ログイン中ユーザーを送信者の初期値に
+  // ログイン中ユーザー情報を送信者表示欄にセット
   const sessionUser = getSessionUser();
-  if (sessionUser) {
-    const selfMember = allMembers.find(m => m.id === sessionUser.id);
-    if (selfMember) {
-      document.getElementById('ind-sender').value = selfMember.id;
-      document.getElementById('bc-sender').value  = selfMember.id;
-    }
-  }
+  const selfMember = sessionUser ? allMembers.find(m => m.id === sessionUser.id) : null;
+  const senderName  = selfMember ? selfMember.last_name + selfMember.first_name : (sessionUser?.name ?? '—');
+  const senderEmail = selfMember?.email ?? '';
+
+  ['ind','bc'].forEach(prefix => {
+    const nameEl  = document.getElementById(`${prefix}-sender-name`);
+    const emailEl = document.getElementById(`${prefix}-sender-email`);
+    if (nameEl)  nameEl.textContent  = senderName;
+    if (emailEl) emailEl.textContent = senderEmail ? `(${senderEmail})` : '';
+  });
 
   // 個別連絡の団員チェックリスト
   renderIndMemberList();
@@ -628,51 +621,52 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function openSendPreview(type) {
+  // ログイン中ユーザーを送信者として取得
+  const sessionUser = getSessionUser();
+  const selfMember  = sessionUser ? allMembers.find(m => m.id === sessionUser.id) : null;
+  const senderId    = selfMember?.id    ?? sessionUser?.id    ?? '';
+  const senderName  = selfMember ? selfMember.last_name + selfMember.first_name : (sessionUser?.name ?? '');
+  const senderEmail = selfMember?.email ?? '';
+
   // バリデーション
   if (type === 'individual') {
-    const senderId = document.getElementById('ind-sender').value;
     const targets  = getCheckedMemberIds();
     const subject  = document.getElementById('ind-subject').value.trim();
     const body     = document.getElementById('ind-body').value.trim();
-    if (!senderId) { showToast('送信者を選択してください', 'error'); return; }
     if (targets.length === 0) { showToast('宛先を1名以上選択してください', 'error'); return; }
     if (!subject)  { showToast('件名を入力してください', 'error'); return; }
     if (!body)     { showToast('本文を入力してください', 'error'); return; }
 
-    const sender = allMembers.find(m => m.id === senderId);
     const targetNames = targets.map(id => {
       const m = allMembers.find(x => x.id === id);
       return m ? m.last_name + m.first_name : id;
     });
 
-    pendingSend = { type, senderId, senderName: sender?.last_name + sender?.first_name, senderEmail: sender?.email,
+    pendingSend = { type, senderId, senderName, senderEmail,
       targets, targetNames, subject, body };
 
     document.getElementById('preview-modal-title').textContent = '個別連絡 — 送信確認';
     document.getElementById('preview-meta').innerHTML =
       `<span class="badge badge-navy">個別連絡</span>
        <span class="badge badge-navy">宛先：${escHtml(targetNames.join('、'))}</span>
-       <span class="badge badge-navy">送信者：${escHtml(pendingSend.senderName)}</span>`;
+       <span class="badge badge-navy">送信者：${escHtml(senderName)}</span>`;
 
   } else {
-    const senderId = document.getElementById('bc-sender').value;
     const subject  = document.getElementById('bc-subject').value.trim();
     const body     = document.getElementById('bc-body').value.trim();
-    if (!senderId) { showToast('送信者を選択してください', 'error'); return; }
     if (!subject)  { showToast('件名を入力してください', 'error'); return; }
     if (!body)     { showToast('本文を入力してください', 'error'); return; }
 
-    const sender = allMembers.find(m => m.id === senderId);
     const allCount = allMembers.filter(m => m.email).length;
 
-    pendingSend = { type, senderId, senderName: sender?.last_name + sender?.first_name, senderEmail: sender?.email,
+    pendingSend = { type, senderId, senderName, senderEmail,
       targets: null, subject, body, allCount };
 
     document.getElementById('preview-modal-title').textContent = '全体連絡 — 送信確認';
     document.getElementById('preview-meta').innerHTML =
       `<span class="badge badge-danger">全体連絡</span>
        <span class="badge badge-navy">全団員 ${allCount}名</span>
-       <span class="badge badge-navy">送信者：${escHtml(pendingSend.senderName)}</span>`;
+       <span class="badge badge-navy">送信者：${escHtml(senderName)}</span>`;
   }
 
   document.getElementById('preview-subject').textContent = pendingSend.subject;
@@ -715,39 +709,43 @@ async function executeSend() {
     const { error: dbError } = await _sb.from('contact_messages').insert(recordBase);
     if (dbError) throw new Error('DB保存エラー: ' + dbError.message);
 
-    // ── Edge Function でメール送信 ──
-    // Edge Functionが未設定の場合はメールアドレス一覧のみ処理
+    // ── Edge Function でメール送信（未デプロイ時はスキップ） ──
     if (EDGE_FUNCTION_URL) {
-      // 送信先メールアドレスを収集
-      let toEmails = [];
-      if (pendingSend.type === 'individual') {
-        toEmails = pendingSend.targets
-          .map(id => allMembers.find(m => m.id === id)?.email)
-          .filter(Boolean);
-        // 送信者にもBCC
-        if (pendingSend.senderEmail) toEmails.push(pendingSend.senderEmail);
-      } else {
-        toEmails = allMembers.map(m => m.email).filter(Boolean);
-      }
+      try {
+        let toEmails = [];
+        if (pendingSend.type === 'individual') {
+          toEmails = pendingSend.targets
+            .map(id => allMembers.find(m => m.id === id)?.email)
+            .filter(Boolean);
+          if (pendingSend.senderEmail) toEmails.push(pendingSend.senderEmail);
+        } else {
+          toEmails = allMembers.map(m => m.email).filter(Boolean);
+        }
 
-      const { data: sessionData } = await _sb.auth.getSession();
-      const token = sessionData?.session?.access_token;
+        const { data: sessionData } = await _sb.auth.getSession();
+        const token = sessionData?.session?.access_token;
 
-      if (token && toEmails.length > 0) {
-        await fetch(EDGE_FUNCTION_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            to:      toEmails,
-            subject: pendingSend.subject,
-            body:    pendingSend.body,
-            type:    pendingSend.type,
-          }),
-        });
-        // Edge Functionのエラーは送信記録の成否に影響させない
+        if (token && toEmails.length > 0) {
+          const res = await fetch(EDGE_FUNCTION_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              to:      toEmails,
+              subject: pendingSend.subject,
+              body:    pendingSend.body,
+              type:    pendingSend.type,
+            }),
+          });
+          if (!res.ok) {
+            console.warn('[HighasuiDX] Edge Function エラー（無視）:', res.status, res.statusText);
+          }
+        }
+      } catch (edgeErr) {
+        // CORS・ネットワークエラーはログのみ。DB保存は完了済みのため続行。
+        console.warn('[HighasuiDX] Edge Function 呼び出し失敗（無視）:', edgeErr.message);
       }
     }
 
