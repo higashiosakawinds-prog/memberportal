@@ -170,6 +170,13 @@
                 <span class="form-hint">区分の変更は管理者にお問い合わせください。</span>
               </div>
             </div>
+            <div class="form-group">
+              <label class="form-label">パートリーダー</label>
+              <label class="role-checkbox-item light" style="display:inline-flex;width:auto;">
+                <input type="checkbox" id="p-is-part-leader">
+                <span>パートリーダーである</span>
+              </label>
+            </div>
             <div class="form-row-2">
               <div class="form-group">
                 <label class="form-label" for="p-joined-date">在籍開始年月日</label>
@@ -332,6 +339,9 @@ async function loadProfile() {
     ? renderRoleBadges(roles)
     : roles.join(', ');
 
+  // パートリーダーチェックボックス
+  document.getElementById('p-is-part-leader').checked = profile.is_part_leader ?? false;
+
   document.getElementById('profile-form').style.display = 'block';
 }
 
@@ -392,6 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
       phone:             document.getElementById('p-phone').value.trim(),
       birthday:          document.getElementById('p-birthday').value || null,
       emergency_contact: document.getElementById('p-emergency-contact').value.trim(),
+      is_part_leader:    document.getElementById('p-is-part-leader').checked,
     }).eq('id', sessionUser.id);
 
     btn.disabled = false;
