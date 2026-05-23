@@ -72,7 +72,9 @@
       <select id="filter-formation" class="form-control" style="max-width:200px;">
         <option value="">すべての編成</option>
         <option value="吹奏楽（大編成）">吹奏楽（大編成）</option>
+        <option value="吹奏楽（中編成）">吹奏楽（中編成）</option>
         <option value="吹奏楽（小編成）">吹奏楽（小編成）</option>
+        <option value="フレックス">フレックス</option>
         <option value="アンサンブル">アンサンブル</option>
         <option value="ソロ">ソロ</option>
         <option value="その他">その他</option>
@@ -245,19 +247,19 @@ const PART_KEYWORDS = {
   piccolo:       ['piccolo','fl','picc','flute'],
   flute:       ['fl','piccolo','picc','flute'],
   oboe:        ['oboe', 'ob'],
-  clarinet:    ['clarinet', 'cl'],
+  clarinet:    ['clarinet', 'cl','BassCl'],
   bassoon:     ['bassoon', 'fg', 'bn'],
   ssaxophone:   ['saxophone', 'sax', 'soprano sax','alto sax', 'tenor sax', 'baritone sax', 'ss','as', 'ts', 'bs'],
   asaxophone:   ['saxophone', 'sax', 'soprano sax','alto sax', 'tenor sax', 'baritone sax', 'ss','as', 'ts', 'bs'],
   tsaxophone:   ['saxophone', 'sax', 'soprano sax','alto sax', 'tenor sax', 'baritone sax', 'ss','as', 'ts', 'bs'],
   bsaxophone:   ['saxophone', 'sax', 'soprano sax','alto sax', 'tenor sax', 'baritone sax', 'ss','as', 'ts', 'bs'],
-  horn:        ['horn', 'hn', 'hr'],
+  horn:        ['horn', 'hn', 'hr','EsHorn','FHorn'],
   trumpet:     ['trumpet', 'tp', 'tpt', 'tr'],
-  trombone:    ['trombone', 'tb', 'tbn'],
+  trombone:    ['trombone', 'tb', 'tbn','basstb'],
   euphonium:   ['euphonium', 'euph', 'baritone', 'bar'],
   tuba:        ['tuba', 'tu'],
-  percussion:  ['percussion', 'perc', 'dr', 'drum', 'timp', 'xyl', 'mar'],
-  contrabass:  ['contrabass', 'cb', 'string bass'],
+  percussion:  ['percussion', 'perc', 'dr', 'drum', 'timp', 'xyl', 'mar','glock','BD','snare','symbal','Pf','drums','Timpani'],
+  contrabass:  ['contrabass', 'cb', 'string bass','SB','S.Bass','E.Bass'],
   piano:       ['piano', 'pf', 'pno'],
 };
 
