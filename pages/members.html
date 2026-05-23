@@ -192,15 +192,15 @@ const CATEGORY_BADGE  = { regular:'badge-success', trainee:'badge-navy', rest:'b
 const DETAIL_ROLES = ['gm', 'admin'];
 
 const DEMO_MEMBERS = [
-  { id:'1', last_name:'デモ', first_name:'データ', last_kana:'デモ', first_kana:'データ', part:'clarinet', roles:['admin'], category:'regular', joined_date:'2020-04-01', email:'yamada@example.com', phone:'090-0000-0001', birthday:'1995-08-15', emergency_contact:'山田 花子：母：090-0000-0099', created_at:'2020-04-01T00:00:00Z' },
-  { id:'2', last_name:'鈴木', first_name:'花子', last_kana:'スズキ', first_kana:'ハナコ', part:'flute', roles:['conductor'], category:'regular', joined_date:'2019-04-01', email:'suzuki@example.com', phone:'090-0000-0002', birthday:'1990-03-22', emergency_contact:'', created_at:'2019-04-01T00:00:00Z' },
-  { id:'3', last_name:'田中', first_name:'一郎', last_kana:'タナカ', first_kana:'イチロウ', part:'trumpet', roles:['manager'], category:'regular', joined_date:'2021-09-01', email:'tanaka@example.com', phone:'', birthday:'', emergency_contact:'', created_at:'2021-09-01T00:00:00Z' },
-  { id:'4', last_name:'佐藤', first_name:'美咲', last_kana:'サトウ', first_kana:'ミサキ', part:'horn', roles:['treasurer'], category:'regular', joined_date:'2022-04-01', email:'sato@example.com', phone:'090-0000-0004', birthday:'1998-12-01', emergency_contact:'', created_at:'2022-04-01T00:00:00Z' },
-  { id:'5', last_name:'伊藤', first_name:'健太', last_kana:'イトウ', first_kana:'ケンタ', part:'trombone', roles:['librarian'], category:'regular', joined_date:'2023-04-01', email:'ito@example.com', phone:'', birthday:'', emergency_contact:'', created_at:'2023-04-01T00:00:00Z' },
-  { id:'6', last_name:'渡辺', first_name:'さくら', last_kana:'ワタナベ', first_kana:'サクラ', part:'saxophone', roles:['member'], category:'regular', joined_date:'2022-09-01', email:'watanabe@example.com', phone:'', birthday:'', emergency_contact:'', created_at:'2022-09-01T00:00:00Z' },
-  { id:'7', last_name:'中村', first_name:'大輔', last_kana:'ナカムラ', first_kana:'ダイスケ', part:'tuba', roles:['member'], category:'regular', joined_date:'2024-04-01', email:'nakamura@example.com', phone:'', birthday:'', emergency_contact:'', created_at:'2024-04-01T00:00:00Z' },
-  { id:'8', last_name:'小林', first_name:'恵', last_kana:'コバヤシ', first_kana:'メグミ', part:'percussion', roles:['member'], category:'trainee', joined_date:'2024-10-01', email:'kobayashi@example.com', phone:'', birthday:'', emergency_contact:'', created_at:'2024-10-01T00:00:00Z' },
-  { id:'9', last_name:'加藤', first_name:'浩二', last_kana:'カトウ', first_kana:'コウジ', part:'euphonium', roles:['member'], category:'rest', joined_date:'2021-04-01', email:'kato@example.com', phone:'', birthday:'', emergency_contact:'', created_at:'2021-04-01T00:00:00Z' },
+  { id:'1', last_name:'山田', first_name:'太郎', last_kana:'ヤマダ', first_kana:'タロウ', part:'clarinet', roles:['admin'], category:'regular', joined_date:'2020-04-01', email:'yamada@example.com', phone:'090-0000-0001', birthday:'1995-08-15', emergency_contact:'山田 花子：母：090-0000-0099', created_at:'2020-04-01T00:00:00Z', is_part_leader:true },
+  { id:'2', last_name:'鈴木', first_name:'花子', last_kana:'スズキ', first_kana:'ハナコ', part:'flute', roles:['conductor'], category:'regular', joined_date:'2019-04-01', email:'suzuki@example.com', phone:'090-0000-0002', birthday:'1990-03-22', emergency_contact:'', created_at:'2019-04-01T00:00:00Z', is_part_leader:false },
+  { id:'3', last_name:'田中', first_name:'一郎', last_kana:'タナカ', first_kana:'イチロウ', part:'trumpet', roles:['manager'], category:'regular', joined_date:'2021-09-01', email:'tanaka@example.com', phone:'', birthday:'', emergency_contact:'', created_at:'2021-09-01T00:00:00Z', is_part_leader:false },
+  { id:'4', last_name:'佐藤', first_name:'美咲', last_kana:'サトウ', first_kana:'ミサキ', part:'horn', roles:['treasurer'], category:'regular', joined_date:'2022-04-01', email:'sato@example.com', phone:'090-0000-0004', birthday:'1998-12-01', emergency_contact:'', created_at:'2022-04-01T00:00:00Z', is_part_leader:true },
+  { id:'5', last_name:'伊藤', first_name:'健太', last_kana:'イトウ', first_kana:'ケンタ', part:'trombone', roles:['librarian'], category:'regular', joined_date:'2023-04-01', email:'ito@example.com', phone:'', birthday:'', emergency_contact:'', created_at:'2023-04-01T00:00:00Z', is_part_leader:false },
+  { id:'6', last_name:'渡辺', first_name:'さくら', last_kana:'ワタナベ', first_kana:'サクラ', part:'saxophone', roles:['member'], category:'regular', joined_date:'2022-09-01', email:'watanabe@example.com', phone:'', birthday:'', emergency_contact:'', created_at:'2022-09-01T00:00:00Z', is_part_leader:false },
+  { id:'7', last_name:'中村', first_name:'大輔', last_kana:'ナカムラ', first_kana:'ダイスケ', part:'tuba', roles:['member'], category:'regular', joined_date:'2024-04-01', email:'nakamura@example.com', phone:'', birthday:'', emergency_contact:'', created_at:'2024-04-01T00:00:00Z', is_part_leader:false },
+  { id:'8', last_name:'小林', first_name:'恵', last_kana:'コバヤシ', first_kana:'メグミ', part:'percussion', roles:['member'], category:'trainee', joined_date:'2024-10-01', email:'kobayashi@example.com', phone:'', birthday:'', emergency_contact:'', created_at:'2024-10-01T00:00:00Z', is_part_leader:false },
+  { id:'9', last_name:'加藤', first_name:'浩二', last_kana:'カトウ', first_kana:'コウジ', part:'euphonium', roles:['member'], category:'rest', joined_date:'2021-04-01', email:'kato@example.com', phone:'', birthday:'', emergency_contact:'', created_at:'2021-04-01T00:00:00Z', is_part_leader:false },
 ];
 
 let allMembers = [];
@@ -303,6 +303,7 @@ function renderList() {
             <span class="member-row__part">${escHtml(PART_LABELS[m.part] ?? '—')}</span>
             <div class="member-row__badges">
               ${roleBadges}
+              ${m.is_part_leader ? '<span class="badge badge-warning">PL</span>' : ''}
               <span class="badge ${catCls}">${escHtml(CATEGORY_LABELS[m.category] ?? '—')}</span>
             </div>
             <span class="member-row__joined">${escHtml(formatJoinedDate(m.joined_date))}〜</span>
@@ -342,6 +343,8 @@ function openDetailModal(memberId) {
       <dd>${escHtml(PART_LABELS[m.part] ?? '—')}</dd>
       <dt>役職</dt>
       <dd><span style="display:inline-flex;gap:4px;flex-wrap:wrap;">${roleBadges}</span></dd>
+      <dt>PL</dt>
+      <dd>${m.is_part_leader ? '<span class="badge badge-warning">パートリーダー</span>' : '—'}</dd>
       <dt>区分</dt>
       <dd><span class="badge ${catCls}">${escHtml(CATEGORY_LABELS[m.category] ?? '—')}</span></dd>
       <dt>在籍開始</dt>
