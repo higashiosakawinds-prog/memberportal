@@ -320,9 +320,15 @@
       </div>
 
     </div>
-    <div class="modal__footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-edit')">キャンセル</button>
-      <button class="btn btn-gold" id="btn-save-score">保存する</button>
+    <div class="modal__footer" style="justify-content:space-between;">
+      <button class="btn btn-danger" id="btn-delete-score" style="display:none;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+        この楽曲を削除
+      </button>
+      <div style="display:flex;gap:var(--space-3);">
+        <button class="btn btn-outline" onclick="closeModal('modal-edit')">キャンセル</button>
+        <button class="btn btn-gold" id="btn-save-score">保存する</button>
+      </div>
     </div>
   </div>
 </div>
@@ -606,6 +612,7 @@ async function openAddModal() {
     document.getElementById(id).value = '';
   });
   document.getElementById('edit-formation').value = '';
+  document.getElementById('btn-delete-score').style.display = 'none';
 
   openModal('modal-edit');
 }
@@ -629,6 +636,7 @@ async function openEditModal(id) {
   document.getElementById('edit-formation').value   = s.formation  ?? '';
   document.getElementById('edit-index-kana').value  = s.index_kana ?? '';
   document.getElementById('edit-index-alpha').value = s.index_alpha ?? '';
+  document.getElementById('btn-delete-score').style.display = 'inline-flex';
 
   openModal('modal-edit');
 }
@@ -697,6 +705,56 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.disabled = false; btn.textContent = '保存する';
     closeModal('modal-edit');
     showToast(editingScoreId ? '楽曲情報を更新しました' : '楽曲を登録しました', 'success');
+    renderTable();
+  });
+
+  // ── 削除ボタン ──
+  document.getElementById('btn-delete-score').addEventListener('click', async () => {
+    if (!editingScoreId || !_sb) return;
+
+    const target = allScores.find(x => x.id === editingScoreId);
+    if (!target) return;
+
+    if (!confirm(`「${target.title_ja}」を削除しますか？\nPDFファイルもすべて削除されます。この操作は元に戻せません。`)) return;
+
+    const btn = document.getElementById('btn-delete-score');
+    btn.disabled = true; btn.textContent = '削除中…';
+
+    // 1. score_pdfsのストレージパスを取得
+    const { data: pdfs } = await _sb
+      .from('score_pdfs')
+      .select('storage_path')
+      .eq('score_id', editingScoreId);
+
+    // 2. Storageから一括削除
+    if (pdfs && pdfs.length > 0) {
+      const paths = pdfs.map(p => p.storage_path);
+      const { error: storageError } = await _sb.storage.from('scores').remove(paths);
+      if (storageError) {
+        showToast(`Storage削除失敗: ${storageError.message}`, 'error');
+        btn.disabled = false; btn.textContent = 'この楽曲を削除';
+        return;
+      }
+    }
+
+    // 3. scores2を削除（score_pdfsはCASCADEで自動削除）
+    const { error: dbError } = await _sb
+      .from('scores2')
+      .delete()
+      .eq('id', editingScoreId);
+
+    if (dbError) {
+      showToast(`削除失敗: ${dbError.message}`, 'error');
+      btn.disabled = false; btn.textContent = 'この楽曲を削除';
+      return;
+    }
+
+    // 4. ローカル状態を更新
+    allScores = allScores.filter(x => x.id !== editingScoreId);
+    editingScoreId = null;
+
+    closeModal('modal-edit');
+    showToast('楽曲を削除しました', 'success');
     renderTable();
   });
 });
