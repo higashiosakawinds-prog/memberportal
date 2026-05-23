@@ -712,7 +712,7 @@ function openSendPreview(type) {
 --
 東大阪吹奏楽団　${pendingSend.roleLabel}　${pendingSend.senderLastName}
 ` +
-    `このメールは送信専用です。返信の必要がある場合は送信者のメールアドレス（${pendingSend.senderEmail}）までお願いします。`;
+    `返信の必要がある場合は送信者のメールアドレス（${pendingSend.senderEmail}）または東大阪吹奏楽団公式メール（higashiosaka.winds@gmal.com）までご連絡ください。`;
 
   document.getElementById('preview-subject').textContent = pendingSend.subject;
   document.getElementById('preview-body').textContent    = pendingSend.body + footerPreview;
@@ -735,7 +735,7 @@ async function executeSend() {
 --
 東大阪吹奏楽団　${roleLabel}　${senderLastName}
 ` +
-    `このメールは送信専用です。返信の必要がある場合は送信者のメールアドレス（${senderEmail}）までお願いします。`;
+    `返信の必要がある場合は送信者のメールアドレス（${senderEmail}）または東大阪吹奏楽団公式メール（higashiosaka.winds@gmal.com）までご連絡ください。`;
 
   const fullBody = body + footer;
 
