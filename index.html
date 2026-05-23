@@ -6,10 +6,6 @@
   <title>東大阪吹奏楽団 DXシステム</title>
   <link rel="stylesheet" href="css/variables.css">
   <link rel="stylesheet" href="css/common.css">
-  <!-- アイコン -->
-  <link rel="icon" href="favicon.ico" sizes="any">
-  <link rel="apple-touch-icon" href="apple-touch-icon-180x180.png" sizes="180x180">
-  <link rel="icon" type="image/png" href="android-chrome-192x192.png" sizes="192x192">
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -396,7 +392,7 @@ async function loadContactMessages() {
 
     const { data: msgs, error: msgsError } = await _sb
       .from('contact_messages')
-      .select('id, type, subject, body, sender_name, sent_at, target_member_names')
+      .select('id, type, subject, body, sender_name, sent_at, target_member_names, target_member_ids')
       .gte('sent_at', oneMonthAgo.toISOString())
       .order('sent_at', { ascending: false });
 
@@ -418,29 +414,55 @@ async function loadContactMessages() {
       });
     };
 
+    // ログイン中ユーザーのID・名前を取得（個別連絡の表示制御に使用）
+    const currentUser = getSessionUser ? getSessionUser() : null;
+    const currentUserId   = currentUser?.id   ?? null;
+    const currentUserName = currentUser?.name ?? null;
+
     const rows = msgs.map(msg => {
-      const typeLabel = msg.type === 'broadcast'
+      const isBroadcast = msg.type === 'broadcast';
+      const typeLabel = isBroadcast
         ? '<span class="badge badge-danger" style="font-size:10px;">全体連絡</span>'
         : '<span class="badge badge-navy" style="font-size:10px;">個別連絡</span>';
 
-      let summary;
-      if (msg.type === 'broadcast') {
-        summary = `<button class="btn btn-sm btn-outline" onclick="openContactDetail('${escHtml(msg.id)}')">内容を確認</button>`;
+      if (isBroadcast) {
+        // 全体連絡：全員に件名・送信者・内容確認ボタンを表示
+        const summary = `<button class="btn btn-sm btn-outline" onclick="openContactDetail('${escHtml(msg.id)}')">内容を確認</button>`;
+        return `
+          <tr>
+            <td>${typeLabel}</td>
+            <td style="font-weight:600;color:var(--navy-800);">${escHtml(msg.subject)}</td>
+            <td style="font-size:var(--text-sm);color:var(--gray-600);">${escHtml(msg.sender_name ?? '—')}</td>
+            <td style="font-size:var(--text-xs);color:var(--gray-500);white-space:nowrap;">${escHtml(fmtDate(msg.sent_at))}</td>
+            <td>${summary}</td>
+          </tr>`;
       } else {
-        const names = Array.isArray(msg.target_member_names) && msg.target_member_names.length > 0
-          ? msg.target_member_names.join('、')
-          : '—';
-        summary = `<span style="font-size:var(--text-xs);color:var(--gray-600);">${escHtml(names)} さんへ連絡が届いています</span>`;
-      }
+        // 個別連絡：宛先本人（ログインユーザー）のみ件名・送信者・内容確認を表示
+        const targetIds = Array.isArray(msg.target_member_ids) ? msg.target_member_ids : [];
+        const isRecipient = currentUserId && targetIds.includes(currentUserId);
 
-      return `
-        <tr>
-          <td>${typeLabel}</td>
-          <td style="font-weight:600;color:var(--navy-800);">${escHtml(msg.subject)}</td>
-          <td style="font-size:var(--text-sm);color:var(--gray-600);">${escHtml(msg.sender_name ?? '—')}</td>
-          <td style="font-size:var(--text-xs);color:var(--gray-500);white-space:nowrap;">${escHtml(fmtDate(msg.sent_at))}</td>
-          <td>${summary}</td>
-        </tr>`;
+        if (!isRecipient) {
+          // 宛先外のユーザーには最低限の通知のみ（誰への連絡かも非表示）
+          return `
+            <tr>
+              <td>${typeLabel}</td>
+              <td style="color:var(--gray-400);font-style:italic;" colspan="3">個別連絡があります（あなた宛ではありません）</td>
+              <td style="font-size:var(--text-xs);color:var(--gray-500);white-space:nowrap;">${escHtml(fmtDate(msg.sent_at))}</td>
+              <td></td>
+            </tr>`;
+        }
+
+        // 宛先本人には全情報を表示
+        const summary = `<button class="btn btn-sm btn-outline" onclick="openContactDetail('${escHtml(msg.id)}')">内容を確認</button>`;
+        return `
+          <tr>
+            <td>${typeLabel}</td>
+            <td style="font-weight:600;color:var(--navy-800);">${escHtml(msg.subject)}</td>
+            <td style="font-size:var(--text-sm);color:var(--gray-600);">${escHtml(msg.sender_name ?? '—')}</td>
+            <td style="font-size:var(--text-xs);color:var(--gray-500);white-space:nowrap;">${escHtml(fmtDate(msg.sent_at))}</td>
+            <td>${summary}</td>
+          </tr>`;
+      }
     }).join('');
 
     contactWrap.innerHTML = `
@@ -511,7 +533,7 @@ async function openPastContacts() {
 
   const { data, error } = await _sb
     .from('contact_messages')
-    .select('id, type, subject, sender_name, sent_at')
+    .select('id, type, subject, sender_name, sent_at, target_member_ids')
     .gte('sent_at', oneYearAgo.toISOString())
     .order('sent_at', { ascending: false });
 
@@ -524,22 +546,39 @@ async function openPastContacts() {
 
   const rows = data.length === 0
     ? '<p style="font-size:var(--text-sm);color:var(--gray-500);padding:var(--space-4);">過去1年の連絡はありません。</p>'
-    : data.map(msg => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--gray-200);gap:var(--space-3);flex-wrap:wrap;">
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-1);flex-wrap:wrap;">
-              ${msg.type === 'broadcast'
-                ? '<span class="badge badge-danger" style="font-size:10px;">全体連絡</span>'
-                : '<span class="badge badge-navy" style="font-size:10px;">個別連絡</span>'}
-              <span style="font-size:var(--text-xs);color:var(--gray-500);">${escHtml(fmtDate(msg.sent_at))}</span>
-            </div>
-            <p style="font-size:var(--text-sm);font-weight:600;color:var(--navy-800);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(msg.subject)}</p>
-            <p style="font-size:var(--text-xs);color:var(--gray-500);">${escHtml(msg.sender_name ?? '—')}</p>
-          </div>
-          ${msg.type === 'broadcast'
+    : (() => {
+        const cu = getSessionUser ? getSessionUser() : null;
+        const cuId = cu?.id ?? null;
+        return data.map(msg => {
+          const isBroadcast = msg.type === 'broadcast';
+          const targetIds = Array.isArray(msg.target_member_ids) ? msg.target_member_ids : [];
+          const isRecipient = !isBroadcast && cuId && targetIds.includes(cuId);
+          const showDetail = isBroadcast || isRecipient;
+          const badge = isBroadcast
+            ? '<span class="badge badge-danger" style="font-size:10px;">全体連絡</span>'
+            : '<span class="badge badge-navy" style="font-size:10px;">個別連絡</span>';
+          const subjectText = showDetail
+            ? `<p style="font-size:var(--text-sm);font-weight:600;color:var(--navy-800);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(msg.subject)}</p>`
+            : `<p style="font-size:var(--text-sm);color:var(--gray-400);font-style:italic;">個別連絡（あなた宛ではありません）</p>`;
+          const senderText = showDetail
+            ? `<p style="font-size:var(--text-xs);color:var(--gray-500);">${escHtml(msg.sender_name ?? '—')}</p>`
+            : '';
+          const btn = showDetail
             ? `<button class="btn btn-sm btn-outline" onclick="openContactDetail('${escHtml(msg.id)}');closeModal('modal-past-contacts');">内容を確認</button>`
-            : ''}
-        </div>`).join('');
+            : '';
+          return `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--gray-200);gap:var(--space-3);flex-wrap:wrap;">
+              <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-1);flex-wrap:wrap;">
+                  ${badge}
+                  <span style="font-size:var(--text-xs);color:var(--gray-500);">${escHtml(fmtDate(msg.sent_at))}</span>
+                </div>
+                ${subjectText}${senderText}
+              </div>
+              ${btn}
+            </div>`;
+        }).join('');
+      })();
 
   // モーダルがなければ動的生成
   if (!document.getElementById('modal-past-contacts')) {
@@ -574,5 +613,3 @@ function escHtml(str) {
 </script>
 </body>
 </html>
-
-
