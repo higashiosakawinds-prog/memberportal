@@ -246,19 +246,20 @@
         </div>
         <div class="card__body">
           <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-4);">
-            宛先と送信者を設定し、その両者のメールアドレスにメッセージを送信します。
+            宛先を選択し、メッセージを送信します。送信元は団の共用アドレスになります。
           </p>
 
-          <p class="compose-section-title">送信者設定</p>
+          <p class="compose-section-title">送信者（件名・署名に表示されます）</p>
           <div class="form-group">
-            <label class="form-label">送信者役職<span class="required">*</span></label>
-            <select id="ind-role" class="form-control">
-              <option value="">役職を選択してください</option>
-            </select>
-            <span class="form-hint">件名に【役職　苗字】が自動で付与されます。送信者のメールアドレスにも同じ内容が届きます。</span>
-          </div>
-          <div id="ind-sender-preview" style="display:none;padding:var(--space-3) var(--space-4);background:var(--gray-100);border-radius:var(--radius-md);border:1px solid var(--gray-200);font-size:var(--text-sm);color:var(--gray-700);margin-bottom:var(--space-4);">
-            件名プレビュー：<span id="ind-subject-preview-text" style="font-weight:600;color:var(--navy-800);"></span>
+            <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);background:var(--gray-100);border:1px solid var(--gray-200);border-radius:var(--radius-md);flex-wrap:wrap;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--gray-400)" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+              <span id="ind-sender-name" style="font-size:var(--text-sm);font-weight:500;color:var(--navy-800);">—</span>
+              <span id="ind-sender-email" style="font-size:var(--text-xs);color:var(--gray-500);"></span>
+            </div>
+            <div id="ind-role-select-wrap" style="margin-top:var(--space-3);display:none;">
+              <label class="form-label" style="font-size:var(--text-xs);">送信に使う役職を選択<span class="required">*</span></label>
+              <select id="ind-role-select" class="form-control" style="max-width:200px;margin-top:var(--space-1);"></select>
+            </div>
           </div>
 
           <p class="compose-section-title">宛先設定</p>
@@ -280,7 +281,7 @@
           <p class="compose-section-title">メール内容</p>
           <div class="form-group">
             <label class="form-label">件名<span class="required">*</span></label>
-            <input type="text" id="ind-subject" class="form-control" placeholder="例：次回練習についてのご連絡" oninput="updateIndSubjectPreview()">
+            <input type="text" id="ind-subject" class="form-control" placeholder="例：次回練習についてのご連絡">
           </div>
           <div class="form-group">
             <label class="form-label">本文<span class="required">*</span></label>
@@ -315,22 +316,23 @@
             <span>登録されているすべての団員に一斉送信します。送信後はダッシュボードに1か月間表示されます。</span>
           </div>
 
-          <p class="compose-section-title">送信者設定</p>
+          <p class="compose-section-title">送信者（件名・署名に表示されます）</p>
           <div class="form-group">
-            <label class="form-label">送信者役職<span class="required">*</span></label>
-            <select id="bc-role" class="form-control">
-              <option value="">役職を選択してください</option>
-            </select>
-            <span class="form-hint">件名に【役職　苗字】が自動で付与されます。</span>
-          </div>
-          <div id="bc-sender-preview" style="display:none;padding:var(--space-3) var(--space-4);background:var(--gray-100);border-radius:var(--radius-md);border:1px solid var(--gray-200);font-size:var(--text-sm);color:var(--gray-700);margin-bottom:var(--space-4);">
-            件名プレビュー：<span id="bc-subject-preview-text" style="font-weight:600;color:var(--navy-800);"></span>
+            <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);background:var(--gray-100);border:1px solid var(--gray-200);border-radius:var(--radius-md);flex-wrap:wrap;">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--gray-400)" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+              <span id="bc-sender-name" style="font-size:var(--text-sm);font-weight:500;color:var(--navy-800);">—</span>
+              <span id="bc-sender-email" style="font-size:var(--text-xs);color:var(--gray-500);"></span>
+            </div>
+            <div id="bc-role-select-wrap" style="margin-top:var(--space-3);display:none;">
+              <label class="form-label" style="font-size:var(--text-xs);">送信に使う役職を選択<span class="required">*</span></label>
+              <select id="bc-role-select" class="form-control" style="max-width:200px;margin-top:var(--space-1);"></select>
+            </div>
           </div>
 
           <p class="compose-section-title">メール内容</p>
           <div class="form-group">
             <label class="form-label">件名<span class="required">*</span></label>
-            <input type="text" id="bc-subject" class="form-control" placeholder="例：2026年5月 全体練習スケジュールのご連絡" oninput="updateBcSubjectPreview()">
+            <input type="text" id="bc-subject" class="form-control" placeholder="例：2026年5月 全体練習スケジュールのご連絡">
           </div>
           <div class="form-group">
             <label class="form-label">本文<span class="required">*</span></label>
@@ -402,7 +404,7 @@
       </button>
     </div>
     <div class="modal__body">
-      <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-4);">以下の内容でメールを送信します。送信後は取り消せません。</p>
+      <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-4);">以下の内容を確認し「メールアプリで開く」を押すと、宛先・件名・本文が入力済みのメール作成画面が開きます。内容を確認してから送信してください。</p>
       <div class="msg-detail-meta" id="preview-meta"></div>
       <p style="font-size:var(--text-xs);font-weight:700;color:var(--navy-800);letter-spacing:.1em;text-transform:uppercase;margin-bottom:var(--space-2);">件名</p>
       <p style="font-size:var(--text-sm);font-weight:600;color:var(--navy-800);margin-bottom:var(--space-4);" id="preview-subject"></p>
@@ -413,7 +415,7 @@
       <button class="btn btn-outline" onclick="closeModal('modal-preview')">キャンセル</button>
       <button class="btn btn-gold" id="btn-send-confirm">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
-        送信する
+        メールアプリで開く
       </button>
     </div>
   </div>
@@ -445,33 +447,12 @@
 // ══════════════════════════════════════════════════
 
 // ▼ 連絡網専用パスワード（本番前に変更してください）
-const CONTACT_PASSWORD = 'higasui2024';
-
-// ▼ 送信元メールアドレス（固定）
-const FROM_EMAIL = 'higashiosaka.winds@gmail.com';
-
-// Supabase Edge Function URL（メール送信用）
-// supabase.js の SUPABASE_CONFIG.url を参照
-const EDGE_FUNCTION_URL = (() => {
-  try { return SUPABASE_CONFIG.url + '/functions/v1/send-contact'; } catch(e) { return ''; }
-})();
-
-// 役職定義（ラベル）
-const ROLE_LABEL_MAP = {
-  gm:        'GM',
-  admin:     '幹部',
-  conductor: '指揮者',
-  manager:   '運営委員',
-  treasurer: '会計',
-  librarian: '蔵書委員',
-  member:    '一般団員',
-};
+const CONTACT_PASSWORD = 'contact2026';
 
 // ══════════════════════════════════════════════════
 //  状態
 // ══════════════════════════════════════════════════
-let allMembers  = [];      // profiles テーブルのメンバー一覧
-let selfMember  = null;    // ログイン中ユーザーのprofile
+let allMembers = [];       // profiles テーブルのメンバー一覧
 let pendingSend = null;    // 送信確認中のデータ
 
 // ══════════════════════════════════════════════════
@@ -552,73 +533,41 @@ async function loadMembers() {
 
   allMembers = data ?? [];
 
-  // ログイン中ユーザーのprofileを取得
+  // ログイン中ユーザー情報を送信者表示欄にセット
   const sessionUser = getSessionUser();
-  selfMember = sessionUser ? allMembers.find(m => m.id === sessionUser.id) ?? null : null;
+  const selfMember  = sessionUser ? allMembers.find(m => m.id === sessionUser.id) : null;
+  const senderLastName = selfMember?.last_name ?? (sessionUser?.name ?? '—');
+  const senderEmail    = selfMember?.email ?? '';
 
-  // ログイン中ユーザーの役職セレクトを生成（両タブ共通）
-  buildRoleSelects();
+  // 役職リスト
+  const userRoles = Array.isArray(selfMember?.roles)
+    ? selfMember.roles
+    : (selfMember?.role ? [selfMember.role] : []);
+
+  ['ind','bc'].forEach(prefix => {
+    const nameEl  = document.getElementById(`${prefix}-sender-name`);
+    const emailEl = document.getElementById(`${prefix}-sender-email`);
+    if (nameEl)  nameEl.textContent  = senderLastName + ' さん';
+    if (emailEl) emailEl.textContent = senderEmail ? `(${senderEmail})` : '';
+
+    // 複数役職の場合は選択UIを表示
+    const wrap = document.getElementById(`${prefix}-role-select-wrap`);
+    const sel  = document.getElementById(`${prefix}-role-select`);
+    if (userRoles.length > 1) {
+      wrap.style.display = 'block';
+      sel.innerHTML = userRoles.map(r => {
+        const def = ROLE_DEFINITIONS.find(d => d.value === r);
+        return `<option value="${r}">${def?.label ?? r}</option>`;
+      }).join('');
+    } else if (userRoles.length === 1) {
+      wrap.style.display = 'none';
+      if (sel) sel.innerHTML = `<option value="${userRoles[0]}">${(ROLE_DEFINITIONS.find(d=>d.value===userRoles[0])?.label) ?? userRoles[0]}</option>`;
+    }
+  });
 
   // 個別連絡の団員チェックリスト
   renderIndMemberList();
   buildBcTargetPreview();
-}
-
-// ── 役職セレクト生成（ログインユーザーの役職のみ表示） ──
-function buildRoleSelects() {
-  if (!selfMember) return;
-  const roles = Array.isArray(selfMember.roles) ? selfMember.roles : [selfMember.roles].filter(Boolean);
-  const opts = roles.map(r =>
-    `<option value="${escHtml(r)}">${escHtml(ROLE_LABEL_MAP[r] ?? r)}</option>`
-  ).join('');
-
-  ['ind-role', 'bc-role'].forEach(id => {
-    document.getElementById(id).innerHTML =
-      '<option value="">役職を選択してください</option>' + opts;
-    // 役職が1つのみなら自動選択
-    if (roles.length === 1) {
-      document.getElementById(id).value = roles[0];
-      updateSubjectPreview(id === 'ind-role' ? 'ind' : 'bc');
-    }
-  });
-
-  document.getElementById('ind-role').addEventListener('change', () => updateSubjectPreview('ind'));
-  document.getElementById('bc-role').addEventListener('change',  () => updateSubjectPreview('bc'));
-}
-
-// ── 件名プレビュー更新 ──
-function buildSubjectPrefix(prefix) {
-  const roleEl = document.getElementById(prefix + '-role');
-  const roleKey = roleEl?.value ?? '';
-  if (!roleKey || !selfMember) return '';
-  const roleLabel = ROLE_LABEL_MAP[roleKey] ?? roleKey;
-  return `【${roleLabel}　${selfMember.last_name}】`;
-}
-
-function updateSubjectPreview(prefix) {
-  const subjectInput = document.getElementById(prefix + '-subject');
-  const previewWrap  = document.getElementById(prefix + '-sender-preview');
-  const previewText  = document.getElementById(prefix + '-subject-preview-text');
-  const roleKey = document.getElementById(prefix + '-role')?.value ?? '';
-  if (!roleKey) { previewWrap.style.display = 'none'; return; }
-  const fullSubject = buildSubjectPrefix(prefix) + (subjectInput?.value.trim() ?? '');
-  previewText.textContent = fullSubject || '（件名を入力してください）';
-  previewWrap.style.display = 'block';
-}
-
-function updateIndSubjectPreview() { updateSubjectPreview('ind'); }
-function updateBcSubjectPreview()  { updateSubjectPreview('bc');  }
-
-// ── メール本文に付与する署名を生成 ──
-function buildSignature(roleKey) {
-  if (!selfMember || !roleKey) return '';
-  const roleLabel = ROLE_LABEL_MAP[roleKey] ?? roleKey;
-  return [
-    '',
-    '---',
-    `東大阪吹奏楽団　${roleLabel}　${selfMember.last_name}`,
-    `このメールは送信専用です。返信の必要がある場合は送信者のメールアドレス（${selfMember.email ?? ''}）までお願いします。`,
-  ].join('\n');
 }
 
 // ── 個別連絡：チェックリスト描画 ──
@@ -692,73 +641,81 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function openSendPreview(type) {
-  if (!selfMember) { showToast('ログイン情報が取得できません', 'error'); return; }
+  // ── ログイン中ユーザー情報を取得 ──
+  const sessionUser = getSessionUser();
+  const selfMember  = sessionUser ? allMembers.find(m => m.id === sessionUser.id) : null;
+  const senderId    = selfMember?.id       ?? sessionUser?.id ?? '';
+  const senderLastName = selfMember?.last_name ?? (sessionUser?.name ?? '');
+  const senderEmail = selfMember?.email ?? '';
 
+  // 選択された役職（複数役職の場合はセレクトから、1役職の場合は直接取得）
+  const prefix      = type === 'individual' ? 'ind' : 'bc';
+  const roleSelEl   = document.getElementById(`${prefix}-role-select`);
+  const selectedRole = roleSelEl?.value ?? '';
+  const roleDef     = ROLE_DEFINITIONS.find(d => d.value === selectedRole);
+  const roleLabel   = roleDef?.label ?? selectedRole;
+
+  // 件名プレフィックス：【役職　苗字】
+  const subjectPrefix = `【${roleLabel}　${senderLastName}】`;
+
+  // バリデーション
   if (type === 'individual') {
-    const roleKey  = document.getElementById('ind-role').value;
-    const targets  = getCheckedMemberIds();
-    const subject  = document.getElementById('ind-subject').value.trim();
-    const body     = document.getElementById('ind-body').value.trim();
-    if (!roleKey)           { showToast('役職を選択してください', 'error'); return; }
+    const targets = getCheckedMemberIds();
+    const rawSubject = document.getElementById('ind-subject').value.trim();
+    const body       = document.getElementById('ind-body').value.trim();
     if (targets.length === 0) { showToast('宛先を1名以上選択してください', 'error'); return; }
-    if (!subject)           { showToast('件名を入力してください', 'error'); return; }
-    if (!body)              { showToast('本文を入力してください', 'error'); return; }
+    if (!rawSubject)  { showToast('件名を入力してください', 'error'); return; }
+    if (!body)        { showToast('本文を入力してください', 'error'); return; }
+    if (!selectedRole){ showToast('役職を選択してください', 'error'); return; }
 
+    const subject = subjectPrefix + rawSubject;
     const targetNames = targets.map(id => {
       const m = allMembers.find(x => x.id === id);
       return m ? m.last_name + m.first_name : id;
     });
-    const fullSubject = buildSubjectPrefix('ind') + subject;
-    const fullBody    = body + buildSignature(roleKey);
 
-    pendingSend = {
-      type,
-      roleKey,
-      senderName:  selfMember.last_name + selfMember.first_name,
-      senderEmail: selfMember.email ?? '',
-      targets, targetNames,
-      subject: fullSubject,
-      body:    fullBody,
-    };
+    pendingSend = { type, senderId, senderLastName, senderEmail,
+      roleLabel, subject, rawSubject, body,
+      targets, targetNames };
 
     document.getElementById('preview-modal-title').textContent = '個別連絡 — 送信確認';
     document.getElementById('preview-meta').innerHTML =
       `<span class="badge badge-navy">個別連絡</span>
        <span class="badge badge-navy">宛先：${escHtml(targetNames.join('、'))}</span>
-       <span class="badge badge-navy">送信者：${escHtml(pendingSend.senderName)}</span>`;
+       <span class="badge badge-navy">送信者：${escHtml(roleLabel + '　' + senderLastName)}</span>`;
 
   } else {
-    const roleKey = document.getElementById('bc-role').value;
-    const subject = document.getElementById('bc-subject').value.trim();
-    const body    = document.getElementById('bc-body').value.trim();
-    if (!roleKey) { showToast('役職を選択してください', 'error'); return; }
-    if (!subject) { showToast('件名を入力してください', 'error'); return; }
-    if (!body)    { showToast('本文を入力してください', 'error'); return; }
+    const rawSubject = document.getElementById('bc-subject').value.trim();
+    const body       = document.getElementById('bc-body').value.trim();
+    if (!rawSubject)  { showToast('件名を入力してください', 'error'); return; }
+    if (!body)        { showToast('本文を入力してください', 'error'); return; }
+    if (!selectedRole){ showToast('役職を選択してください', 'error'); return; }
 
-    const allCount   = allMembers.filter(m => m.email).length;
-    const fullSubject = buildSubjectPrefix('bc') + subject;
-    const fullBody    = body + buildSignature(roleKey);
+    const subject  = subjectPrefix + rawSubject;
+    const allCount = allMembers.filter(m => m.email).length;
 
-    pendingSend = {
-      type,
-      roleKey,
-      senderName:  selfMember.last_name + selfMember.first_name,
-      senderEmail: selfMember.email ?? '',
-      targets: null,
-      subject: fullSubject,
-      body:    fullBody,
-      allCount,
-    };
+    pendingSend = { type, senderId, senderLastName, senderEmail,
+      roleLabel, subject, rawSubject, body,
+      targets: null, allCount };
 
     document.getElementById('preview-modal-title').textContent = '全体連絡 — 送信確認';
     document.getElementById('preview-meta').innerHTML =
       `<span class="badge badge-danger">全体連絡</span>
        <span class="badge badge-navy">全団員 ${allCount}名</span>
-       <span class="badge badge-navy">送信者：${escHtml(pendingSend.senderName)}</span>`;
+       <span class="badge badge-navy">送信者：${escHtml(roleLabel + '　' + senderLastName)}</span>`;
   }
 
+  // 確認モーダルには実際に送られる件名・本文を表示
+  const footerPreview =
+    `
+
+--
+東大阪吹奏楽団　${pendingSend.roleLabel}　${pendingSend.senderLastName}
+` +
+    `このメールは送信専用です。返信の必要がある場合は送信者のメールアドレス（${pendingSend.senderEmail}）までお願いします。`;
+
   document.getElementById('preview-subject').textContent = pendingSend.subject;
-  document.getElementById('preview-body').textContent    = pendingSend.body;
+  document.getElementById('preview-body').textContent    = pendingSend.body + footerPreview;
   openModal('modal-preview');
 }
 
@@ -766,104 +723,95 @@ function openSendPreview(type) {
 //  実際の送信処理
 // ══════════════════════════════════════════════════
 async function executeSend() {
-  if (!pendingSend || !_sb) { showToast('送信準備ができていません', 'error'); return; }
+  if (!pendingSend) { showToast('送信準備ができていません', 'error'); return; }
 
-  const btn = document.getElementById('btn-send-confirm');
-  btn.disabled = true;
-  btn.textContent = '送信中…';
+  const { type, senderId, senderLastName, senderEmail,
+          roleLabel, subject, body, targets, targetNames } = pendingSend;
 
-  try {
-    const now = new Date().toISOString();
+  // ── 署名を組み立て ──
+  const footer =
+    `
 
-    // ── Supabase contact_messages テーブルに保存 ──
-    const recordBase = {
-      type:         pendingSend.type,
-      subject:      pendingSend.subject,
-      body:         pendingSend.body,
-      sender_id:    selfMember?.id ?? null,
-      sender_name:  pendingSend.senderName,
-      sender_email: pendingSend.senderEmail,
-      sent_at:      now,
-    };
+--
+東大阪吹奏楽団　${roleLabel}　${senderLastName}
+` +
+    `このメールは送信専用です。返信の必要がある場合は送信者のメールアドレス（${senderEmail}）までお願いします。`;
 
-    if (pendingSend.type === 'individual') {
-      recordBase.target_member_ids   = pendingSend.targets;
-      recordBase.target_member_names = pendingSend.targetNames;
-    } else {
-      recordBase.target_member_ids   = null;
-      recordBase.target_member_names = null;
-    }
+  const fullBody = body + footer;
 
-    const { error: dbError } = await _sb.from('contact_messages').insert(recordBase);
-    if (dbError) throw new Error('DB保存エラー: ' + dbError.message);
+  // ── URLエンコード ──
+  const encSubject = encodeURIComponent(subject);
+  const encBody    = encodeURIComponent(fullBody);
 
-    // ── Edge Function でメール送信 ──
-    if (EDGE_FUNCTION_URL) {
-      // 送信先メールアドレスを収集
-      let toEmails = [];
-      if (pendingSend.type === 'individual') {
-        // 宛先団員のメールアドレス
-        toEmails = pendingSend.targets
-          .map(id => allMembers.find(m => m.id === id)?.email)
-          .filter(Boolean);
-        // 送信者本人にも同送（重複を除く）
-        if (pendingSend.senderEmail && !toEmails.includes(pendingSend.senderEmail)) {
-          toEmails.push(pendingSend.senderEmail);
-        }
-      } else {
-        // 全体連絡：全団員
-        toEmails = allMembers.map(m => m.email).filter(Boolean);
-      }
-
-      const { data: sessionData } = await _sb.auth.getSession();
-      const token = sessionData?.session?.access_token;
-
-      if (token && toEmails.length > 0) {
-        await fetch(EDGE_FUNCTION_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            from:    FROM_EMAIL,
-            to:      toEmails,
-            subject: pendingSend.subject,
-            body:    pendingSend.body,
-            type:    pendingSend.type,
-          }),
-        });
-        // Edge Functionのエラーは送信記録の成否に影響させない
-      }
-    }
-
-    // 成功
-    closeModal('modal-preview');
-    showToast('送信しました（連絡履歴に記録）', 'success');
-    pendingSend = null;
-
-    // フォームクリア
-    if (recordBase.type === 'individual') {
-      document.getElementById('ind-subject').value = '';
-      document.getElementById('ind-body').value    = '';
-      document.querySelectorAll('#ind-member-list input').forEach(el => el.checked = false);
-      updateIndCharCount();
-      updateIndTargetPreview();
-    } else {
-      document.getElementById('bc-subject').value = '';
-      document.getElementById('bc-body').value    = '';
-      updateBcCharCount();
-    }
-
-    await loadHistory();
-
-  } catch(e) {
-    console.error('[HighasuiDX] 送信エラー:', e);
-    showToast('送信に失敗しました: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg> 送信する`;
+  // ── mailto リンクを生成してメールアプリを開く ──
+  let mailtoHref;
+  if (type === 'broadcast') {
+    // 全体連絡：BCCに全団員
+    const toEmails = allMembers.map(m => m.email).filter(Boolean);
+    const bcc = toEmails.join(',');
+    // 送信元は higashiosaka.winds@gmail.com なので TO に自身
+    mailtoHref = `mailto:higashiosaka.winds@gmail.com?bcc=${encodeURIComponent(bcc)}&subject=${encSubject}&body=${encBody}`;
+  } else {
+    // 個別連絡：TOに宛先、CCに送信者自身
+    const toEmails = targets
+      .map(id => allMembers.find(m => m.id === id)?.email)
+      .filter(Boolean);
+    const to  = toEmails.join(',');
+    const cc  = senderEmail ? encodeURIComponent(senderEmail) : '';
+    mailtoHref = cc
+      ? `mailto:${encodeURIComponent(to)}?cc=${cc}&subject=${encSubject}&body=${encBody}`
+      : `mailto:${encodeURIComponent(to)}?subject=${encSubject}&body=${encBody}`;
   }
+
+  window.location.href = mailtoHref;
+
+  // ── DB に連絡履歴を保存 ──
+  if (_sb) {
+    try {
+      const now = new Date().toISOString();
+      const senderDisplayName = `${roleLabel}　${senderLastName}`;
+      const recordBase = {
+        type,
+        subject,
+        body:         fullBody,
+        sender_id:    senderId,
+        sender_name:  senderDisplayName,
+        sender_email: senderEmail,
+        sent_at:      now,
+      };
+      if (type === 'individual') {
+        recordBase.target_member_ids   = targets;
+        recordBase.target_member_names = targetNames;
+      } else {
+        recordBase.target_member_ids   = null;
+        recordBase.target_member_names = null;
+      }
+      await _sb.from('contact_messages').insert(recordBase);
+    } catch(e) {
+      console.warn('[HighasuiDX] 履歴保存エラー:', e.message);
+    }
+  }
+
+  // ── 後処理 ──
+  closeModal('modal-preview');
+  showToast('メールアプリを開きました。内容を確認して送信してください。', 'success');
+
+  const sentType = type;
+  pendingSend = null;
+
+  if (sentType === 'individual') {
+    document.getElementById('ind-subject').value = '';
+    document.getElementById('ind-body').value    = '';
+    document.querySelectorAll('#ind-member-list input').forEach(el => el.checked = false);
+    updateIndCharCount();
+    updateIndTargetPreview();
+  } else {
+    document.getElementById('bc-subject').value = '';
+    document.getElementById('bc-body').value    = '';
+    updateBcCharCount();
+  }
+
+  await loadHistory();
 }
 
 // ══════════════════════════════════════════════════
