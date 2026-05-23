@@ -246,7 +246,7 @@
         </div>
         <div class="card__body">
           <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-4);">
-            宛先を選択し、メッセージを送信します。
+            宛先を選択し、メッセージを送信します。送信者はログイン中のあなたのアカウントになります。
           </p>
 
           <p class="compose-section-title">送信者</p>
@@ -396,7 +396,7 @@
       </button>
     </div>
     <div class="modal__body">
-      <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-4);">以下の内容でメールを送信します。送信後は取り消せません。</p>
+      <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-4);">以下の内容を確認し「メールアプリで開く」を押すと、宛先・件名・本文が入力済みのメール作成画面が開きます。内容を確認してから送信してください。</p>
       <div class="msg-detail-meta" id="preview-meta"></div>
       <p style="font-size:var(--text-xs);font-weight:700;color:var(--navy-800);letter-spacing:.1em;text-transform:uppercase;margin-bottom:var(--space-2);">件名</p>
       <p style="font-size:var(--text-sm);font-weight:600;color:var(--navy-800);margin-bottom:var(--space-4);" id="preview-subject"></p>
@@ -407,7 +407,7 @@
       <button class="btn btn-outline" onclick="closeModal('modal-preview')">キャンセル</button>
       <button class="btn btn-gold" id="btn-send-confirm">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
-        送信する
+        メールアプリで開く
       </button>
     </div>
   </div>
@@ -440,13 +440,6 @@
 
 // ▼ 連絡網専用パスワード（本番前に変更してください）
 const CONTACT_PASSWORD = 'contact2026';
-
-// Supabase Edge Function URL（メール送信用）
-// supabase.js の SUPABASE_CONFIG.url を参照
-const EDGE_FUNCTION_URL = (() => {
-  // SUPABASE_CONFIGが読み込まれていれば利用、なければ空文字
-  try { return SUPABASE_CONFIG.url + '/functions/v1/send-contact'; } catch(e) { return ''; }
-})();
 
 // ══════════════════════════════════════════════════
 //  状態
@@ -678,104 +671,86 @@ function openSendPreview(type) {
 //  実際の送信処理
 // ══════════════════════════════════════════════════
 async function executeSend() {
-  if (!pendingSend || !_sb) { showToast('送信準備ができていません', 'error'); return; }
+  if (!pendingSend) { showToast('送信準備ができていません', 'error'); return; }
 
-  const btn = document.getElementById('btn-send-confirm');
-  btn.disabled = true;
-  btn.textContent = '送信中…';
-
-  try {
-    const now = new Date().toISOString();
-
-    // ── Supabase contact_messages テーブルに保存 ──
-    const recordBase = {
-      type:         pendingSend.type,
-      subject:      pendingSend.subject,
-      body:         pendingSend.body,
-      sender_id:    pendingSend.senderId,
-      sender_name:  pendingSend.senderName,
-      sender_email: pendingSend.senderEmail,
-      sent_at:      now,
-    };
-
-    if (pendingSend.type === 'individual') {
-      recordBase.target_member_ids   = pendingSend.targets;
-      recordBase.target_member_names = pendingSend.targetNames;
-    } else {
-      recordBase.target_member_ids   = null;
-      recordBase.target_member_names = null;
-    }
-
-    const { error: dbError } = await _sb.from('contact_messages').insert(recordBase);
-    if (dbError) throw new Error('DB保存エラー: ' + dbError.message);
-
-    // ── Edge Function でメール送信（未デプロイ時はスキップ） ──
-    if (EDGE_FUNCTION_URL) {
-      try {
-        let toEmails = [];
-        if (pendingSend.type === 'individual') {
-          toEmails = pendingSend.targets
-            .map(id => allMembers.find(m => m.id === id)?.email)
-            .filter(Boolean);
-          if (pendingSend.senderEmail) toEmails.push(pendingSend.senderEmail);
-        } else {
-          toEmails = allMembers.map(m => m.email).filter(Boolean);
-        }
-
-        const { data: sessionData } = await _sb.auth.getSession();
-        const token = sessionData?.session?.access_token;
-
-        if (token && toEmails.length > 0) {
-          const res = await fetch(EDGE_FUNCTION_URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              to:      toEmails,
-              subject: pendingSend.subject,
-              body:    pendingSend.body,
-              type:    pendingSend.type,
-            }),
-          });
-          if (!res.ok) {
-            console.warn('[HighasuiDX] Edge Function エラー（無視）:', res.status, res.statusText);
-          }
-        }
-      } catch (edgeErr) {
-        // CORS・ネットワークエラーはログのみ。DB保存は完了済みのため続行。
-        console.warn('[HighasuiDX] Edge Function 呼び出し失敗（無視）:', edgeErr.message);
-      }
-    }
-
-    // 成功
-    closeModal('modal-preview');
-    showToast('送信しました（連絡履歴に記録）', 'success');
-    pendingSend = null;
-
-    // フォームクリア
-    if (recordBase.type === 'individual') {
-      document.getElementById('ind-subject').value = '';
-      document.getElementById('ind-body').value    = '';
-      document.querySelectorAll('#ind-member-list input').forEach(el => el.checked = false);
-      updateIndCharCount();
-      updateIndTargetPreview();
-    } else {
-      document.getElementById('bc-subject').value = '';
-      document.getElementById('bc-body').value    = '';
-      updateBcCharCount();
-    }
-
-    await loadHistory();
-
-  } catch(e) {
-    console.error('[HighasuiDX] 送信エラー:', e);
-    showToast('送信に失敗しました: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg> 送信する`;
+  // ── 1. mailto リンクを生成してメールアプリを開く ──
+  let toEmails = [];
+  if (pendingSend.type === 'individual') {
+    toEmails = pendingSend.targets
+      .map(id => allMembers.find(m => m.id === id)?.email)
+      .filter(Boolean);
+  } else {
+    toEmails = allMembers.map(m => m.email).filter(Boolean);
   }
+
+  // URLエンコード
+  const encSubject = encodeURIComponent(pendingSend.subject);
+  const encBody    = encodeURIComponent(
+    pendingSend.body +
+    '\n\n--\n東大阪吹奏楽団 DXシステムより\n送信者：' + (pendingSend.senderName ?? '')
+  );
+
+  // 全体連絡はBCC、個別連絡はTO
+  let mailtoHref;
+  if (pendingSend.type === 'broadcast') {
+    // BCCに全員、TOは空（送信者自身のメールアプリが開くので自分のアドレスが入る）
+    const bcc = toEmails.map(encodeURIComponent).join(',');
+    mailtoHref = `mailto:?bcc=${bcc}&subject=${encSubject}&body=${encBody}`;
+  } else {
+    const to = toEmails.map(encodeURIComponent).join(',');
+    mailtoHref = `mailto:${to}?subject=${encSubject}&body=${encBody}`;
+  }
+
+  // メールアプリを開く
+  window.location.href = mailtoHref;
+
+  // ── 2. DB に連絡履歴を保存 ──
+  if (_sb) {
+    try {
+      const now = new Date().toISOString();
+      const recordBase = {
+        type:         pendingSend.type,
+        subject:      pendingSend.subject,
+        body:         pendingSend.body,
+        sender_id:    pendingSend.senderId,
+        sender_name:  pendingSend.senderName,
+        sender_email: pendingSend.senderEmail,
+        sent_at:      now,
+      };
+      if (pendingSend.type === 'individual') {
+        recordBase.target_member_ids   = pendingSend.targets;
+        recordBase.target_member_names = pendingSend.targetNames;
+      } else {
+        recordBase.target_member_ids   = null;
+        recordBase.target_member_names = null;
+      }
+      await _sb.from('contact_messages').insert(recordBase);
+    } catch(e) {
+      console.warn('[HighasuiDX] 履歴保存エラー:', e.message);
+    }
+  }
+
+  // ── 3. 後処理 ──
+  closeModal('modal-preview');
+  showToast('メールアプリを開きました。内容を確認して送信してください。', 'success');
+
+  // フォームクリア（pendingSendをnullにする前にtypeを保存）
+  const sentType = pendingSend.type;
+  pendingSend = null;
+
+  if (sentType === 'individual') {
+    document.getElementById('ind-subject').value = '';
+    document.getElementById('ind-body').value    = '';
+    document.querySelectorAll('#ind-member-list input').forEach(el => el.checked = false);
+    updateIndCharCount();
+    updateIndTargetPreview();
+  } else {
+    document.getElementById('bc-subject').value = '';
+    document.getElementById('bc-body').value    = '';
+    updateBcCharCount();
+  }
+
+  await loadHistory();
 }
 
 // ══════════════════════════════════════════════════
