@@ -7,10 +7,6 @@
   <link rel="stylesheet" href="../../css/variables.css">
   <link rel="stylesheet" href="../../css/common.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- アイコン -->
-  <link rel="icon" href="../../favicon.ico" sizes="any">
-  <link rel="apple-touch-icon" href="../../apple-touch-icon-180x180.png" sizes="180x180">
-  <link rel="icon" type="image/png" href="../../android-chrome-192x192.png" sizes="192x192">
   <style>
     body {
       background: var(--navy-900);
@@ -188,6 +184,13 @@
           <input type="date" id="joined-date" class="form-control">
           <span class="field-error-msg" id="err-joined-date"></span>
         </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">パートリーダー</label>
+        <label class="role-checkbox-item" style="display:inline-flex;width:auto;">
+          <input type="checkbox" id="is-part-leader">
+          <span>パートリーダーである</span>
+        </label>
       </div>
 
       <!-- 連絡先情報 -->
@@ -392,6 +395,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       birthday:          document.getElementById('birthday').value || null,
       emergency_contact: document.getElementById('emergency-contact').value.trim(),
       joined_date:       joinedDate,
+      is_part_leader:    document.getElementById('is-part-leader').checked,
     });
 
     if (insertError) {
