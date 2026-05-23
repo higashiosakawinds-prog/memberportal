@@ -346,7 +346,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             ${endDate ? `〜 ${escHtml(endDate)}` : '—'}
           </td>
           <td>
-            <a href="pages/scores.html" class="btn btn-sm btn-outline">詳細・印刷</a>
+         <a href="pages/scores.html?id=${escHtml(s.id)}" class="btn btn-sm btn-outline">詳細・印刷</a>
           </td>
         </tr>`;
     }).join('');
