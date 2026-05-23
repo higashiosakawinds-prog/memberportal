@@ -446,6 +446,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('filter-formation').addEventListener('change', renderTable);
   document.getElementById('filter-public').addEventListener('change', renderTable);
   await loadScores();
+
+  // URLパラメータに id が指定されている場合は詳細モーダルを自動オープン
+  const params = new URLSearchParams(window.location.search);
+  const targetId = params.get('id');
+  if (targetId) {
+    await openDetail(targetId);
+  }
 });
 </script>
 </body>
