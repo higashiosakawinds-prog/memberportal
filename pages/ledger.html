@@ -8,7 +8,6 @@
   <link rel="stylesheet" href="../css/common.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    /* ── レイアウト ── */
     .form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); }
     .summary-row { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-4); margin-bottom:var(--space-6); }
     .summary-card {
@@ -22,14 +21,11 @@
     .expense { color:var(--danger); }
     .balance { color:var(--navy-800); }
 
-    /* ── ツールバー ── */
     .toolbar {
       display:flex; gap:var(--space-3); flex-wrap:wrap;
       margin-bottom:var(--space-4); align-items:center;
     }
-    .toolbar select, .toolbar input[type=number] { max-width:140px; }
 
-    /* ── 期間ナビゲーター ── */
     .period-nav {
       display:flex; align-items:center; gap:var(--space-2);
       background:var(--white); border:1px solid var(--gray-200);
@@ -63,7 +59,6 @@
       box-shadow:0 1px 3px rgba(0,0,0,0.12);
     }
 
-    /* ── 更新ボタン ── */
     .refresh-btn {
       display:inline-flex; align-items:center; gap:var(--space-2);
       padding:var(--space-2) var(--space-4);
@@ -73,10 +68,8 @@
       transition:all var(--transition-fast);
     }
     .refresh-btn:hover { border-color:var(--navy-500); color:var(--navy-700); background:var(--gray-100); }
-    .refresh-btn svg { transition:transform 0.5s ease; }
     .refresh-btn.spinning svg { animation:spin 0.8s linear infinite; }
 
-    /* ── テーブル ── */
     .amount-cell {
       text-align:right; font-family:var(--font-display);
       font-weight:600; font-size:var(--text-base); white-space:nowrap;
@@ -86,38 +79,15 @@
       border-radius:var(--radius-lg); overflow:hidden;
       border:1px solid var(--gray-200);
     }
-    .ledger-table-wrap .table { min-width:580px; }
+    .ledger-table-wrap .table { min-width:640px; }
 
-    /* ── スプレッドシート連携バナー ── */
-    .gs-banner {
-      display:flex; align-items:flex-start; gap:var(--space-3);
-      padding:var(--space-4) var(--space-5);
-      background:rgba(41,128,185,0.06); border:1px solid rgba(41,128,185,0.2);
-      border-radius:var(--radius-md); font-size:var(--text-sm);
-      color:#1a5276; line-height:1.6; margin-bottom:var(--space-6);
+    /* 購入先サブテキスト */
+    .desc-vendor {
+      font-size:10px; color:var(--gray-400);
+      margin-top:2px; display:block;
     }
-    .gs-banner svg { flex-shrink:0; margin-top:2px; color:var(--info); }
-    .gs-banner code {
-      background:rgba(41,128,185,0.1); padding:2px 6px;
-      border-radius:3px; font-size:var(--text-xs); word-break:break-all;
-    }
-    .gs-banner input {
-      flex:1; margin-top:var(--space-2);
-      padding:var(--space-2) var(--space-3);
-      border:1px solid rgba(41,128,185,0.4); border-radius:var(--radius-sm);
-      font-size:var(--text-xs); color:#1a5276; background:rgba(255,255,255,0.8);
-    }
-    .gs-banner input:focus { outline:none; border-color:var(--info); }
-    .gs-banner button {
-      margin-top:var(--space-2); padding:var(--space-2) var(--space-4);
-      background:var(--info); color:var(--white); border:none;
-      border-radius:var(--radius-sm); font-size:var(--text-xs);
-      font-weight:700; cursor:pointer; white-space:nowrap;
-      transition:background var(--transition-fast);
-    }
-    .gs-banner button:hover { background:#2471a3; }
 
-    /* ── ステータスチップ ── */
+    /* 同期ステータスチップ */
     .sync-status {
       display:inline-flex; align-items:center; gap:var(--space-1);
       font-size:10px; font-weight:600; letter-spacing:.05em;
@@ -126,12 +96,8 @@
     .sync-status.ok   { background:rgba(39,174,96,.12); color:#1e8449; }
     .sync-status.err  { background:rgba(192,57,43,.12);  color:var(--danger); }
     .sync-status.wait { background:rgba(107,114,128,.12); color:var(--gray-500); }
-    .sync-dot {
-      width:6px; height:6px; border-radius:50%;
-      background:currentColor; flex-shrink:0;
-    }
+    .sync-dot { width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; }
 
-    /* ── レスポンシブ ── */
     @media(max-width:768px){
       .summary-row { grid-template-columns:1fr 1fr; gap:var(--space-3); }
       .summary-card { padding:var(--space-3); }
@@ -158,6 +124,10 @@
         <h1 class="page-header__title">出納帳</h1>
       </div>
       <div class="page-header__actions">
+        <!-- 同期ステータス -->
+        <span class="sync-status wait" id="sync-status-chip" style="align-self:center;">
+          <span class="sync-dot"></span> 未接続
+        </span>
         <!-- 更新ボタン -->
         <button class="refresh-btn" id="btn-refresh" title="スプレッドシートから再読み込み">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="15" height="15">
@@ -170,10 +140,10 @@
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="16" height="16">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12M12 16.5V3"/>
           </svg>
-          CSVダウンロード
+          CSV
         </button>
         <!-- 仕訳追加 -->
-        <button class="btn btn-gold" onclick="openModal('modal-add')">
+        <button class="btn btn-gold" id="btn-open-add">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
           </svg>
@@ -182,95 +152,21 @@
       </div>
     </div>
 
-    <!-- Google Sheets 連携設定バナー -->
-    <div class="gs-banner fade-in fade-in-1" id="gs-banner">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/>
-      </svg>
-      <div style="flex:1;">
-        <strong>Google Sheets 連携</strong>　スプレッドシートと同期するには、Apps Script WebアプリのURLを設定してください。<br>
-        <span style="font-size:var(--text-xs);opacity:.8;">
-          設定方法：スプレッドシートの「拡張機能 → Apps Script」で下記のスクリプトを貼り付け、ウェブアプリとしてデプロイし（アクセス：全員）、発行されたURLを入力してください。
-          URLは <code>https://script.google.com/macros/s/.../exec</code> の形式です。
-        </span>
-        <div style="display:flex;gap:var(--space-2);margin-top:var(--space-2);flex-wrap:wrap;">
-          <input type="url" id="gs-url-input" placeholder="https://script.google.com/macros/s/.../exec" style="min-width:200px;">
-          <button id="gs-save-btn">URLを保存して接続</button>
-        </div>
-        <div style="margin-top:var(--space-2);">
-          <span class="sync-status wait" id="sync-status-chip">
-            <span class="sync-dot"></span> 未接続
-          </span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Apps Script セットアップ案内 -->
-    <div class="card fade-in fade-in-1 mb-6" id="gs-script-hint" style="display:none;">
-      <div class="card__header">
-        <span class="card__title">Apps Script のセットアップ</span>
-        <button class="btn btn-sm btn-outline" onclick="document.getElementById('gs-script-hint').style.display='none'">閉じる</button>
-      </div>
-      <div class="card__body">
-        <p style="font-size:var(--text-sm);color:var(--gray-600);margin-bottom:var(--space-3);">以下のコードを Google Apps Script に貼り付け、「ウェブアプリとしてデプロイ」→「アクセスできるユーザー：全員」で公開してください。</p>
-        <pre style="background:var(--navy-900);color:var(--gold-300);padding:var(--space-4);border-radius:var(--radius-md);font-size:11px;overflow-x:auto;line-height:1.7;"><code>// Google Apps Script — 出納帳連携スクリプト
-// シート名は「出納帳」に設定してください。列順: 日付, カテゴリ, 摘要, 収支, 金額
-
-const SHEET_NAME = '出納帳';
-
-function doGet(e) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  const rows  = sheet.getDataRange().getValues();
-  const data  = [];
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row[0]) continue;
-    data.push({
-      id:          String(row[5] || i),
-      date:        Utilities.formatDate(new Date(row[0]), 'Asia/Tokyo', 'yyyy-MM-dd'),
-      category:    String(row[1]),
-      description: String(row[2]),
-      type:        String(row[3]),   // 'income' or 'expense'
-      amount:      Number(row[4]),
-    });
-  }
-  return ContentService
-    .createTextOutput(JSON.stringify({ ok:true, data }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function doPost(e) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  const body  = JSON.parse(e.postData.contents);
-  const id    = String(Date.now());
-  sheet.appendRow([
-    body.date, body.category, body.description,
-    body.type, body.amount, id
-  ]);
-  return ContentService
-    .createTextOutput(JSON.stringify({ ok:true, id }))
-    .setMimeType(ContentService.MimeType.JSON);
-}</code></pre>
-      </div>
-    </div>
-
     <!-- 期間選択 -->
     <div class="fade-in fade-in-1 mb-4" style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;">
-      <!-- モード切替 -->
       <div class="period-mode-btns">
-        <button class="period-mode-btn active" data-mode="month" id="btn-mode-month">月別</button>
-        <button class="period-mode-btn"        data-mode="year"  id="btn-mode-year">年別</button>
-        <button class="period-mode-btn"        data-mode="all"   id="btn-mode-all">全期間</button>
+        <button class="period-mode-btn active" data-mode="month">月別</button>
+        <button class="period-mode-btn"        data-mode="year">年別</button>
+        <button class="period-mode-btn"        data-mode="all">全期間</button>
       </div>
-      <!-- 月・年ナビゲーター（全期間モード時は非表示） -->
       <div class="period-nav" id="period-nav">
-        <button class="period-nav__btn" id="btn-period-prev" title="前へ">
+        <button class="period-nav__btn" id="btn-period-prev">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" width="14" height="14">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
           </svg>
         </button>
         <span class="period-nav__label" id="period-label">—</span>
-        <button class="period-nav__btn" id="btn-period-next" title="次へ">
+        <button class="period-nav__btn" id="btn-period-next">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" width="14" height="14">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
           </svg>
@@ -294,7 +190,7 @@ function doPost(e) {
       </div>
     </div>
 
-    <!-- フィルター追加ツールバー -->
+    <!-- フィルタツールバー -->
     <div class="toolbar fade-in fade-in-3">
       <select id="filter-type" class="form-control" style="max-width:140px;">
         <option value="">収支すべて</option>
@@ -310,18 +206,18 @@ function doPost(e) {
         <option value="会場費">会場費</option>
         <option value="その他">その他</option>
       </select>
-      <input type="text" id="filter-keyword" class="form-control" placeholder="摘要で検索…" style="flex:1;min-width:160px;">
+      <input type="text" id="filter-keyword" class="form-control" placeholder="摘要・購入先で検索…" style="flex:1;min-width:160px;">
       <span id="filtered-count" style="font-size:var(--text-xs);color:var(--gray-500);white-space:nowrap;"></span>
     </div>
 
     <!-- テーブル -->
     <div class="fade-in fade-in-3 ledger-table-wrap">
-      <table class="table" id="ledger-table">
+      <table class="table">
         <thead>
           <tr>
             <th>日付</th>
             <th>カテゴリ</th>
-            <th>摘要</th>
+            <th>摘要 / 購入先</th>
             <th style="text-align:right;">収入</th>
             <th style="text-align:right;">支出</th>
             <th style="width:72px;"></th>
@@ -383,10 +279,9 @@ function doPost(e) {
         <label class="form-label">摘要 <span class="required">*</span></label>
         <input type="text" id="add-description" class="form-control" placeholder="例：4月分団費 20名分">
       </div>
-      <!-- GS未接続時の注意 -->
-      <div id="modal-gs-warning" class="alert alert-warning" style="display:none;">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
-        <span>スプレッドシートURLが未設定のため、この仕訳はこのセッション内のみ保存されます。</span>
+      <div class="form-group">
+        <label class="form-label">購入先</label>
+        <input type="text" id="add-vendor" class="form-control" placeholder="例：ヤマハミュージック、Amazon など">
       </div>
     </div>
     <div class="modal__footer">
@@ -401,138 +296,53 @@ function doPost(e) {
 <script src="../js/common.js"></script>
 <script>
 // ════════════════════════════════════════════════
-//  定数 / デモデータ
+//  ★ 設定：Apps Script Webアプリ URL
+//    スプレッドシートの「拡張機能 → Apps Script」でデプロイしたURLに書き換えてください
 // ════════════════════════════════════════════════
-const GS_URL_KEY = 'higasui_ledger_gs_url';
+const GS_URL = 'https://script.google.com/macros/s/AKfycbx-mwLTKGdHA2zjvQZiMOylDGDgT2Xl4abynm2kQV7968muF95uWAJ602yiEyKGveXJ/exec';
 
+
+// ════════════════════════════════════════════════
+//  デモデータ（GS未接続時のフォールバック）
+// ════════════════════════════════════════════════
 const DEMO_ENTRIES = [
-  { id:'d1', date:'2024-04-01', category:'団費',    description:'4月分団費 20名分',     amount:100000, type:'income'  },
-  { id:'d2', date:'2024-04-05', category:'楽譜代',  description:'定演楽譜購入',          amount: 45000, type:'expense' },
-  { id:'d3', date:'2024-04-10', category:'会場費',  description:'4月練習会場費',         amount: 20000, type:'expense' },
-  { id:'d4', date:'2024-05-01', category:'団費',    description:'5月分団費 20名分',     amount:100000, type:'income'  },
-  { id:'d5', date:'2024-05-08', category:'楽器費',  description:'チューナー購入',        amount:  8000, type:'expense' },
-  { id:'d6', date:'2024-05-10', category:'会場費',  description:'5月練習会場費',         amount: 20000, type:'expense' },
-  { id:'d7', date:'2024-06-01', category:'団費',    description:'6月分団費 20名分',     amount:100000, type:'income'  },
-  { id:'d8', date:'2024-06-15', category:'演奏会費', description:'定演チラシ印刷代',     amount: 35000, type:'expense' },
+  { id:'d1', date:'2024-06-01', category:'団費',    description:'6月分団費 20名分', vendor:'',                 amount:100000, type:'income'  },
+  { id:'d2', date:'2024-06-15', category:'演奏会費', description:'定演チラシ印刷代', vendor:'キンコーズ',        amount: 35000, type:'expense' },
+  { id:'d3', date:'2024-05-10', category:'会場費',  description:'5月練習会場費',    vendor:'東大阪市民会館',    amount: 20000, type:'expense' },
+  { id:'d4', date:'2024-05-08', category:'楽器費',  description:'チューナー購入',   vendor:'ヤマハミュージック', amount:  8000, type:'expense' },
+  { id:'d5', date:'2024-05-01', category:'団費',    description:'5月分団費 20名分', vendor:'',                 amount:100000, type:'income'  },
+  { id:'d6', date:'2024-04-10', category:'会場費',  description:'4月練習会場費',    vendor:'東大阪市民会館',    amount: 20000, type:'expense' },
+  { id:'d7', date:'2024-04-05', category:'楽譜代',  description:'定演楽譜購入',     vendor:'全音楽譜出版社',    amount: 45000, type:'expense' },
+  { id:'d8', date:'2024-04-01', category:'団費',    description:'4月分団費 20名分', vendor:'',                 amount:100000, type:'income'  },
 ];
 
 // ════════════════════════════════════════════════
 //  状態
 // ════════════════════════════════════════════════
-let allEntries = [];          // 全仕訳（ソート済み：新しい順）
-let gsUrl      = '';          // Apps Script WebアプリURL
-let periodMode = 'month';     // 'month' | 'year' | 'all'
+let allEntries = [];
+let periodMode = 'month';
 let periodYear = new Date().getFullYear();
-let periodMonth= new Date().getMonth() + 1; // 1-12
+let periodMonth = new Date().getMonth() + 1;
 
 // ════════════════════════════════════════════════
 //  ユーティリティ
 // ════════════════════════════════════════════════
-function fmt(n) {
-  return '¥' + Number(n).toLocaleString('ja-JP');
+function fmt(n) { return '¥' + Number(n).toLocaleString('ja-JP'); }
+
+function escHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+function byDateDesc(a, b) { return b.date.localeCompare(a.date); }
+
+// GS URL が placeholder のままかどうか
+function isGsConfigured() {
+  return GS_URL && !GS_URL.includes('YOUR_SCRIPT_ID');
 }
 
 // ════════════════════════════════════════════════
-//  Google Sheets 連携
-// ════════════════════════════════════════════════
-
-/** 保存済みURLをロード */
-function loadGsUrl() {
-  gsUrl = localStorage.getItem(GS_URL_KEY) || '';
-  const input = document.getElementById('gs-url-input');
-  if (input && gsUrl) input.value = gsUrl;
-  updateSyncChip(gsUrl ? 'wait' : 'none');
-}
-
-/** URLを保存して接続テスト */
-async function saveGsUrl() {
-  const input = document.getElementById('gs-url-input');
-  const url = (input?.value || '').trim();
-  if (!url) { showToast('URLを入力してください', 'error'); return; }
-  gsUrl = url;
-  localStorage.setItem(GS_URL_KEY, gsUrl);
-  showToast('URLを保存しました。データを読み込んでいます…');
-  await fetchFromGS(true);
-}
-
-/** スプレッドシートからデータ取得
- *  CORS対策：GAS側で doGet を実装し、
- *  Content-Type: application/json + CORS ヘッダーを返す。
- *  fetch のリダイレクトはブラウザが自動処理するため、
- *  GAS の /exec エンドポイントを直接叩くのが最もシンプル。
- */
-async function fetchFromGS(showResult = false) {
-  if (!gsUrl) {
-    // GS未接続：デモデータ or ローカルキャッシュを使用
-    if (allEntries.length === 0) {
-      allEntries = [...DEMO_ENTRIES].sort(byDateDesc);
-    }
-    renderTable();
-    return;
-  }
-
-  setBtnRefreshSpinning(true);
-  updateSyncChip('wait');
-
-  try {
-    // GAS WebアプリはリダイレクトするのでReferrer-Policyに注意
-    // no-cors では JSON が読めないため、GAS側で適切なCORSヘッダーが必要
-    const res = await fetch(gsUrl, {
-      method: 'GET',
-      redirect: 'follow',
-    });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    if (!json.ok || !Array.isArray(json.data)) throw new Error('不正なレスポンス形式');
-
-    allEntries = json.data.sort(byDateDesc);
-    updateSyncChip('ok');
-    if (showResult) showToast(`${allEntries.length}件を読み込みました`, 'success');
-  } catch (err) {
-    console.warn('[HighasuiDX] GS取得エラー:', err.message);
-    updateSyncChip('err');
-    // フォールバック：キャッシュ or デモデータ
-    if (allEntries.length === 0) {
-      allEntries = [...DEMO_ENTRIES].sort(byDateDesc);
-    }
-    if (showResult) showToast('スプレッドシートへの接続に失敗しました。デモデータを表示します。', 'error');
-  } finally {
-    setBtnRefreshSpinning(false);
-    renderTable();
-  }
-}
-
-/** スプレッドシートへデータを書き込む */
-async function postToGS(entry) {
-  if (!gsUrl) return false;
-  try {
-    const res = await fetch(gsUrl, {
-      method: 'POST',
-      redirect: 'follow',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      // GAS の doPost は e.postData.contents で受け取るため
-      // Content-Type を text/plain にすることでプリフライトを回避
-      body: JSON.stringify({
-        date:        entry.date,
-        category:    entry.category,
-        description: entry.description,
-        type:        entry.type,
-        amount:      entry.amount,
-      }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    if (!json.ok) throw new Error('書き込み失敗');
-    return json.id || entry.id;
-  } catch (err) {
-    console.warn('[HighasuiDX] GS書き込みエラー:', err.message);
-    return false;
-  }
-}
-
-// ════════════════════════════════════════════════
-//  UI ヘルパー
+//  同期ステータス表示
 // ════════════════════════════════════════════════
 function updateSyncChip(state) {
   const chip = document.getElementById('sync-status-chip');
@@ -543,11 +353,71 @@ function updateSyncChip(state) {
     ok:   ['ok',   '同期済み'],
     err:  ['err',  '接続エラー'],
   };
-  const [cls, label] = MAP[state] || MAP.none;
+  const [cls, label] = MAP[state] ?? MAP.none;
   chip.className = `sync-status ${cls}`;
   chip.innerHTML = `<span class="sync-dot"></span> ${label}`;
 }
 
+// ════════════════════════════════════════════════
+//  スプレッドシートとの通信
+// ════════════════════════════════════════════════
+
+/** GS から全件取得 */
+async function fetchFromGS(showResult = false) {
+  if (!isGsConfigured()) {
+    allEntries = [...DEMO_ENTRIES].sort(byDateDesc);
+    updateSyncChip('none');
+    renderTable();
+    return;
+  }
+
+  setBtnRefreshSpinning(true);
+  updateSyncChip('wait');
+
+  try {
+    const res = await fetch(GS_URL, { method: 'GET', redirect: 'follow' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (!json.ok || !Array.isArray(json.data)) throw new Error('レスポンス形式エラー');
+
+    allEntries = json.data.sort(byDateDesc);
+    updateSyncChip('ok');
+    if (showResult) showToast(`${allEntries.length}件を読み込みました`, 'success');
+  } catch (err) {
+    console.warn('[HighasuiDX] GS取得エラー:', err.message);
+    updateSyncChip('err');
+    if (allEntries.length === 0) allEntries = [...DEMO_ENTRIES].sort(byDateDesc);
+    if (showResult) showToast('スプレッドシートへの接続に失敗しました', 'error');
+  } finally {
+    setBtnRefreshSpinning(false);
+    renderTable();
+  }
+}
+
+/** GS へデータを POST（追加 or 削除）*/
+async function postToGS(body) {
+  if (!isGsConfigured()) return null;
+  try {
+    const res = await fetch(GS_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      // text/plain で送ることでプリフライトを回避
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error ?? '書き込み失敗');
+    return json;
+  } catch (err) {
+    console.warn('[HighasuiDX] GS POST エラー:', err.message);
+    return null;
+  }
+}
+
+// ════════════════════════════════════════════════
+//  UI ヘルパー
+// ════════════════════════════════════════════════
 function setBtnRefreshSpinning(on) {
   const btn = document.getElementById('btn-refresh');
   if (!btn) return;
@@ -562,22 +432,17 @@ function updatePeriodLabel() {
   const label = document.getElementById('period-label');
   const nav   = document.getElementById('period-nav');
   if (!label) return;
-  if (periodMode === 'all') {
-    if (nav) nav.style.display = 'none';
-    return;
-  }
-  if (nav) nav.style.display = 'flex';
-  if (periodMode === 'month') {
-    label.textContent = `${periodYear}年${periodMonth}月`;
-  } else {
-    label.textContent = `${periodYear}年`;
-  }
+  if (periodMode === 'all') { nav.style.display = 'none'; return; }
+  nav.style.display = 'flex';
+  label.textContent = periodMode === 'month'
+    ? `${periodYear}年${periodMonth}月`
+    : `${periodYear}年`;
 }
 
-function movePeriod(dir) { // dir: -1 | +1
+function movePeriod(dir) {
   if (periodMode === 'month') {
     periodMonth += dir;
-    if (periodMonth > 12) { periodMonth = 1;  periodYear++; }
+    if (periodMonth > 12) { periodMonth = 1; periodYear++; }
     if (periodMonth < 1)  { periodMonth = 12; periodYear--; }
   } else {
     periodYear += dir;
@@ -586,7 +451,6 @@ function movePeriod(dir) { // dir: -1 | +1
   renderTable();
 }
 
-/** エントリが現在の期間に含まれるか */
 function inPeriod(entry) {
   if (periodMode === 'all') return true;
   const [y, m] = entry.date.split('-').map(Number);
@@ -596,25 +460,21 @@ function inPeriod(entry) {
 }
 
 // ════════════════════════════════════════════════
-//  フィルタリング / サマリー / テーブル描画
+//  フィルタリング・サマリー・テーブル描画
 // ════════════════════════════════════════════════
-
-/** 日付降順ソート */
-function byDateDesc(a, b) {
-  return b.date.localeCompare(a.date);
-}
-
-/** 現在の期間 + フィルターを適用 */
 function getFiltered() {
-  const type = document.getElementById('filter-type')?.value || '';
-  const cat  = document.getElementById('filter-category')?.value || '';
-  const kw   = (document.getElementById('filter-keyword')?.value || '').toLowerCase();
+  const type = document.getElementById('filter-type')?.value ?? '';
+  const cat  = document.getElementById('filter-category')?.value ?? '';
+  const kw   = (document.getElementById('filter-keyword')?.value ?? '').toLowerCase();
 
   return allEntries.filter(e => {
-    if (!inPeriod(e))                            return false;
-    if (type && e.type !== type)                 return false;
-    if (cat  && e.category !== cat)              return false;
-    if (kw   && !e.description.toLowerCase().includes(kw)) return false;
+    if (!inPeriod(e))                       return false;
+    if (type && e.type !== type)            return false;
+    if (cat  && e.category !== cat)         return false;
+    if (kw) {
+      const haystack = `${e.description} ${e.vendor ?? ''}`.toLowerCase();
+      if (!haystack.includes(kw))           return false;
+    }
     return true;
   });
 }
@@ -644,47 +504,61 @@ function renderTable() {
 
   if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:var(--space-10);color:var(--gray-500);">
-      ${allEntries.length === 0 ? 'データを取得中です。更新ボタンを押してください。' : '該当する仕訳がありません'}
+      ${allEntries.length === 0 ? '更新ボタンを押してデータを取得してください。' : '該当する仕訳がありません'}
     </td></tr>`;
     return;
   }
 
   tbody.innerHTML = filtered.map(e => `
     <tr>
-      <td style="white-space:nowrap;font-size:var(--text-sm);">${e.date}</td>
+      <td style="white-space:nowrap;font-size:var(--text-sm);">${escHtml(e.date)}</td>
       <td><span class="badge badge-navy">${escHtml(e.category)}</span></td>
-      <td style="color:var(--gray-700);">${escHtml(e.description)}</td>
+      <td>
+        <span style="color:var(--gray-800);">${escHtml(e.description)}</span>
+        ${e.vendor ? `<span class="desc-vendor">📍 ${escHtml(e.vendor)}</span>` : ''}
+      </td>
       <td class="amount-cell income">${e.type === 'income'  ? fmt(e.amount) : ''}</td>
       <td class="amount-cell expense">${e.type === 'expense' ? fmt(e.amount) : ''}</td>
       <td>
         <button class="btn btn-sm btn-outline"
           style="color:var(--danger);border-color:var(--danger);"
-          onclick="deleteEntry('${escHtml(e.id)}')">削除</button>
+          onclick="deleteEntry('${escHtml(String(e.id))}')">削除</button>
       </td>
     </tr>
   `).join('');
 }
 
-function escHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, c =>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+// ════════════════════════════════════════════════
+//  CRUD
+// ════════════════════════════════════════════════
 
-// ════════════════════════════════════════════════
-//  CRUD 操作
-// ════════════════════════════════════════════════
+/** 削除：ローカル + GS */
 async function deleteEntry(id) {
-  if (!confirm('この仕訳を削除しますか？\n※スプレッドシート連携中の場合、シート側の削除は手動で行ってください。')) return;
-  allEntries = allEntries.filter(e => e.id !== id);
-  showToast('削除しました（ローカルのみ）', 'success');
+  if (!confirm('この仕訳を削除しますか？')) return;
+
+  // GS から削除
+  if (isGsConfigured()) {
+    const result = await postToGS({ action: 'delete', id });
+    if (result === null) {
+      showToast('スプレッドシートからの削除に失敗しました', 'error');
+      return; // GS削除が失敗した場合はローカルも変えない
+    }
+    showToast('削除しました', 'success');
+  } else {
+    showToast('削除しました（ローカルのみ）', 'success');
+  }
+
+  // ローカルから除去
+  allEntries = allEntries.filter(e => String(e.id) !== String(id));
   renderTable();
 }
 
+/** CSV ダウンロード */
 function downloadCSV() {
   const filtered = getFiltered();
-  const rows = [['日付', 'カテゴリ', '摘要', '収入', '支出']];
+  const rows = [['日付', 'カテゴリ', '摘要', '購入先', '収入', '支出']];
   filtered.forEach(e => rows.push([
-    e.date, e.category, e.description,
+    e.date, e.category, e.description, e.vendor ?? '',
     e.type === 'income'  ? e.amount : '',
     e.type === 'expense' ? e.amount : '',
   ]));
@@ -703,23 +577,17 @@ function downloadCSV() {
 // ════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
 
-  // GS URLロード
-  loadGsUrl();
-
   // 今日の日付をデフォルトに
   document.getElementById('add-date').valueAsDate = new Date();
-
-  // GS URL 保存
-  document.getElementById('gs-save-btn').addEventListener('click', saveGsUrl);
-  document.getElementById('gs-url-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') saveGsUrl();
-  });
 
   // 更新ボタン
   document.getElementById('btn-refresh').addEventListener('click', () => fetchFromGS(true));
 
   // CSV
   document.getElementById('btn-csv').addEventListener('click', downloadCSV);
+
+  // 仕訳追加モーダルを開くボタン
+  document.getElementById('btn-open-add').addEventListener('click', () => openModal('modal-add'));
 
   // 期間モード切替
   document.querySelectorAll('.period-mode-btn').forEach(btn => {
@@ -732,7 +600,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // 期間ナビ
   document.getElementById('btn-period-prev').addEventListener('click', () => movePeriod(-1));
   document.getElementById('btn-period-next').addEventListener('click', () => movePeriod(+1));
 
@@ -741,60 +608,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById(id)?.addEventListener('change', renderTable));
   document.getElementById('filter-keyword')?.addEventListener('input', renderTable);
 
-  // Apps Script スクリプト案内を表示するリンク
-  const hintLink = document.createElement('a');
-  hintLink.textContent = 'セットアップ手順を表示';
-  hintLink.href = '#';
-  hintLink.style.cssText = 'font-size:var(--text-xs);color:var(--info);text-decoration:underline;margin-left:8px;';
-  hintLink.addEventListener('click', e => {
-    e.preventDefault();
-    document.getElementById('gs-script-hint').style.display = 'block';
-    document.getElementById('gs-script-hint').scrollIntoView({ behavior:'smooth' });
-  });
-  document.getElementById('sync-status-chip').after(hintLink);
-
-  // GS未接続時はモーダル内に警告を表示
-  document.getElementById('modal-add').addEventListener('click', () => {
-    const warn = document.getElementById('modal-gs-warning');
-    if (warn) warn.style.display = gsUrl ? 'none' : 'flex';
-  });
-
   // 仕訳保存
   document.getElementById('btn-save-entry').addEventListener('click', async () => {
-    const date    = document.getElementById('add-date').value;
-    const type    = document.getElementById('add-type').value;
-    const cat     = document.getElementById('add-category').value;
-    const amount  = parseInt(document.getElementById('add-amount').value);
-    const desc    = document.getElementById('add-description').value.trim();
+    const date   = document.getElementById('add-date').value;
+    const type   = document.getElementById('add-type').value;
+    const cat    = document.getElementById('add-category').value;
+    const amount = parseInt(document.getElementById('add-amount').value);
+    const desc   = document.getElementById('add-description').value.trim();
+    const vendor = document.getElementById('add-vendor').value.trim();
 
     if (!date || !cat || !desc || isNaN(amount) || amount <= 0) {
       showToast('すべての必須項目を入力してください', 'error');
       return;
     }
 
-    const tempId = `local_${Date.now()}`;
-    const entry  = { id: tempId, date, type, category: cat, amount, description: desc };
-
     const btn = document.getElementById('btn-save-entry');
     btn.disabled = true;
     btn.textContent = '保存中…';
 
-    // GS に書き込み
-    if (gsUrl) {
-      const newId = await postToGS(entry);
-      if (newId) {
-        entry.id = newId;
+    const tempId = `local_${Date.now()}`;
+    const entry  = { id: tempId, date, type, category: cat, amount, description: desc, vendor };
+
+    if (isGsConfigured()) {
+      const result = await postToGS({ date, type, category: cat, amount, description: desc, vendor });
+      if (result) {
+        entry.id = result.id ?? tempId;
         showToast('スプレッドシートに保存しました', 'success');
       } else {
-        showToast('シートへの書き込みに失敗しました。ローカルのみ追加しました。', 'error');
+        showToast('シートへの保存に失敗しました。ローカルのみ追加しました。', 'error');
       }
     } else {
       showToast('仕訳を追加しました（ローカルのみ）', 'success');
     }
 
-    // 新しいエントリを先頭に追加（日付降順）
     allEntries = [entry, ...allEntries].sort(byDateDesc);
-
     closeModal('modal-add');
     renderTable();
 
@@ -802,13 +649,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.textContent = '保存する';
     document.getElementById('add-amount').value = '';
     document.getElementById('add-description').value = '';
+    document.getElementById('add-vendor').value = '';
     document.getElementById('add-date').valueAsDate = new Date();
   });
 
-  // 期間初期表示
+  // 期間ラベル初期表示
   updatePeriodLabel();
 
-  // データロード（GS接続済みなら取得、未接続ならデモ）
+  // データ読み込み
   await fetchFromGS();
 });
 </script>
