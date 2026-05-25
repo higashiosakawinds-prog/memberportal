@@ -267,12 +267,30 @@ async function loadMyPayments(memberId) {
 }
 
 // ══════════════════════════════════════
-//  描画：区分・会員費カード
+//  描画：区分・会員費カード（自分の区分のみ）
 // ══════════════════════════════════════
 function renderInfoGrid() {
-  const grid = document.getElementById('dues-info-grid');
-  const pm   = myProfile?.payment_method;
-  const cats = ['regular','regular_student','trainee','support'];
+  const grid    = document.getElementById('dues-info-grid');
+  const pm      = myProfile?.payment_method;
+  const myCat   = myProfile?.category;
+  const myFee   = duesFees[myCat];
+
+  // ログイン前 or プロフィール未取得
+  if (!myProfile) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:var(--space-6);color:var(--gray-500);font-size:var(--text-sm);">ログインすると表示されます。</div>`;
+    return;
+  }
+
+  // 休団中はフラットに表示
+  if (myCat === 'rest') {
+    grid.innerHTML = `
+      <div class="dues-info-card mine" style="grid-column:1/-1;">
+        <span class="badge badge-warning" style="font-size:10px;margin-bottom:var(--space-2);display:inline-block;">あなたの区分</span>
+        <p class="dues-info-card__cat">休団中</p>
+        <p style="font-size:var(--text-sm);color:var(--gray-500);margin-top:var(--space-2);">休団中のため団費は発生しません。</p>
+      </div>`;
+    return;
+  }
 
   const methodHtml = pm === 'cash'
     ? '<span class="method-badge method-cash">💴 現金</span>'
@@ -280,20 +298,17 @@ function renderInfoGrid() {
       ? '<span class="method-badge method-credit">💳 クレジット</span>'
       : '<span class="method-badge method-none">⚠ 未設定</span>';
 
-  grid.innerHTML = cats.map(cat => {
-    const fee  = duesFees[cat];
-    const isMe = cat === myProfile?.category;
-    if (!fee) return '';
-    return `
-      <div class="dues-info-card ${isMe ? 'mine' : ''}">
-        ${isMe ? '<span class="badge badge-gold" style="font-size:10px;margin-bottom:6px;display:inline-block;">あなたの区分</span>' : ''}
-        <p class="dues-info-card__cat">${escHtml(CAT_LABELS[cat] ?? cat)}</p>
-        <p class="dues-info-card__amount">¥${Number(fee).toLocaleString()}<small style="font-size:var(--text-sm);font-weight:400;color:var(--gray-500);">/月</small></p>
-        ${isMe ? `<p class="dues-info-card__method">支払い方法<br>${methodHtml}</p>` : ''}
-      </div>`;
-  }).join('');
+  grid.innerHTML = `
+    <div class="dues-info-card mine">
+      <span class="badge badge-gold" style="font-size:10px;margin-bottom:var(--space-2);display:inline-block;">あなたの区分</span>
+      <p class="dues-info-card__cat">${escHtml(CAT_LABELS[myCat] ?? myCat)}</p>
+      <p class="dues-info-card__amount">
+        ${myFee ? `¥${Number(myFee).toLocaleString()}<small style="font-size:var(--text-sm);font-weight:400;color:var(--gray-500);">/月</small>` : '<span style="font-size:var(--text-base);color:var(--gray-400);">未設定</span>'}
+      </p>
+      <p class="dues-info-card__method">支払い方法<br>${methodHtml}</p>
+    </div>`;
 
-  if (!myProfile?.payment_method) {
+  if (!pm) {
     grid.innerHTML += `
       <div class="alert alert-warning" style="grid-column:1/-1;margin-top:var(--space-2);">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
@@ -385,28 +400,30 @@ async function onCreditCheck(cb) {
 }
 
 // ══════════════════════════════════════
-//  QRコード表示
+//  QRコード表示（データ最小化でオーバーフロー回避）
 // ══════════════════════════════════════
 function showQR() {
-  const user   = getSessionUser();
-  const name   = myProfile ? `${myProfile.last_name}${myProfile.first_name}` : (user?.name ?? '');
-  const qrData = JSON.stringify({
-    type: 'dues_payment',
-    memberId: user.id,
-    name,
-    month: selectedMonth,
-    method: 'cash',
-  });
+  const user = getSessionUser();
+  // QRに含めるデータを最小限に絞る
+  // memberId(UUID)は長いため、先頭8文字+月で識別可能にし
+  // 読み取り側(dues-admin)でfullIdをallMembersから逆引きする
+  const shortId = (user.id ?? '').replace(/-/g, '').slice(0, 12); // ハイフン除去後12文字
+  const qrData  = `DP:${shortId}:${selectedMonth}`;
+  // 形式: "DP:<shortId>:<YYYY-MM>"  例: "DP:6ba7b8109173:2025-06"
 
   document.getElementById('qr-title').textContent = `支払い用QRコード — ${fmtMonth(selectedMonth)}`;
-  document.getElementById('qr-info').textContent  = `${name} / ${fmtMonth(selectedMonth)}`;
+  document.getElementById('qr-info').textContent  =
+    `${myProfile ? `${myProfile.last_name} ${myProfile.first_name}` : (user?.name ?? '')} / ${fmtMonth(selectedMonth)}`;
 
   const wrap = document.getElementById('qr-canvas');
   wrap.innerHTML = '';
   new QRCode(wrap, {
-    text: qrData, width: 240, height: 240,
-    colorDark: '#0d1b2a', colorLight: '#ffffff',
-    correctLevel: QRCode.CorrectLevel.M,
+    text:         qrData,
+    width:        240,
+    height:       240,
+    colorDark:    '#0d1b2a',
+    colorLight:   '#ffffff',
+    correctLevel: QRCode.CorrectLevel.L,  // 誤り訂正レベルL（最小）でデータ容量を最大化
   });
   openModal('modal-qr');
 }
@@ -428,7 +445,9 @@ async function doRecord(method) {
     const res = await fetch(DUES_GAS_URL, {
       method:'POST', redirect:'follow',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({ action:'recordPayment', memberId:user.id, month:selectedMonth, method, confirmedAt:now }),
+      body: JSON.stringify({ action:'recordPayment', memberId:user.id, month:selectedMonth, method, confirmedAt:now,
+        name: myProfile ? `${myProfile.last_name}${myProfile.first_name}` : (user?.name ?? ''),
+        category: myProfile?.category ?? '' }),
     });
     const json = await res.json();
     if (!json.ok) throw new Error(json.error);
