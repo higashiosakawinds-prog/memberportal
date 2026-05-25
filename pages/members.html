@@ -128,7 +128,9 @@
           <select id="filter-category" class="form-control" style="max-width:160px;">
             <option value="">すべての区分</option>
             <option value="regular">正団員</option>
+            <option value="regular_student">正団員(学生)</option>
             <option value="trainee">準団員</option>
+            <option value="staff">スタッフ</option>
             <option value="rest">休団中</option>
             <option value="support">賛助</option>
           </select>
@@ -185,7 +187,7 @@ const PART_LABELS = {
   euphonium:'Euphonium', tuba:'Tuba', percussion:'Percussion', contrabass:'Contrabass',
   piano:'Piano', staff:'Staff', other:'Other',
 };
-const CATEGORY_LABELS = { regular:'正団員', trainee:'準団員', rest:'休団中', support:'賛助' };
+const CATEGORY_LABELS = { regular:'正団員',regular_student:'正団員(学生)' ,trainee:'準団員',staff:'スタッフ' ,rest:'休団中', support:'賛助' };
 const CATEGORY_BADGE  = { regular:'badge-success', trainee:'badge-navy', rest:'badge-warning', support:'badge-gold' };
 
 // 詳細モーダルの閲覧権限ロール
