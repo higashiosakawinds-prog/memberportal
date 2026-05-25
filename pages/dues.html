@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>団費登録 — 東大阪吹奏楽団</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/common.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <style>
+    .dues-info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+    .dues-info-card {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      padding: var(--space-5);
+    }
+    .dues-info-card.mine {
+      border-color: var(--gold-500);
+      box-shadow: 0 0 0 3px rgba(201,168,76,0.15);
+    }
+    .dues-info-card__cat {
+      font-size: var(--text-xs);
+      color: var(--gray-500);
+      font-weight: 500;
+      margin-bottom: var(--space-1);
+    }
+    .dues-info-card__amount {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      color: var(--navy-800);
+    }
+    .dues-info-card__method {
+      margin-top: var(--space-3);
+      font-size: var(--text-xs);
+      color: var(--gray-500);
+    }
+    .method-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 10px; border-radius: var(--radius-full);
+      font-size: var(--text-xs); font-weight: 600; margin-top: 4px;
+    }
+    .method-cash   { background: rgba(230,126,34,.12); color: #ca6f1e; }
+    .method-credit { background: rgba(41,128,185,.12);  color: #1a5276; }
+    .method-none   { background: rgba(192,57,43,.12);   color: var(--danger); }
+
+    .month-tabs { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-5); }
+    .month-tab {
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-full); border: 1px solid var(--gray-300);
+      font-size: var(--text-sm); font-weight: 500; color: var(--gray-600);
+      cursor: pointer; background: var(--white); transition: all var(--transition-fast);
+    }
+    .month-tab:hover  { border-color: var(--navy-500); color: var(--navy-700); }
+    .month-tab.active { background: var(--navy-800); color: var(--gold-300); border-color: var(--navy-800); }
+
+    .action-card {
+      background: var(--white); border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg); padding: var(--space-6);
+      margin-bottom: var(--space-6);
+    }
+    .action-card.credit { border-left: 4px solid var(--info); }
+    .action-card.cash   { border-left: 4px solid var(--warning); }
+    .action-card.paid   { border-left: 4px solid var(--success); }
+
+    .check-row {
+      display: flex; align-items: flex-start; gap: var(--space-3);
+      margin-top: var(--space-4); padding: var(--space-4);
+      background: var(--gray-100); border-radius: var(--radius-md);
+    }
+    .big-cb {
+      width: 22px; height: 22px; flex-shrink: 0;
+      accent-color: var(--success); cursor: pointer; margin-top: 2px;
+    }
+
+    .history-wrap {
+      border-radius: var(--radius-lg); overflow: hidden;
+      border: 1px solid var(--gray-200);
+    }
+    .dot {
+      display: inline-block; width: 9px; height: 9px;
+      border-radius: 50%; margin-right: 5px; vertical-align: middle;
+    }
+    .dot.paid   { background: var(--success); }
+    .dot.unpaid { background: var(--gray-300); }
+
+    @media(max-width:600px){
+      .dues-info-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main-content">
+
+    <div class="page-header fade-in">
+      <div>
+        <p class="page-header__eyebrow">ACCOUNTING</p>
+        <h1 class="page-header__title">団費登録</h1>
+      </div>
+    </div>
+
+    <!-- ① 区分・会員費 -->
+    <div class="mb-8 fade-in fade-in-1">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:var(--space-3);margin-bottom:var(--space-4);">
+        <div>
+          <p class="page-header__eyebrow">MEMBERSHIP FEE</p>
+          <h2 style="font-size:var(--text-xl);font-weight:700;color:var(--navy-800);">区分・会員費</h2>
+        </div>
+      </div>
+      <div class="dues-info-grid" id="dues-info-grid">
+        <div style="grid-column:1/-1;text-align:center;padding:var(--space-8);color:var(--gray-500);">
+          <div class="loading-spinner" style="margin:0 auto;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② 支払い確認 -->
+    <div class="mb-8 fade-in fade-in-2">
+      <p class="page-header__eyebrow">PAYMENT</p>
+      <h2 style="font-size:var(--text-xl);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-4);">支払い確認</h2>
+      <div class="month-tabs" id="month-tabs"></div>
+      <div id="payment-action-area">
+        <div style="text-align:center;padding:var(--space-8);color:var(--gray-500);">
+          <div class="loading-spinner" style="margin:0 auto;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ 支払い履歴 -->
+    <div class="mb-8 fade-in fade-in-3">
+      <p class="page-header__eyebrow">HISTORY</p>
+      <h2 style="font-size:var(--text-xl);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-4);">支払い状況（直近1年）</h2>
+      <div class="history-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>月</th>
+              <th style="text-align:center;">状況</th>
+              <th>確認日</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody">
+            <tr><td colspan="3" style="text-align:center;padding:var(--space-8);">
+              <div class="loading-spinner" style="margin:0 auto;"></div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- QR表示モーダル -->
+<div class="modal-overlay" id="modal-qr">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal__header">
+      <h2 class="modal__title" id="qr-title">支払い用QRコード</h2>
+      <button class="modal__close" onclick="closeModal('modal-qr')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div class="alert alert-warning mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+        <span>会計担当者にこのQRコードを読み取ってもらってください。</span>
+      </div>
+      <div id="qr-canvas" style="display:flex;justify-content:center;padding:var(--space-4) 0;"></div>
+      <p id="qr-info" style="text-align:center;font-size:var(--text-sm);color:var(--gray-600);margin-top:var(--space-2);"></p>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-qr')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<script src="../js/supabase.js"></script>
+<script src="../js/common.js"></script>
+<script>
+// ══════════════════════════════════════
+//  設定
+// ══════════════════════════════════════
+const DUES_GAS_URL = 'https://script.google.com/macros/s/YOUR_DUES_SCRIPT_ID/exec';
+
+const CAT_LABELS = {
+  regular:         '正団員',
+  regular_student: '正団員（学生）',
+  trainee:         '準団員',
+  support:         'スタッフ',
+  rest:            '休団中',
+};
+
+// ══════════════════════════════════════
+//  状態
+// ══════════════════════════════════════
+let myProfile       = null;
+let duesFees        = {};
+let paymentRecords  = {};
+let selectedMonth   = '';
+let availableMonths = [];
+
+// ══════════════════════════════════════
+//  ユーティリティ
+// ══════════════════════════════════════
+const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const isGasOk = () => DUES_GAS_URL && !DUES_GAS_URL.includes('YOUR_DUES_SCRIPT_ID');
+
+function fmtMonth(ym) {
+  const [y, m] = ym.split('-');
+  return `${y}年${parseInt(m)}月`;
+}
+
+function buildMonths() {
+  const now = new Date(), list = [];
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    list.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  return list;
+}
+
+// ══════════════════════════════════════
+//  データ取得
+// ══════════════════════════════════════
+async function loadFees() {
+  if (!_sb) return { regular:3000, regular_student:2000, trainee:2000, support:1000 };
+  const { data } = await _sb.from('dues_settings').select('*');
+  const r = {};
+  (data ?? []).forEach(d => { r[d.category] = d.amount; });
+  return r;
+}
+
+async function loadMyPayments(memberId) {
+  if (!isGasOk()) {
+    // デモ：最近の月は未払い、古い月は支払い済み
+    const r = {}, now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      r[k] = { paid: i >= 2, confirmed_at: i >= 2 ? d.toISOString() : null };
+    }
+    return r;
+  }
+  try {
+    const res = await fetch(`${DUES_GAS_URL}?action=getMyPayments&memberId=${encodeURIComponent(memberId)}`,
+      { method:'GET', redirect:'follow' });
+    const json = await res.json();
+    return json.data ?? {};
+  } catch (e) {
+    console.warn('支払い取得失敗', e.message);
+    return {};
+  }
+}
+
+// ══════════════════════════════════════
+//  描画：区分・会員費カード
+// ══════════════════════════════════════
+function renderInfoGrid() {
+  const grid = document.getElementById('dues-info-grid');
+  const pm   = myProfile?.payment_method;
+  const cats = ['regular','regular_student','trainee','support'];
+
+  const methodHtml = pm === 'cash'
+    ? '<span class="method-badge method-cash">💴 現金</span>'
+    : pm === 'credit'
+      ? '<span class="method-badge method-credit">💳 クレジット</span>'
+      : '<span class="method-badge method-none">⚠ 未設定</span>';
+
+  grid.innerHTML = cats.map(cat => {
+    const fee  = duesFees[cat];
+    const isMe = cat === myProfile?.category;
+    if (!fee) return '';
+    return `
+      <div class="dues-info-card ${isMe ? 'mine' : ''}">
+        ${isMe ? '<span class="badge badge-gold" style="font-size:10px;margin-bottom:6px;display:inline-block;">あなたの区分</span>' : ''}
+        <p class="dues-info-card__cat">${escHtml(CAT_LABELS[cat] ?? cat)}</p>
+        <p class="dues-info-card__amount">¥${Number(fee).toLocaleString()}<small style="font-size:var(--text-sm);font-weight:400;color:var(--gray-500);">/月</small></p>
+        ${isMe ? `<p class="dues-info-card__method">支払い方法<br>${methodHtml}</p>` : ''}
+      </div>`;
+  }).join('');
+
+  if (!myProfile?.payment_method) {
+    grid.innerHTML += `
+      <div class="alert alert-warning" style="grid-column:1/-1;margin-top:var(--space-2);">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+        <span>支払い方法が未設定です。会計担当者にご連絡ください。</span>
+      </div>`;
+  }
+}
+
+// ══════════════════════════════════════
+//  描画：月タブ
+// ══════════════════════════════════════
+function renderMonthTabs() {
+  document.getElementById('month-tabs').innerHTML = availableMonths.map(m => `
+    <button class="month-tab ${m === selectedMonth ? 'active' : ''}"
+      onclick="selectMonth('${m}')">${fmtMonth(m)}</button>`).join('');
+}
+function selectMonth(m) { selectedMonth = m; renderMonthTabs(); renderActionArea(); }
+
+// ══════════════════════════════════════
+//  描画：支払いアクションエリア
+// ══════════════════════════════════════
+function renderActionArea() {
+  const area  = document.getElementById('payment-action-area');
+  const pm    = myProfile?.payment_method;
+  const rec   = paymentRecords[selectedMonth];
+  const paid  = rec?.paid ?? false;
+  const label = fmtMonth(selectedMonth);
+
+  if (!myProfile) {
+    area.innerHTML = `<div class="alert alert-info"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg><span>ログインが必要です。</span></div>`;
+    return;
+  }
+  if (!pm) {
+    area.innerHTML = `<div class="alert alert-warning"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg><span>支払い方法が登録されていません。会計担当者にご連絡ください。</span></div>`;
+    return;
+  }
+
+  if (paid) {
+    const dt = rec?.confirmed_at
+      ? new Date(rec.confirmed_at).toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'})
+      : '';
+    area.innerHTML = `
+      <div class="action-card paid">
+        <div style="display:flex;align-items:center;gap:var(--space-3);">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--success)" stroke-width="2" width="36" height="36"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <div>
+            <p style="font-weight:700;color:var(--success);font-size:var(--text-lg);">${escHtml(label)}の団費は支払い済みです</p>
+            ${dt ? `<p style="font-size:var(--text-xs);color:var(--gray-500);">確認日：${escHtml(dt)}</p>` : ''}
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  if (pm === 'credit') {
+    area.innerHTML = `
+      <div class="action-card credit">
+        <p style="font-weight:600;color:var(--navy-800);font-size:var(--text-base);">${escHtml(label)}の団費を支払ったことを確認した。</p>
+        <div class="check-row">
+          <input type="checkbox" class="big-cb" id="credit-cb" onchange="onCreditCheck(this)">
+          <label for="credit-cb" style="font-size:var(--text-sm);color:var(--gray-700);cursor:pointer;">
+            上記を確認してチェックを入れてください。チェック後、支払いが記録されます。
+          </label>
+        </div>
+      </div>`;
+  } else {
+    area.innerHTML = `
+      <div class="action-card cash">
+        <p style="font-weight:600;color:var(--navy-800);font-size:var(--text-base);">${escHtml(label)}の団費を支払う。</p>
+        <p style="font-size:var(--text-sm);color:var(--gray-500);margin-top:var(--space-2);">ボタンを押してQRコードを表示し、会計担当者に読み取ってもらってください。</p>
+        <div style="margin-top:var(--space-4);">
+          <button class="btn btn-gold" onclick="showQR()">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z"/></svg>
+            支払いに進む（QRコード表示）
+          </button>
+        </div>
+      </div>`;
+  }
+}
+
+// ══════════════════════════════════════
+//  クレジット確認チェック
+// ══════════════════════════════════════
+async function onCreditCheck(cb) {
+  if (!cb.checked) return;
+  const ok = confirm(`${fmtMonth(selectedMonth)}の団費支払いを記録します。\nよろしいですか？`);
+  if (!ok) { cb.checked = false; return; }
+  await doRecord('credit');
+}
+
+// ══════════════════════════════════════
+//  QRコード表示
+// ══════════════════════════════════════
+function showQR() {
+  const user   = getSessionUser();
+  const name   = myProfile ? `${myProfile.last_name}${myProfile.first_name}` : (user?.name ?? '');
+  const qrData = JSON.stringify({
+    type: 'dues_payment',
+    memberId: user.id,
+    name,
+    month: selectedMonth,
+    method: 'cash',
+  });
+
+  document.getElementById('qr-title').textContent = `支払い用QRコード — ${fmtMonth(selectedMonth)}`;
+  document.getElementById('qr-info').textContent  = `${name} / ${fmtMonth(selectedMonth)}`;
+
+  const wrap = document.getElementById('qr-canvas');
+  wrap.innerHTML = '';
+  new QRCode(wrap, {
+    text: qrData, width: 240, height: 240,
+    colorDark: '#0d1b2a', colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M,
+  });
+  openModal('modal-qr');
+}
+
+// ══════════════════════════════════════
+//  支払い記録（GAS POST）
+// ══════════════════════════════════════
+async function doRecord(method) {
+  const user = getSessionUser();
+  const now  = new Date().toISOString();
+
+  if (!isGasOk()) {
+    paymentRecords[selectedMonth] = { paid: true, confirmed_at: now };
+    showToast('支払いを記録しました（デモ）', 'success');
+    renderActionArea(); renderHistory();
+    return;
+  }
+  try {
+    const res = await fetch(DUES_GAS_URL, {
+      method:'POST', redirect:'follow',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({ action:'recordPayment', memberId:user.id, month:selectedMonth, method, confirmedAt:now }),
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+    paymentRecords[selectedMonth] = { paid: true, confirmed_at: now };
+    showToast('支払いを記録しました', 'success');
+    renderActionArea(); renderHistory();
+  } catch (e) {
+    showToast('記録に失敗しました', 'error');
+    const cb = document.getElementById('credit-cb');
+    if (cb) cb.checked = false;
+  }
+}
+
+// ══════════════════════════════════════
+//  描画：支払い履歴（直近12ヶ月）
+// ══════════════════════════════════════
+function renderHistory() {
+  const tbody = document.getElementById('history-tbody');
+  const now   = new Date();
+  tbody.innerHTML = Array.from({length:12},(_,i) => {
+    const d   = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const rec  = paymentRecords[key];
+    const paid = rec?.paid ?? false;
+    const dt   = (paid && rec?.confirmed_at)
+      ? new Date(rec.confirmed_at).toLocaleDateString('ja-JP',{year:'numeric',month:'short',day:'numeric'})
+      : '—';
+    return `
+      <tr>
+        <td><span class="dot ${paid?'paid':'unpaid'}"></span>${fmtMonth(key)}</td>
+        <td style="text-align:center;">
+          ${paid
+            ? '<span class="badge badge-success">支払い済み</span>'
+            : '<span class="badge" style="background:var(--gray-200);color:var(--gray-500);">未払い</span>'}
+        </td>
+        <td style="font-size:var(--text-xs);color:var(--gray-500);">${paid ? escHtml(dt) : '—'}</td>
+      </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════
+//  初期化
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  const user = getSessionUser();
+  availableMonths = buildMonths();
+  selectedMonth   = availableMonths[0];
+
+  if (_sb && user) {
+    const { data } = await _sb.from('profiles')
+      .select('id,last_name,first_name,category,payment_method')
+      .eq('id', user.id).single();
+    myProfile = data;
+  }
+
+  duesFees       = await loadFees();
+  paymentRecords = user ? await loadMyPayments(user.id) : {};
+
+  renderInfoGrid();
+  renderMonthTabs();
+  renderActionArea();
+  renderHistory();
+});
+</script>
+</body>
+</html>
