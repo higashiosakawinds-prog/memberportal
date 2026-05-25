@@ -11,9 +11,14 @@
 //    ['all']  → ログイン済み全員が利用可能
 //    ['admin','librarian'] のように配列で役職を指定 → その役職のみ
 //
-//  変更例（楽譜管理を蔵書委員・管理者のみにしたい場合）:
-//    nav_scores:   ['admin', 'librarian'],
-//    scores_edit:  ['admin', 'librarian'],
+//  【団費関連権限キー一覧】
+//    nav_dues            : 「団費登録」ページをサイドバーに表示
+//    nav_dues_admin      : 「団費管理」ページをサイドバーに表示
+//    dues_view           : 団費登録ページの閲覧
+//    dues_admin          : 団費管理ページの閲覧・操作全般
+//    dues_payment_approve: QRコード承認・手動支払い変更
+//    dues_fee_edit       : 団費金額の変更
+//    dues_method_edit    : 支払い方法の変更（現金/クレジット）
 // ═══════════════════════════════════════════════════════
 const ROLE_PERMISSIONS = {
   // ── サイドバーの表示権限 ──
@@ -24,26 +29,32 @@ const ROLE_PERMISSIONS = {
   nav_distribution:       ['all'],
   nav_repertoire:         ['all'],
   nav_ledger:             ['all'],
-  nav_dues:               ['all'],
+  nav_dues:               ['all'],                           // 団費登録（全員）
+  nav_dues_admin:         ['gm', 'admin', 'treasurer'],      // 団費管理（GM・幹部・会計のみ）
   nav_instruments:        ['all'],
   nav_instrument_lending: ['all'],
   nav_qrcode:             ['all'],
-  nav_contact:            ['all'],
+  nav_contact:            ['gm', 'admin', 'manager'],        // 連絡網（役職限定）
   nav_requests:           ['all'],
-  nav_contact:  ['gm', 'admin', 'manager'],
-contact_send: ['gm', 'admin', 'manager'],
 
   // ── 各ページの操作（編集・追加・削除）権限 ──
-  // ページ内で canDo('scores_edit') を呼び出して判定します
+  // ページ内で canDo('キー名') を呼び出して判定します
   scores_edit:            ['all'],
   distribution_edit:      ['all'],
   repertoire_edit:        ['all'],
   ledger_edit:            ['all'],
-  dues_edit:              ['all'],
+
+  // 団費関連
+  dues_view:              ['all'],                           // 団費登録ページ閲覧
+  dues_admin:             ['gm', 'admin', 'treasurer'],      // 団費管理ページ全般
+  dues_payment_approve:   ['gm', 'admin', 'treasurer'],      // QR承認・手動支払い変更
+  dues_fee_edit:          ['gm', 'admin', 'treasurer'],      // 金額変更
+  dues_method_edit:       ['gm', 'admin', 'treasurer'],      // 支払い方法変更
+
   instruments_edit:       ['all'],
   lending_edit:           ['all'],
   qrcode_print:           ['all'],
-  contact_send:           ['all'],
+  contact_send:           ['gm', 'admin', 'manager'],        // 連絡送信（役職限定）
   requests_approve:       ['all'],
   members_edit:           ['all'],
 };
@@ -52,13 +63,13 @@ contact_send: ['gm', 'admin', 'manager'],
 // 役職定義（表示名・バッジ色）
 // ─────────────────────────────────────────
 const ROLE_DEFINITIONS = [
-  { value: 'gm',     label: 'GM',   badgeClass: 'badge-danger'  },
+  { value: 'gm',        label: 'GM',     badgeClass: 'badge-danger'  },
   { value: 'admin',     label: '幹部',   badgeClass: 'badge-danger'  },
-  { value: 'conductor', label: '指揮者',   badgeClass: 'badge-navy'    },
-  { value: 'manager',   label: '運営委員', badgeClass: 'badge-navy'    },
-  { value: 'treasurer', label: '会計',     badgeClass: 'badge-gold'    },
-  { value: 'librarian', label: '蔵書委員', badgeClass: 'badge-success' },
-  { value: 'member',    label: '一般団員', badgeClass: 'badge-navy'    },
+  { value: 'conductor', label: '指揮者', badgeClass: 'badge-navy'    },
+  { value: 'manager',   label: '運営委員', badgeClass: 'badge-navy'  },
+  { value: 'treasurer', label: '会計',   badgeClass: 'badge-gold'    },
+  { value: 'librarian', label: '蔵書委員', badgeClass: 'badge-success'},
+  { value: 'member',    label: '一般団員', badgeClass: 'badge-navy'  },
 ];
 
 // ─────────────────────────────────────────
@@ -73,7 +84,7 @@ function getSessionUser() {
 
 // ─────────────────────────────────────────
 // 権限チェック関数
-// 使い方: canDo('scores_edit') → true/false
+// 使い方: canDo('dues_admin') → true/false
 // ─────────────────────────────────────────
 function canDo(permissionKey) {
   const allowed = ROLE_PERMISSIONS[permissionKey];
@@ -129,10 +140,10 @@ const NAV_ITEMS = [
         id: 'scores', permKey: 'nav_scores', label: '楽譜管理', href: 'pages/scores.html',
         icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z"/></svg>`,
       },
-            {
-  id: 'score-editor', permKey: 'nav_scoreedit', label: '楽譜管理（編集）', href: 'pages/score-editor.html',
-  icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z"/></svg>`,
-},
+      {
+        id: 'score-editor', permKey: 'nav_scoreedit', label: '楽譜管理（編集）', href: 'pages/score-editor.html',
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z"/></svg>`,
+      },
       {
         id: 'distribution', permKey: 'nav_distribution', label: '配布・貸出管理', href: 'pages/distribution.html',
         icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z"/></svg>`,
@@ -152,8 +163,13 @@ const NAV_ITEMS = [
         icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0118 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>`,
       },
       {
-        id: 'dues', permKey: 'nav_dues', label: '団費収入', href: 'pages/dues.html',
+        id: 'dues', permKey: 'nav_dues', label: '団費登録', href: 'pages/dues.html',
         icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z"/></svg>`,
+      },
+      {
+        // ★ 新規追加：団費管理ページ（GM・幹部・会計のみ表示）
+        id: 'dues-admin', permKey: 'nav_dues_admin', label: '団費管理', href: 'pages/dues-admin.html',
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7.5l3 4.5m0 0l3-4.5M12 12v5.25M15 12H9m6 3H9m12-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
       },
     ],
   },
@@ -242,8 +258,6 @@ function renderHeader(options = {}) {
   `;
 
   document.getElementById('logout-btn').addEventListener('click', () => {
-    // ★ 修正: typeof _sb !== 'undefined' は常にtrue（let宣言のため）
-    //         _sb が実際に初期化済みかどうかを確認する
     if (typeof Auth !== 'undefined' && _sb) {
       Auth.signOut();
     } else {
