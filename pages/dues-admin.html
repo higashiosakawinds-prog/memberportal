@@ -263,7 +263,7 @@
 // ══════════════════════════════════════
 //  設定・定数
 // ══════════════════════════════════════
-const DUES_GAS_URL = 'https://script.google.com/macros/s/AKfycbwgEdouCSt4CSomg5btY-blrVquKj3Hor7pZSDSMnDvsxNM-K9jxH8_4wfjVxYGapPBGg/exec';
+const DUES_GAS_URL = 'https://script.google.com/macros/s/AKfycbwvfg_SisVkhgPg8XqWWztiRKwOx7nwAP2JIJzTltuLeYvb8n1yzh2CCxCOEg_Vy91xlg/exec';
 
 const CAT_LABELS = {
   regular:'正団員', regular_student:'正団員（学生）',
@@ -478,11 +478,10 @@ function onDetected(raw) {
 
   if (raw.startsWith('DP:')) {
     const parts = raw.split(':');
-    // parts: ['DP', shortId, 'YYYY', 'MM'] ← YYYY-MM は split(':') で分割される
-    // → 'YYYY-MM' は index 2〜3 を再結合
-    if (parts.length >= 4) {
+    // parts: ['DP', shortId, 'YYYY-MM'] ← YYYY-MM はコロンを含まないため分割されない
+    if (parts.length >= 3) {
       const shortId  = parts[1];
-      const yyyyMM   = `${parts[2]}-${parts[3]}`;
+      const yyyyMM   = parts[2];
 
       // allMembersからショートIDで逆引き（先頭12文字照合）
       const found = allMembers.find(m => {
