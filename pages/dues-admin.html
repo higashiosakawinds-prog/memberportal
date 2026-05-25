@@ -137,11 +137,10 @@
               <th id="mh0" style="text-align:center;">—</th>
               <th id="mh1" style="text-align:center;">—</th>
               <th id="mh2" style="text-align:center;">—</th>
-              <th style="width:70px;"></th>
             </tr>
           </thead>
           <tbody id="status-tbody">
-            <tr><td colspan="8" style="text-align:center;padding:var(--space-10);">
+            <tr><td colspan="7" style="text-align:center;padding:var(--space-10);">
               <div class="loading-spinner" style="margin:0 auto;"></div>
             </td></tr>
           </tbody>
@@ -255,20 +254,6 @@
     </div>
 
   </main>
-</div>
-
-<!-- 手動編集モーダル -->
-<div class="modal-overlay" id="modal-edit">
-  <div class="modal" style="max-width:460px;">
-    <div class="modal__header">
-      <h2 class="modal__title" id="edit-title">支払い状況を編集</h2>
-      <button class="modal__close" onclick="closeModal('modal-edit')">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="modal__body" id="edit-body"></div>
-    <div class="modal__footer"><button class="btn btn-outline" onclick="closeModal('modal-edit')">閉じる</button></div>
-  </div>
 </div>
 
 <div class="toast-container" id="toast-container"></div>
@@ -404,7 +389,6 @@ function renderStatusTable() {
         <td><span class="badge badge-navy" style="font-size:10px;">${escHtml(CAT_LABELS[m.category]??'—')}</span></td>
         <td>${pmBadge}</td>
         ${cells}
-        <td><button class="btn btn-sm btn-outline" onclick="openEditModal('${m.id}')">編集</button></td>
       </tr>`;
   }).join('');
 }
@@ -422,12 +406,19 @@ async function updatePay(memberId, month, paid) {
   if (!allPayments[memberId]) allPayments[memberId] = {};
   allPayments[memberId][month] = { paid, confirmed_at: paid ? now : null };
 
+  const m = allMembers.find(x => x.id === memberId);
+
   if (isGasOk()) {
     try {
       await fetch(DUES_GAS_URL, {
         method:'POST', redirect:'follow',
         headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body: JSON.stringify({ action: paid ? 'recordPayment' : 'cancelPayment', memberId, month, confirmedAt:now }),
+        body: JSON.stringify({
+          action: paid ? 'recordPayment' : 'cancelPayment',
+          memberId, month, confirmedAt: now,
+          name:     m ? `${m.last_name}${m.first_name}` : '',
+          category: m?.category ?? '',
+        }),
       });
     } catch(e){ console.warn('支払い更新失敗',e.message); }
   }
@@ -435,34 +426,6 @@ async function updatePay(memberId, month, paid) {
   showToast(paid ? '支払い済みにしました' : '支払いを取り消しました', 'success');
   renderStatusTable();
   updateUnpaidList();
-}
-
-function openEditModal(memberId) {
-  const m = allMembers.find(x => x.id === memberId);
-  if (!m) return;
-  document.getElementById('edit-title').textContent = `${m.last_name} ${m.first_name} — 支払い編集`;
-
-  document.getElementById('edit-body').innerHTML = months3.map(mo => {
-    const rec  = allPayments[memberId]?.[mo];
-    const paid = rec?.paid ?? false;
-    const dt   = (paid && rec?.confirmed_at)
-      ? new Date(rec.confirmed_at).toLocaleDateString('ja-JP',{month:'short',day:'numeric'})
-      : '';
-    return `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--gray-200);">
-        <span style="font-size:var(--text-sm);font-weight:500;">${fmtMonth(mo)}</span>
-        <div style="display:flex;align-items:center;gap:var(--space-3);">
-          ${paid
-            ? `<span style="font-size:var(--text-xs);color:var(--gray-500);">${dt}</span><span class="badge badge-success">済み</span>`
-            : `<span class="badge" style="background:var(--gray-200);color:var(--gray-500);">未払い</span>`}
-          <button class="btn btn-sm ${paid?'btn-danger':'btn-primary'}"
-            onclick="updatePay('${memberId}','${mo}',${!paid});openEditModal('${memberId}')">
-            ${paid?'取消':'済みにする'}
-          </button>
-        </div>
-      </div>`;
-  }).join('');
-  openModal('modal-edit');
 }
 
 // ══════════════════════════════════════
@@ -508,25 +471,68 @@ function stopScan() {
 
 function onDetected(raw) {
   stopScan();
-  let parsed;
-  try { parsed = JSON.parse(raw); } catch {
-    showQrErr('QRコードの形式が正しくありません。'); return;
+
+  // QRデータ形式: "DP:<shortId>:<YYYY-MM>"
+  // shortId = memberId のハイフン除去後先頭12文字
+  let memberId = null, month = null, memberName = '—';
+
+  if (raw.startsWith('DP:')) {
+    const parts = raw.split(':');
+    // parts: ['DP', shortId, 'YYYY', 'MM'] ← YYYY-MM は split(':') で分割される
+    // → 'YYYY-MM' は index 2〜3 を再結合
+    if (parts.length >= 4) {
+      const shortId  = parts[1];
+      const yyyyMM   = `${parts[2]}-${parts[3]}`;
+
+      // allMembersからショートIDで逆引き（先頭12文字照合）
+      const found = allMembers.find(m => {
+        const sid = (m.id ?? '').replace(/-/g, '').slice(0, 12);
+        return sid === shortId;
+      });
+
+      if (found) {
+        memberId   = found.id;
+        memberName = `${found.last_name}${found.first_name}`;
+      } else {
+        showQrErr('団員が見つかりませんでした。団員データが読み込まれているか確認してください。');
+        return;
+      }
+
+      if (!/^\d{4}-\d{2}$/.test(yyyyMM)) {
+        showQrErr('QRコードの月情報が正しくありません。');
+        return;
+      }
+      month = yyyyMM;
+    } else {
+      showQrErr('QRコードの形式が正しくありません。');
+      return;
+    }
+  } else {
+    // 旧JSON形式との後方互換
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.type !== 'dues_payment') { showQrErr('このQRコードは団費支払い用ではありません。'); return; }
+      memberId   = parsed.memberId;
+      month      = parsed.month;
+      memberName = parsed.name ?? '—';
+    } catch {
+      showQrErr('QRコードの形式が正しくありません。');
+      return;
+    }
   }
-  if (parsed.type !== 'dues_payment') {
-    showQrErr('このQRコードは団費支払い用ではありません。'); return;
-  }
-  pendingQr = parsed;
+
+  pendingQr = { memberId, month, name: memberName };
 
   const r = document.getElementById('qr-result');
   r.className = 'qr-result ok';
   r.innerHTML = `
     <p style="font-weight:700;color:var(--success);margin-bottom:4px;">QRコードを検出しました</p>
-    <p>団員：${escHtml(parsed.name)}</p>
-    <p>対象月：${escHtml(fmtMonth(parsed.month))}</p>`;
+    <p>団員：${escHtml(memberName)}</p>
+    <p>対象月：${escHtml(fmtMonth(month))}</p>`;
   r.style.display = 'block';
 
   document.getElementById('qr-confirm-info').innerHTML =
-    `<strong>${escHtml(parsed.name)}</strong> さんの <strong>${escHtml(fmtMonth(parsed.month))}</strong>分（現金）を受け取りましたか？`;
+    `<strong>${escHtml(memberName)}</strong> さんの <strong>${escHtml(fmtMonth(month))}</strong>分（現金）を受け取りましたか？`;
   document.getElementById('qr-confirm').style.display = 'block';
 }
 
