@@ -191,7 +191,7 @@
     <!-- 新規登録ボタンはタブ切替後に表示 -->
     <div class="page-header__actions" id="score-editor-actions">
       <button class="btn btn-gold" id="btn-add-score">
-        <svg ...>...</svg>新規登録
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>新規登録
       </button>
     </div>
   </div>
@@ -204,8 +204,41 @@
 
   <!-- ── 楽譜一覧タブ ── -->
   <div class="se-panel active" id="sep-scores">
-    <!-- 既存の検索ツールバーとテーブルをここに -->
-    ...
+    <!-- 検索ツールバー -->
+    <div class="toolbar fade-in fade-in-1">
+      <input type="text" id="search-input" class="form-control" placeholder="曲名・作曲者で検索…">
+      <select id="filter-formation" class="form-control" style="max-width:200px;">
+        <option value="">すべての編成</option>
+        <option value="吹奏楽（大編成）">吹奏楽（大編成）</option>
+        <option value="吹奏楽（中編成）">吹奏楽（中編成）</option>
+        <option value="吹奏楽（小編成）">吹奏楽（小編成）</option>
+        <option value="フレックス">フレックス</option>
+        <option value="アンサンブル">アンサンブル</option>
+        <option value="ソロ">ソロ</option>
+        <option value="その他">その他</option>
+      </select>
+    </div>
+
+    <!-- 楽譜テーブル -->
+    <div class="score-table-wrap fade-in fade-in-2">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:80px;">楽譜番号</th>
+            <th>曲名</th>
+            <th>作曲者／アーティスト</th>
+            <th>編成</th>
+            <th style="width:80px;">PDF</th>
+            <th style="width:120px;"></th>
+          </tr>
+        </thead>
+        <tbody id="scores-tbody">
+          <tr><td colspan="6" style="text-align:center;padding:var(--space-10);">
+            <div class="loading-spinner" style="margin:0 auto var(--space-3);"></div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <!-- ── 貸出・返却受付タブ ── -->
