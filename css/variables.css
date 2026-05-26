@@ -2,7 +2,7 @@
    東大阪吹奏楽団 DXシステム - CSS変数・共通定義
    ============================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;600&family=DM+Mono:wght@400;500&family=Outfit:wght@600;700&display=swap');
 
 :root {
   /* ── カラーパレット ── */
@@ -34,6 +34,7 @@
   /* ── タイポグラフィ ── */
   --font-display: 'Cormorant Garamond', 'Noto Serif JP', serif;
   --font-body:    'Noto Sans JP', sans-serif;
+  --font-numeric: 'Outfit', 'DM Mono', 'Tabular Numbers', monospace;
 
   --text-xs:   0.75rem;
   --text-sm:   0.875rem;
