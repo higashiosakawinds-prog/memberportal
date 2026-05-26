@@ -353,12 +353,13 @@ ul, ol { list-style: none; }
 .stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
 
 .stat-card__number {
-  font-family: var(--font-display);
+  font-family: var(--font-numeric);
   font-size: var(--text-4xl);
   font-weight: 700;
   color: var(--navy-800);
   line-height: 1;
   margin-bottom: var(--space-2);
+  letter-spacing: -0.02em;
 }
 
 .stat-card__label {
