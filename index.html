@@ -12,6 +12,7 @@
   <link rel="icon" type="image/png" href="android-chrome-192x192.png" sizes="192x192">
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -83,6 +84,18 @@
         <p style="font-size:var(--text-sm);">連絡データを読み込み中…</p>
       </div>
     </div>
+
+<!-- 楽譜貸出申請 -->
+<div class="mb-6 fade-in fade-in-4">
+  <p class="page-header__eyebrow">LENDING</p>
+  <h2 class="page-header__title" style="font-size:var(--text-2xl);">楽譜貸出申請</h2>
+</div>
+<div id="lending-status-wrap" class="mb-8 fade-in fade-in-4">
+  <div style="text-align:center;padding:var(--space-8);color:var(--gray-500);">
+    <div class="loading-spinner" style="margin:0 auto var(--space-3);"></div>
+    <p style="font-size:var(--text-sm);">貸出データを読み込み中…</p>
+  </div>
+</div>
 
     <!-- 機能メニュー -->
     <div class="mb-6 fade-in fade-in-5">
@@ -377,6 +390,111 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ─── 連絡セクション ───
   await loadContactMessages();
+
+  // ─── 楽譜貸出申請セクション ───
+await loadMyLendingStatus();
+
+async function loadMyLendingStatus() {
+  const wrap = document.getElementById('lending-status-wrap');
+  const sessionUser = getSessionUser();
+  if (!_sb || !sessionUser) {
+    wrap.innerHTML = `<div style="text-align:center;padding:var(--space-6);color:var(--gray-500);background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--gray-200);">
+      <p style="font-size:var(--text-sm);">ログインすると表示されます。</p></div>`;
+    return;
+  }
+
+  const { data, error } = await _sb.from('score_lending_requests')
+    .select('*').eq('requester_id', sessionUser.id)
+    .in('status', ['pending','lending']).order('created_at', { ascending: false });
+
+  if (error || !data || data.length === 0) {
+    wrap.innerHTML = `<div style="text-align:center;padding:var(--space-6);color:var(--gray-500);background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--gray-200);">
+      <p style="font-size:var(--text-sm);">貸出申請はありません。</p></div>`;
+    return;
+  }
+
+  const fmtDate = s => s ? new Date(s).toLocaleDateString('ja-JP', {month:'numeric',day:'numeric',weekday:'short'}) : '—';
+
+  const rows = data.map(r => {
+    const isPending = r.status === 'pending';
+    const isOverdue = !isPending && r.due_date && new Date(r.due_date) < new Date();
+    const statusBadge = isPending
+      ? '<span class="badge badge-warning">申請中</span>'
+      : `<span class="badge ${isOverdue ? 'badge-danger' : 'badge-success'}">貸出中</span>`;
+
+    const actionBtn = isPending
+      ? `<button class="btn btn-sm btn-outline" onclick="openLendingQrModal('${escHtml(r.id)}','lending')">貸出確認QR</button>`
+      : `<button class="btn btn-sm btn-outline" onclick="openLendingQrModal('${escHtml(r.id)}','return')">返却手続</button>`;
+
+    return `<tr>
+      <td style="font-weight:600;color:var(--navy-800);">${escHtml(r.score_title)}</td>
+      <td style="font-size:var(--text-xs);">${escHtml((r.parts ?? []).join('、'))}</td>
+      <td>${statusBadge}</td>
+      <td style="font-size:var(--text-sm);${isOverdue ? 'color:var(--danger);font-weight:700;' : ''}">${isPending ? '—' : fmtDate(r.due_date)}</td>
+      <td>${actionBtn}</td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `<div style="border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--gray-200);overflow-x:auto;">
+    <table class="table" style="min-width:500px;">
+      <thead><tr><th>楽曲名</th><th>パート</th><th>状態</th><th>返却期限</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// QR表示モーダル（貸出確認 or 返却）
+async function openLendingQrModal(requestId, mode) {
+  if (typeof QRCode === 'undefined') {
+    showToast('QRCodeライブラリが読み込まれていません', 'error'); return;
+  }
+  const { data: req } = await _sb.from('score_lending_requests').select('*').eq('id', requestId).single();
+  if (!req) return;
+
+  const title   = mode === 'lending' ? '貸出確認QRコード' : '返却用QRコード';
+  const qrData  = JSON.stringify({ type: mode === 'lending' ? 'score_lending' : 'score_return', requestId });
+
+  // 既存モーダルを再利用 or 動的生成
+  let modal = document.getElementById('modal-lending-qr');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'modal-lending-qr';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:380px;">
+        <div class="modal__header">
+          <h2 class="modal__title" id="lqr-title"></h2>
+          <button class="modal__close" onclick="closeModal('modal-lending-qr')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <div class="alert alert-warning mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+            <span id="lqr-desc"></span>
+          </div>
+          <div id="lqr-canvas" style="display:flex;justify-content:center;padding:var(--space-4) 0;"></div>
+          <p id="lqr-info" style="text-align:center;font-size:var(--text-sm);color:var(--gray-600);margin-top:var(--space-2);"></p>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn-outline" onclick="closeModal('modal-lending-qr')">閉じる</button>
+        </div>
+      </div>`;
+    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+    document.body.appendChild(modal);
+  }
+
+  document.getElementById('lqr-title').textContent = title;
+  document.getElementById('lqr-desc').textContent  = mode === 'lending'
+    ? '蔵書委員・GMにこのQRコードを読み取ってもらってください。'
+    : '返却時に蔵書委員・GMにこのQRコードを読み取ってもらってください。';
+  document.getElementById('lqr-info').textContent  = `${req.score_title} / ${(req.parts ?? []).join('、')}`;
+
+  const wrap = document.getElementById('lqr-canvas');
+  wrap.innerHTML = '';
+  new QRCode(wrap, { text: qrData, width: 240, height: 240, colorDark: '#0d1b2a', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.L });
+  openModal('modal-lending-qr');
+}
 });
 
 // ── 連絡メッセージの取得・表示 ──
