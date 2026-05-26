@@ -13,6 +13,26 @@
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <style>
+    /* ── ダッシュボード：機能メニューグリッド ── */
+    #menu-grid { grid-template-columns: repeat(3, 1fr); }
+    .menu-requests-card { grid-column: span 3 / auto; }
+    @media (max-width: 1024px) {
+      #menu-grid { grid-template-columns: repeat(2, 1fr); }
+      .menu-requests-card { grid-column: span 2 / auto; }
+    }
+    @media (max-width: 768px) {
+      #menu-grid { grid-template-columns: 1fr; gap: var(--space-3); }
+      .menu-requests-card { grid-column: auto; }
+    }
+    /* ── ダッシュボード：データセクション横スクロール ── */
+    #distributed-scores-wrap > div[style*="border-radius"],
+    #contact-messages-wrap > div[style*="border-radius"],
+    #lending-status-wrap > div[style*="border-radius"] {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+  </style>
 </head>
 <body>
 
@@ -220,17 +240,17 @@
       </a>
 
       <!-- 団員申請 -->
-      <a href="pages/requests.html" class="card card--elevated fade-in fade-in-1" style="display:block;transition:transform var(--transition-base),box-shadow var(--transition-base);grid-column: span 3 / auto;"
+      <a href="pages/requests.html" class="card card--elevated fade-in fade-in-1 menu-requests-card" style="display:block;transition:transform var(--transition-base),box-shadow var(--transition-base);"
          onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='var(--shadow-lg)'"
          onmouseout="this.style.transform='';this.style.boxShadow=''">
-        <div class="card__body" style="display:flex;align-items:center;gap:var(--space-6);">
+        <div class="card__body" style="display:flex;align-items:center;gap:var(--space-4);">
           <div style="flex-shrink:0;width:48px;height:48px;background:var(--navy-800);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--gold-400)" stroke-width="1.5" width="26" height="26">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"/>
             </svg>
           </div>
-          <div style="flex:1;">
-            <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-1);">
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-1);flex-wrap:wrap;">
               <h3 style="font-size:var(--text-lg);font-weight:700;color:var(--navy-800);">団員申請</h3>
               <span class="badge badge-danger">2件 未処理</span>
             </div>
