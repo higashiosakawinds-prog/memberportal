@@ -117,6 +117,18 @@
   </div>
 </div>
 
+<!-- 団費支払い -->
+<div class="mb-6 fade-in fade-in-4">
+  <p class="page-header__eyebrow">ACCOUNTING</p>
+  <h2 class="page-header__title" style="font-size:var(--text-2xl);">団費支払い</h2>
+</div>
+<div id="dues-status-wrap" class="mb-8 fade-in fade-in-4">
+  <div style="text-align:center;padding:var(--space-8);color:var(--gray-500);">
+    <div class="loading-spinner" style="margin:0 auto var(--space-3);"></div>
+    <p style="font-size:var(--text-sm);">団費データを読み込み中…</p>
+  </div>
+</div>
+
     <!-- 機能メニュー -->
     <div class="mb-6 fade-in fade-in-5">
       <p class="page-header__eyebrow">MENU</p>
@@ -413,6 +425,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ─── 楽譜貸出申請セクション ───
 await loadMyLendingStatus();
+
+  // ─── 団費支払いセクション ───
+  await loadDuesStatus();
 });
 
 // ── 楽譜貸出申請ステータス読み込み（グローバル） ──
@@ -739,6 +754,114 @@ async function openPastContacts() {
 
   document.getElementById('past-contacts-body').innerHTML = rows;
   document.getElementById('modal-past-contacts').classList.add('open');
+}
+
+// ── 団費支払い状況の取得・表示 ──
+async function loadDuesStatus() {
+  const wrap = document.getElementById('dues-status-wrap');
+  const sessionUser = getSessionUser();
+
+  if (!sessionUser) {
+    wrap.innerHTML = `<div style="text-align:center;padding:var(--space-6);color:var(--gray-500);background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--gray-200);">
+      <p style="font-size:var(--text-sm);">ログインすると表示されます。</p></div>`;
+    return;
+  }
+
+  // 直近3ヶ月のYYYY-MM配列を生成
+  const now = new Date();
+  const months = Array.from({ length: 3 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  const fmtMonth = ym => {
+    const [y, m] = ym.split('-');
+    return `${y}年${parseInt(m)}月`;
+  };
+
+  // GAS URL（dues.htmlと同じ設定）
+  const DUES_GAS_URL = 'https://script.google.com/macros/s/AKfycbwvfg_SisVkhgPg8XqWWztiRKwOx7nwAP2JIJzTltuLeYvb8n1yzh2CCxCOEg_Vy91xlg/exec';
+  const isGasOk = DUES_GAS_URL && !DUES_GAS_URL.includes('YOUR_DUES_SCRIPT_ID');
+
+  // 支払いデータ取得
+  let paymentRecords = {};
+  if (isGasOk) {
+    try {
+      const res = await fetch(
+        `${DUES_GAS_URL}?action=getMyPayments&memberId=${encodeURIComponent(sessionUser.id)}`,
+        { method: 'GET', redirect: 'follow' }
+      );
+      const json = await res.json();
+      paymentRecords = json.data ?? {};
+    } catch (e) {
+      console.warn('[HighasuiDX] 団費データ取得失敗:', e.message);
+    }
+  }
+
+  // 休団中かどうか確認（Supabase profileのcategory）
+  let isRest = false;
+  if (_sb) {
+    const { data: prof } = await _sb
+      .from('profiles')
+      .select('category')
+      .eq('id', sessionUser.id)
+      .single();
+    isRest = prof?.category === 'rest';
+  }
+
+  if (isRest) {
+    wrap.innerHTML = `<div style="text-align:center;padding:var(--space-6);color:var(--gray-500);background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--gray-200);">
+      <p style="font-size:var(--text-sm);">休団中のため団費は発生しません。</p></div>`;
+    return;
+  }
+
+  // 各月の支払い状況を行として組み立て
+  const rows = months.map(ym => {
+    const rec  = paymentRecords[ym];
+    const paid = rec?.paid ?? false;
+    const confirmedAt = (paid && rec?.confirmed_at)
+      ? new Date(rec.confirmed_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' })
+      : null;
+
+    const statusCell = paid
+      ? `<span class="badge badge-success" style="gap:4px;">
+           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+           支払い済み
+         </span>`
+      : `<span class="badge badge-warning">未払い</span>`;
+
+    const actionCell = paid
+      ? `<span style="font-size:var(--text-xs);color:var(--gray-400);">${confirmedAt ? `確認：${escHtml(confirmedAt)}` : ''}</span>`
+      : `<a href="pages/dues.html" class="btn btn-sm btn-gold" style="white-space:nowrap;">
+           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/></svg>
+           支払をする
+         </a>`;
+
+    return `<tr>
+      <td style="font-weight:600;color:var(--navy-800);">${fmtMonth(ym)}</td>
+      <td>${statusCell}</td>
+      <td style="text-align:right;">${actionCell}</td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div style="border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--gray-200);">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>月</th>
+            <th>支払い状況</th>
+            <th style="text-align:right;"></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:var(--space-3);text-align:right;">
+      <a href="pages/dues.html" class="btn btn-sm btn-outline" style="font-size:var(--text-xs);">
+        団費詳細・全履歴を見る →
+      </a>
+    </div>`;
 }
 
 function escHtml(str) {
