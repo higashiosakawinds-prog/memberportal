@@ -182,58 +182,88 @@
 
 <div class="app-layout">
   <nav class="sidebar" id="sidebar"></nav>
-  <main class="main-content">
+<main class="main-content">
+  <div class="page-header fade-in">
+    <div>
+      <p class="page-header__eyebrow">LIBRARY · EDITOR</p>
+      <h1 class="page-header__title">楽譜管理（編集）</h1>
+    </div>
+    <!-- 新規登録ボタンはタブ切替後に表示 -->
+    <div class="page-header__actions" id="score-editor-actions">
+      <button class="btn btn-gold" id="btn-add-score">
+        <svg ...>...</svg>新規登録
+      </button>
+    </div>
+  </div>
 
-    <div class="page-header fade-in">
-      <div>
-        <p class="page-header__eyebrow">LIBRARY · EDITOR</p>
-        <h1 class="page-header__title">楽譜管理（編集）</h1>
+  <!-- ── エディタータブ ── -->
+  <div style="display:flex;gap:0;border-bottom:2px solid var(--gray-200);margin-bottom:var(--space-6);flex-wrap:wrap;" class="fade-in fade-in-1">
+    <button class="se-tab active" data-tab="scores" style="padding:var(--space-3) var(--space-5);font-size:var(--text-sm);font-weight:500;color:var(--gray-500);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all var(--transition-fast);background:none;border-top:none;border-left:none;border-right:none;">楽譜一覧</button>
+    <button class="se-tab" data-tab="lending" style="padding:var(--space-3) var(--space-5);font-size:var(--text-sm);font-weight:500;color:var(--gray-500);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all var(--transition-fast);background:none;border-top:none;border-left:none;border-right:none;">貸出・返却受付</button>
+  </div>
+
+  <!-- ── 楽譜一覧タブ ── -->
+  <div class="se-panel active" id="sep-scores">
+    <!-- 既存の検索ツールバーとテーブルをここに -->
+    ...
+  </div>
+
+  <!-- ── 貸出・返却受付タブ ── -->
+  <div class="se-panel" id="sep-lending" style="display:none;">
+    <div class="card mb-6">
+      <div class="card__header">
+        <span class="card__title">QRコード読み取り（貸出・返却受付）</span>
       </div>
-      <div class="page-header__actions">
-        <button class="btn btn-gold" id="btn-add-score">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-          新規登録
+      <div class="card__body">
+        <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-4);">
+          団員が提示するQRコードをカメラで読み取り、貸出承認または返却処理を行います。
+        </p>
+        <div style="text-align:center;margin-bottom:var(--space-4);">
+          <button class="btn btn-gold" id="btn-lending-scan-start">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/></svg>
+            カメラを起動
+          </button>
+          <button class="btn btn-outline" id="btn-lending-scan-stop" style="display:none;margin-left:var(--space-2);">停止</button>
+        </div>
+        <div id="lending-scan-wrap" style="display:none;position:relative;max-width:340px;margin:0 auto;border-radius:var(--radius-lg);overflow:hidden;background:var(--navy-900);">
+          <video id="lending-qr-video" autoplay muted playsinline style="width:100%;display:block;"></video>
+          <canvas id="lending-qr-canvas" style="display:none;"></canvas>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+            <div style="width:200px;height:200px;border:3px solid var(--gold-500);border-radius:var(--radius-md);box-shadow:0 0 0 9999px rgba(0,0,0,.4);position:relative;overflow:hidden;">
+              <div style="position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold-400),transparent);animation:scanLine 2s linear infinite;top:50%;"></div>
+            </div>
+          </div>
+        </div>
+        <div id="lending-qr-result" style="display:none;margin-top:var(--space-4);"></div>
+      </div>
+    </div>
+
+    <!-- 貸出中一覧 -->
+    <div class="card">
+      <div class="card__header" style="justify-content:space-between;">
+        <span class="card__title">貸出中一覧</span>
+        <button class="btn btn-sm btn-outline" id="btn-reload-lending">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+          更新
         </button>
       </div>
+      <div style="overflow-x:auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>申請者</th><th>楽曲名</th><th>パート</th><th>状態</th><th>返却期限</th><th>申請日</th>
+            </tr>
+          </thead>
+          <tbody id="lending-list-tbody">
+            <tr><td colspan="6" style="text-align:center;padding:var(--space-8);">
+              <div class="loading-spinner" style="margin:0 auto;"></div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
-
-    <!-- 検索ツールバー -->
-    <div class="toolbar fade-in fade-in-1">
-      <input type="text" id="search-input" class="form-control" placeholder="曲名・作曲者で検索…">
-      <select id="filter-formation" class="form-control" style="max-width:200px;">
-        <option value="">すべての編成</option>
-        <option value="吹奏楽（大編成）">吹奏楽（大編成）</option>
-        <option value="吹奏楽（中編成）">吹奏楽（中編成）</option>
-        <option value="吹奏楽（小編成）">吹奏楽（小編成）</option>
-        <option value="フレックス">フレックス</option>
-        <option value="アンサンブル">アンサンブル</option>
-        <option value="ソロ">ソロ</option>
-        <option value="その他">その他</option>
-      </select>
-    </div>
-
-    <!-- 楽譜テーブル -->
-    <div class="score-table-wrap fade-in fade-in-2">
-      <table class="table">
-        <thead>
-          <tr>
-            <th style="width:80px;">楽譜番号</th>
-            <th>曲名</th>
-            <th>作曲者／アーティスト</th>
-            <th>編成</th>
-            <th style="width:60px;text-align:center;">PDF</th>
-            <th style="width:200px;text-align:center;">操作</th>
-          </tr>
-        </thead>
-        <tbody id="scores-tbody">
-          <tr><td colspan="6" style="text-align:center;padding:var(--space-10);">
-            <div class="loading-spinner" style="margin:0 auto var(--space-3);"></div>
-          </td></tr>
-        </tbody>
-      </table>
-    </div>
-
-  </main>
+  </div>
+</main>
 </div>
 
 <!-- ══════════════════════════════════
@@ -1029,6 +1059,216 @@ async function deletePdf(pdfId, storagePath) {
   }
 }
 
+// ══════════════════════════════════════
+//  タブ切替（楽譜一覧 / 貸出・返却受付）
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.se-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.se-tab').forEach(t => {
+        t.classList.remove('active');
+        t.style.color = 'var(--gray-500)';
+        t.style.borderBottomColor = 'transparent';
+        t.style.fontWeight = '500';
+      });
+      document.querySelectorAll('.se-panel').forEach(p => p.style.display = 'none');
+      tab.classList.add('active');
+      tab.style.color = 'var(--navy-800)';
+      tab.style.borderBottomColor = 'var(--gold-500)';
+      tab.style.fontWeight = '700';
+      document.getElementById(`sep-${tab.dataset.tab}`).style.display = 'block';
+
+      // 新規登録ボタンはscoresタブのみ表示
+      const actionsEl = document.getElementById('score-editor-actions');
+      if (actionsEl) actionsEl.style.display = tab.dataset.tab === 'scores' ? 'flex' : 'none';
+
+      if (tab.dataset.tab === 'lending') loadLendingList();
+    });
+  });
+
+  document.getElementById('btn-lending-scan-start')?.addEventListener('click', startLendingScan);
+  document.getElementById('btn-lending-scan-stop')?.addEventListener('click', stopLendingScan);
+  document.getElementById('btn-reload-lending')?.addEventListener('click', loadLendingList);
+});
+
+// ══════════════════════════════════════
+//  貸出一覧読み込み
+// ══════════════════════════════════════
+async function loadLendingList() {
+  const tbody = document.getElementById('lending-list-tbody');
+  if (!_sb) { tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:var(--space-8);color:var(--gray-500);">Supabase未接続</td></tr>`; return; }
+  tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:var(--space-8);"><div class="loading-spinner" style="margin:0 auto;"></div></td></tr>`;
+
+  const { data, error } = await _sb.from('score_lending_requests')
+    .select('*').in('status', ['pending','lending']).order('created_at', { ascending: false });
+
+  if (error || !data || data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:var(--space-8);color:var(--gray-500);">${error ? '取得失敗' : '貸出中の楽譜はありません'}</td></tr>`;
+    return;
+  }
+
+  const fmtDate = s => s ? new Date(s).toLocaleDateString('ja-JP', {month:'numeric',day:'numeric',weekday:'short'}) : '—';
+
+  tbody.innerHTML = data.map(r => {
+    const statusBadge = r.status === 'pending'
+      ? '<span class="badge badge-warning">申請中</span>'
+      : '<span class="badge badge-success">貸出中</span>';
+    const dueOverdue = r.due_date && new Date(r.due_date) < new Date()
+      ? 'color:var(--danger);font-weight:700;' : '';
+    return `<tr>
+      <td style="font-size:var(--text-sm);">${escHtml(r.requester_name)}</td>
+      <td style="font-weight:600;color:var(--navy-800);">${escHtml(r.score_title)}</td>
+      <td style="font-size:var(--text-xs);">${escHtml((r.parts ?? []).join('、'))}</td>
+      <td>${statusBadge}</td>
+      <td style="font-size:var(--text-sm);${dueOverdue}">${fmtDate(r.due_date)}</td>
+      <td style="font-size:var(--text-xs);color:var(--gray-500);">${fmtDate(r.created_at)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════
+//  QRスキャン（貸出・返却）
+// ══════════════════════════════════════
+let lendingScanStream = null;
+let lendingScanTimer  = null;
+let pendingLendingQr  = null;
+
+async function startLendingScan() {
+  document.getElementById('lending-qr-result').style.display = 'none';
+  document.getElementById('btn-lending-scan-start').style.display = 'none';
+  document.getElementById('btn-lending-scan-stop').style.display = 'inline-flex';
+  document.getElementById('lending-scan-wrap').style.display = 'block';
+
+  try {
+    lendingScanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const video  = document.getElementById('lending-qr-video');
+    const canvas = document.getElementById('lending-qr-canvas');
+    video.srcObject = lendingScanStream;
+    await video.play();
+
+    const ctx = canvas.getContext('2d');
+    lendingScanTimer = setInterval(() => {
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const img  = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+      if (code?.data) onLendingQrDetected(code.data);
+    }, 200);
+  } catch (e) {
+    showToast('カメラへのアクセスが拒否されました', 'error');
+    stopLendingScan();
+  }
+}
+
+function stopLendingScan() {
+  clearInterval(lendingScanTimer); lendingScanTimer = null;
+  lendingScanStream?.getTracks().forEach(t => t.stop()); lendingScanStream = null;
+  document.getElementById('lending-scan-wrap').style.display = 'none';
+  document.getElementById('btn-lending-scan-start').style.display = 'inline-flex';
+  document.getElementById('btn-lending-scan-stop').style.display = 'none';
+}
+
+async function onLendingQrDetected(raw) {
+  stopLendingScan();
+  const resultEl = document.getElementById('lending-qr-result');
+
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch { showLendingQrErr('QRコードの形式が正しくありません。'); return; }
+
+  if (parsed.type !== 'score_lending' && parsed.type !== 'score_return') {
+    showLendingQrErr('このQRコードは楽譜貸出用ではありません。'); return;
+  }
+
+  if (!_sb) { showLendingQrErr('Supabase未接続です。'); return; }
+  const { data: req, error } = await _sb.from('score_lending_requests').select('*').eq('id', parsed.requestId).single();
+  if (error || !req) { showLendingQrErr('申請データが見つかりません。'); return; }
+
+  pendingLendingQr = { type: parsed.type, req };
+
+  if (parsed.type === 'score_lending') {
+    // 貸出承認フロー
+    const now = new Date();
+    const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+    const fmt = d => `${d.getMonth()+1}/${d.getDate()}(${['日','月','火','水','木','金','土'][d.getDay()]})`;
+    const w1 = addDays(now, 7), w2 = addDays(now, 14), w3 = addDays(now, 21);
+
+    resultEl.className = 'qr-result ok';
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = `
+      <p style="font-weight:700;color:var(--success);margin-bottom:var(--space-3);">📖 貸出申請QRを検出</p>
+      <p style="font-size:var(--text-sm);margin-bottom:var(--space-1);">申請者：<strong>${escHtml(req.requester_name)}</strong></p>
+      <p style="font-size:var(--text-sm);margin-bottom:var(--space-1);">楽曲名：<strong>${escHtml(req.score_title)}</strong></p>
+      <p style="font-size:var(--text-sm);margin-bottom:var(--space-4);">パート：${escHtml((req.parts ?? []).join('、'))}</p>
+      <p style="font-size:var(--text-xs);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-2);">返却期限を選択してください</p>
+      <div style="display:flex;flex-direction:column;gap:var(--space-2);margin-bottom:var(--space-4);">
+        <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--text-sm);">
+          <input type="radio" name="due-choice" value="${w1.toISOString().slice(0,10)}" style="accent-color:var(--navy-600);"> 1週間後（${fmt(w1)}）
+        </label>
+        <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--text-sm);">
+          <input type="radio" name="due-choice" value="${w2.toISOString().slice(0,10)}" style="accent-color:var(--navy-600);" checked> 2週間後（${fmt(w2)}）
+        </label>
+        <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--text-sm);">
+          <input type="radio" name="due-choice" value="${w3.toISOString().slice(0,10)}" style="accent-color:var(--navy-600);"> 3週間後（${fmt(w3)}）
+        </label>
+      </div>
+      <button class="btn btn-gold" onclick="approveLending()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+        承認する
+      </button>
+      <button class="btn btn-outline" style="margin-left:var(--space-2);" onclick="document.getElementById('lending-qr-result').style.display='none'">キャンセル</button>`;
+  } else {
+    // 返却フロー
+    resultEl.className = 'qr-result ok';
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = `
+      <p style="font-weight:700;color:var(--info);margin-bottom:var(--space-3);">📬 返却QRを検出</p>
+      <p style="font-size:var(--text-sm);margin-bottom:var(--space-1);">申請者：<strong>${escHtml(req.requester_name)}</strong></p>
+      <p style="font-size:var(--text-sm);margin-bottom:var(--space-1);">楽曲名：<strong>${escHtml(req.score_title)}</strong></p>
+      <p style="font-size:var(--text-sm);margin-bottom:var(--space-4);">パート：${escHtml((req.parts ?? []).join('、'))}</p>
+      <button class="btn btn-gold" onclick="approveReturn()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+        返却を確認する
+      </button>
+      <button class="btn btn-outline" style="margin-left:var(--space-2);" onclick="document.getElementById('lending-qr-result').style.display='none'">キャンセル</button>`;
+  }
+}
+
+function showLendingQrErr(msg) {
+  const r = document.getElementById('lending-qr-result');
+  r.className = 'qr-result err';
+  r.style.display = 'block';
+  r.innerHTML = `<p style="color:var(--danger);">${escHtml(msg)}</p>`;
+}
+
+async function approveLending() {
+  if (!pendingLendingQr || !_sb) return;
+  const dueDate = document.querySelector('input[name="due-choice"]:checked')?.value;
+  if (!dueDate) { showToast('返却期限を選択してください', 'error'); return; }
+
+  const sessionUser = getSessionUser();
+  const { error } = await _sb.from('score_lending_requests').update({
+    status: 'lending', due_date: dueDate,
+    approved_by: sessionUser?.id, approved_at: new Date().toISOString(),
+  }).eq('id', pendingLendingQr.req.id);
+
+  if (error) { showToast('承認失敗: ' + error.message, 'error'); return; }
+  document.getElementById('lending-qr-result').style.display = 'none';
+  pendingLendingQr = null;
+  showToast('貸出を承認しました', 'success');
+  loadLendingList();
+}
+
+async function approveReturn() {
+  if (!pendingLendingQr || !_sb) return;
+  const { error } = await _sb.from('score_lending_requests').delete().eq('id', pendingLendingQr.req.id);
+  if (error) { showToast('返却処理失敗: ' + error.message, 'error'); return; }
+  document.getElementById('lending-qr-result').style.display = 'none';
+  pendingLendingQr = null;
+  showToast('返却処理が完了しました', 'success');
+  loadLendingList();
+}
+  
 // ══════════════════════════════════════
 //  閲覧設定モーダル
 // ══════════════════════════════════════
