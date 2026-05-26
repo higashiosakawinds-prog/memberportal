@@ -87,9 +87,10 @@
 
     @media(max-width:768px){
       .da-tab { padding:var(--space-2) var(--space-3);font-size:var(--text-xs); }
-      /* 支払い状況テーブルを横スクロール */
+      /* 支払い状況テーブル：スマホではパート・区分列を非表示にしてスクロール不要に */
       .st-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
-      .st-wrap .table { min-width:560px; }
+      .st-wrap .table { min-width:unset; width:100%; }
+      .st-col-part, .st-col-cat { display:none !important; }
       /* 督促メールフォームのボタンを縦積みに */
       #panel-mail .card__body > div:last-child { flex-direction:column; gap:var(--space-2); }
       #panel-mail .card__body > div:last-child .btn { width:100%; justify-content:center; }
@@ -99,6 +100,9 @@
     @media(max-width:480px){
       .fee-grid { grid-template-columns:1fr; }
     }
+    /* 数値フォント */
+    .fee-card__amount-val,
+    .dues-num { font-family:var(--font-numeric); font-weight:700; letter-spacing:-0.02em; }
   </style>
 </head>
 <body>
@@ -144,8 +148,8 @@
           <thead>
             <tr>
               <th>氏名</th>
-              <th>パート</th>
-              <th>区分</th>
+              <th class="st-col-part">パート</th>
+              <th class="st-col-cat">区分</th>
               <th>支払い方法</th>
               <th id="mh0" style="text-align:center;">—</th>
               <th id="mh1" style="text-align:center;">—</th>
@@ -398,8 +402,8 @@ function renderStatusTable() {
     return `
       <tr class="${rowCls}">
         <td style="font-weight:600;color:var(--navy-800);">${escHtml(m.last_name)} ${escHtml(m.first_name)}</td>
-        <td style="font-size:var(--text-sm);">${escHtml(PART_LABELS[m.part]??'—')}</td>
-        <td><span class="badge badge-navy" style="font-size:10px;">${escHtml(CAT_LABELS[m.category]??'—')}</span></td>
+        <td class="st-col-part" style="font-size:var(--text-sm);">${escHtml(PART_LABELS[m.part]??'—')}</td>
+        <td class="st-col-cat"><span class="badge badge-navy" style="font-size:10px;">${escHtml(CAT_LABELS[m.category]??'—')}</span></td>
         <td>${pmBadge}</td>
         ${cells}
       </tr>`;
