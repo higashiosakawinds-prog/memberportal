@@ -393,7 +393,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ─── 楽譜貸出申請セクション ───
 await loadMyLendingStatus();
+});
 
+// ── 楽譜貸出申請ステータス読み込み（グローバル） ──
 async function loadMyLendingStatus() {
   const wrap = document.getElementById('lending-status-wrap');
   const sessionUser = getSessionUser();
@@ -495,7 +497,6 @@ async function openLendingQrModal(requestId, mode) {
   new QRCode(wrap, { text: qrData, width: 240, height: 240, colorDark: '#0d1b2a', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.L });
   openModal('modal-lending-qr');
 }
-});
 
 // ── 連絡メッセージの取得・表示 ──
 async function loadContactMessages() {
@@ -727,5 +728,3 @@ function escHtml(str) {
 </script>
 </body>
 </html>
-
-
