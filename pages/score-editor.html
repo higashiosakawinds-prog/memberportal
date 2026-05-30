@@ -885,21 +885,26 @@ async function loadPdfList(scoreId) {
 // パート選択肢HTML（共通）
 function buildPartOptions(selectedKey = '') {
   const opts = [
-    ['', '選択してください'],
-    ['conductor', '指揮者譜'],
-    ['flute', 'フルート'],
-    ['oboe', 'オーボエ'],
-    ['clarinet', 'クラリネット'],
-    ['bassoon', 'ファゴット'],
-    ['saxophone', 'サクソフォーン'],
-    ['horn', 'ホルン'],
-    ['trumpet', 'トランペット'],
-    ['trombone', 'トロンボーン'],
-    ['euphonium', 'ユーフォニアム'],
-    ['tuba', 'テューバ'],
-    ['percussion', '打楽器'],
-    ['contrabass', 'コントラバス'],
-    ['other', 'その他'],
+    ['', '（指定しない）'],
+    ['conductor', 'Score / Conductor'],
+    ['piccolo', 'Piccolo'],
+    ['flute', 'Flute'],
+    ['oboe', 'Oboe'],
+    ['clarinet', 'Clarinet'],
+    ['bassclarinet', 'Bass Clarinet'],
+    ['bassoon', 'Bassoon'],
+    ['ssaxophone', 'Soprano Saxophone'],
+    ['asaxophone', 'Alto Saxophone'],
+    ['tsaxophone', 'Tenor Saxophone'],
+    ['bsaxophone', 'Baritone Saxophone'],
+    ['horn', 'Horn'],
+    ['trumpet', 'Trumpet'],
+    ['trombone', 'Trombone'],
+    ['euphonium', 'Euphonium'],
+    ['tuba', 'Tuba'],
+    ['percussion', 'Percussion'],
+    ['contrabass', 'Contrabass'],
+    ['other', 'Other'],
   ];
   return opts.map(([v, l]) =>
     `<option value="${v}" ${v === selectedKey ? 'selected' : ''}>${l}</option>`
@@ -914,26 +919,29 @@ function onFilesSelected(event) {
   selectedFiles = files;
   const rowsEl = document.getElementById('file-part-rows');
 
-  rowsEl.innerHTML = files.map((f, i) => `
+  rowsEl.innerHTML = files.map((f, i) => {
+    // 拡張子を除いたファイル名をパート名の初期値にする
+    const defaultLabel = f.name.replace(/\.pdf$/i, '');
+    return `
     <div style="padding:var(--space-3) 0;border-bottom:1px solid var(--gray-200);">
       <div style="font-size:var(--text-xs);color:var(--gray-500);margin-bottom:var(--space-2);word-break:break-all;">
         📄 ${escHtml(f.name)}
       </div>
       <div class="form-grid-2">
         <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label" style="font-size:var(--text-xs);">パート（楽器）</label>
+          <label class="form-label" style="font-size:var(--text-xs);">パート（楽器）<span style="color:var(--gray-400);font-weight:400;">（任意）</span></label>
           <select class="form-control file-part-key" data-idx="${i}" onchange="onFilePartKeyChange(this)">
             ${buildPartOptions()}
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label" style="font-size:var(--text-xs);">パート名（詳細）</label>
+          <label class="form-label" style="font-size:var(--text-xs);">パート名 <span class="required">*</span></label>
           <input type="text" class="form-control file-part-label" data-idx="${i}"
-            placeholder="例：Clarinet 1st">
+            value="${escHtml(defaultLabel)}" placeholder="例：Clarinet 1st">
         </div>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 
   document.getElementById('file-part-list').style.display = 'block';
 }
@@ -961,26 +969,28 @@ document.addEventListener('DOMContentLoaded', () => {
     // DataTransfer から input に直接セットできないため、onFilesSelected と同じ処理を実施
     selectedFiles = files;
     const rowsEl = document.getElementById('file-part-rows');
-    rowsEl.innerHTML = files.map((f, i) => `
+    rowsEl.innerHTML = files.map((f, i) => {
+      const defaultLabel = f.name.replace(/\.pdf$/i, '');
+      return `
       <div style="padding:var(--space-3) 0;border-bottom:1px solid var(--gray-200);">
         <div style="font-size:var(--text-xs);color:var(--gray-500);margin-bottom:var(--space-2);word-break:break-all;">
           📄 ${escHtml(f.name)}
         </div>
         <div class="form-grid-2">
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label" style="font-size:var(--text-xs);">パート（楽器）</label>
+            <label class="form-label" style="font-size:var(--text-xs);">パート（楽器）<span style="color:var(--gray-400);font-weight:400;">（任意）</span></label>
             <select class="form-control file-part-key" data-idx="${i}" onchange="onFilePartKeyChange(this)">
               ${buildPartOptions()}
             </select>
           </div>
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label" style="font-size:var(--text-xs);">パート名（詳細）</label>
+            <label class="form-label" style="font-size:var(--text-xs);">パート名 <span class="required">*</span></label>
             <input type="text" class="form-control file-part-label" data-idx="${i}"
-              placeholder="例：Clarinet 1st">
+              value="${escHtml(defaultLabel)}" placeholder="例：Clarinet 1st">
           </div>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
     document.getElementById('file-part-list').style.display = 'block';
   });
 
@@ -1001,9 +1011,9 @@ async function uploadPdfs() {
     return { file, partKey, partLabel };
   });
 
-  const invalid = rows.filter(r => !r.partKey || !r.partLabel);
+  const invalid = rows.filter(r => !r.partLabel);
   if (invalid.length > 0) {
-    showToast('すべてのPDFにパートを指定してください', 'error'); return;
+    showToast('すべてのPDFにパート名を入力してください', 'error'); return;
   }
 
   const btn = document.getElementById('btn-upload-pdf');
@@ -1025,8 +1035,8 @@ async function uploadPdfs() {
     const safeLabel   = partLabel.replace(/[\/\\:*?"<>|]/g, '_');
     const fileName    = `${safeTitleJa}_${safeLabel}`;
 
-    // ストレージパス：ASCII安全な形式
-    const storagePath = `${pdfTargetScore.id}/${partKey}_${Date.now()}_${i}.pdf`;
+    // ストレージパス：ASCII安全な形式（partKey未指定時は "other" を使用）
+    const storagePath = `${pdfTargetScore.id}/${partKey || 'other'}_${Date.now()}_${i}.pdf`;
 
     const { error: uploadError } = await _sb.storage
       .from('scores')
