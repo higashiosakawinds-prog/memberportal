@@ -382,6 +382,18 @@
         </div>
       </div>
 
+      <!-- 印刷制限 -->
+      <p class="section-label">印刷制限</p>
+      <div class="form-group" style="margin-bottom:var(--space-4);">
+        <label style="display:inline-flex;align-items:flex-start;gap:var(--space-3);cursor:pointer;padding:var(--space-4);background:rgba(192,57,43,0.06);border:1px solid rgba(192,57,43,0.2);border-radius:var(--radius-md);width:100%;">
+          <input type="checkbox" id="edit-no-convenience-print" style="width:18px;height:18px;accent-color:var(--danger);flex-shrink:0;margin-top:2px;">
+          <div>
+            <div style="font-weight:700;color:var(--navy-800);font-size:var(--text-sm);">コンビニ印刷不可</div>
+            <div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:2px;line-height:1.6;">チェックを入れると、団員がPDFを開く際に「コンビニ印刷不可」の注意メッセージが表示されます。著作権上の制限がある楽譜に使用してください。</div>
+          </div>
+        </label>
+      </div>
+
       <!-- 備考 -->
       <p class="section-label">備考・メモ</p>
       <div class="form-group">
@@ -681,6 +693,7 @@ async function openAddModal() {
     document.getElementById(id).value = '';
   });
   document.getElementById('edit-formation').value = '';
+  document.getElementById('edit-no-convenience-print').checked = false;
   document.getElementById('btn-delete-score').style.display = 'none';
 
   openModal('modal-edit');
@@ -705,6 +718,7 @@ async function openEditModal(id) {
   document.getElementById('edit-formation').value   = s.formation  ?? '';
   document.getElementById('edit-index-kana').value  = s.index_kana ?? '';
   document.getElementById('edit-index-alpha').value = s.index_alpha ?? '';
+  document.getElementById('edit-no-convenience-print').checked = s.no_convenience_print ?? false;
   document.getElementById('btn-delete-score').style.display = 'inline-flex';
 
   openModal('modal-edit');
@@ -724,15 +738,16 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.disabled = true; btn.textContent = '保存中…';
 
     const payload = {
-      title_ja:    titleJa,
-      title_en:    document.getElementById('edit-title-en').value.trim(),
-      title_kana:  document.getElementById('edit-title-kana').value.trim(),
-      composer:    document.getElementById('edit-composer').value.trim(),
-      artist:      document.getElementById('edit-artist').value.trim(),
+      title_ja:              titleJa,
+      title_en:              document.getElementById('edit-title-en').value.trim(),
+      title_kana:            document.getElementById('edit-title-kana').value.trim(),
+      composer:              document.getElementById('edit-composer').value.trim(),
+      artist:                document.getElementById('edit-artist').value.trim(),
       formation,
-      notes:       document.getElementById('edit-notes').value.trim(),
-      index_kana:  document.getElementById('edit-index-kana').value,
-      index_alpha: document.getElementById('edit-index-alpha').value,
+      notes:                 document.getElementById('edit-notes').value.trim(),
+      index_kana:            document.getElementById('edit-index-kana').value,
+      index_alpha:           document.getElementById('edit-index-alpha').value,
+      no_convenience_print:  document.getElementById('edit-no-convenience-print').checked,
     };
 
     if (!_sb) {
