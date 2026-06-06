@@ -26,16 +26,16 @@ const ROLE_PERMISSIONS = {
   nav_members:            ['all'],
   nav_scores:             ['all'],
   nav_scoreedit:          ['all'],
-  nav_distribution:       ['all'],
-  nav_repertoire:         ['all'],
+  nav_distribution:       ['gm', 'leader','subleader'],
+  nav_repertoire:         ['gm', 'leader','subleader'],
   nav_ledger:             ['all'],
   nav_dues:               ['all'],                           // 団費登録（全員）
-  nav_dues_admin:         ['gm', 'admin', 'treasurer'],      // 団費管理（GM・幹部・会計のみ）
-  nav_instruments:        ['all'],
-  nav_instrument_lending: ['all'],
-  nav_qrcode:             ['all'],
-  nav_contact:            ['gm', 'admin', 'manager'],        // 連絡網（役職限定）
-  nav_requests:           ['all'],
+  nav_dues_admin:         ['gm','leader','subleader', 'treasurer'],      // 団費管理（GM・幹部・会計のみ）
+  nav_instruments:        ['gm', 'leader','subleader'],
+  nav_instrument_lending: ['gm', 'leader','subleader'],
+  nav_qrcode:             ['gm', 'leader','subleader'],
+  nav_contact:            ['gm', 'leader','subleader', 'safety'],        // 連絡網（役職限定）
+  nav_requests:           ['gm', 'leader','subleader'],
 
   // ── 各ページの操作（編集・追加・削除）権限 ──
   // ページ内で canDo('キー名') を呼び出して判定します
@@ -46,15 +46,15 @@ const ROLE_PERMISSIONS = {
 
   // 団費関連
   dues_view:              ['all'],                           // 団費登録ページ閲覧
-  dues_admin:             ['gm', 'admin', 'treasurer'],      // 団費管理ページ全般
-  dues_payment_approve:   ['gm', 'admin', 'treasurer'],      // QR承認・手動支払い変更
-  dues_fee_edit:          ['gm', 'admin', 'treasurer'],      // 金額変更
-  dues_method_edit:       ['gm', 'admin', 'treasurer'],      // 支払い方法変更
+  dues_admin:             ['gm', 'leader','subleader', 'treasurer'],      // 団費管理ページ全般
+  dues_payment_approve:   ['gm', 'leader','subleader', 'treasurer'],      // QR承認・手動支払い変更
+  dues_fee_edit:          ['gm','leader','subleader', 'treasurer'],      // 金額変更
+  dues_method_edit:       ['gm', 'leader','subleader', 'treasurer'],      // 支払い方法変更
 
   instruments_edit:       ['all'],
   lending_edit:           ['all'],
   qrcode_print:           ['all'],
-  contact_send:           ['gm', 'admin', 'manager'],        // 連絡送信（役職限定）
+  contact_send:           ['gm','leader','subleader', 'safety'],        // 連絡送信（役職限定）
   requests_approve:       ['all'],
   members_edit:           ['all'],
 };
@@ -64,11 +64,16 @@ const ROLE_PERMISSIONS = {
 // ─────────────────────────────────────────
 const ROLE_DEFINITIONS = [
   { value: 'gm',        label: 'GM',     badgeClass: 'badge-danger'  },
-  { value: 'admin',     label: '幹部',   badgeClass: 'badge-danger'  },
+  { value: 'leader',     label: '団長',   badgeClass: 'badge-danger'  },
+  { value: 'subleader',     label: '副団長',   badgeClass: 'badge-danger'  },
   { value: 'conductor', label: '指揮者', badgeClass: 'badge-navy'    },
-  { value: 'manager',   label: '運営委員', badgeClass: 'badge-navy'  },
-  { value: 'treasurer', label: '会計',   badgeClass: 'badge-gold'    },
-  { value: 'librarian', label: '蔵書委員', badgeClass: 'badge-success'},
+  { value: 'planner',   label: '企画委員', badgeClass: 'badge-navy'  },
+  { value: 'treasurer', label: '会計委員',   badgeClass: 'badge-gold'    },
+  { value: 'conector', label: '広報委員', badgeClass: 'badge-success'},
+  { value: 'librarian', label: '楽譜委員', badgeClass: 'badge-success'},
+  { value: 'reserver', label: '予約委員', badgeClass: 'badge-success'},
+  { value: 'equipment', label: '備品委員', badgeClass: 'badge-success'},
+  { value: 'safety', label: '安全委員', badgeClass: 'badge-success'},
   { value: 'member',    label: '一般団員', badgeClass: 'badge-navy'  },
 ];
 
