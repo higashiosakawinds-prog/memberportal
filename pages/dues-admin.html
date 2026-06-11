@@ -85,6 +85,66 @@
       padding:var(--space-2) var(--space-3);border-radius:var(--radius-sm);background:var(--gray-100);font-size:var(--text-sm);
     }
 
+    /* ── 団費登録モーダル ── */
+    .calc-section {
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      margin-bottom: var(--space-5);
+    }
+    .calc-section__head {
+      background: var(--navy-900);
+      color: var(--gold-300);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      letter-spacing: .1em;
+      padding: var(--space-2) var(--space-4);
+    }
+    .calc-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--gray-100);
+      font-size: var(--text-sm);
+    }
+    .calc-row:last-child { border-bottom: none; }
+    .calc-row.subtotal { background: var(--gray-100); font-weight: 700; }
+    .calc-row__label { color: var(--gray-600); }
+    .calc-row__formula { font-size: var(--text-xs); color: var(--gray-400); margin-top: 2px; }
+    .calc-row__amount {
+      font-family: var(--font-numeric);
+      font-weight: 700;
+      color: var(--navy-800);
+      text-align: right;
+      white-space: nowrap;
+    }
+    .calc-total-box {
+      background: var(--navy-900);
+      border-radius: var(--radius-md);
+      padding: var(--space-5);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-5);
+    }
+    .calc-total-box__label { font-size: var(--text-sm); color: var(--gold-300); font-weight: 600; }
+    .calc-total-box__amount {
+      font-family: var(--font-display);
+      font-size: var(--text-3xl);
+      font-weight: 700;
+      color: var(--gold-400);
+    }
+    .fee-rate-grid { display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-5); }
+    .fee-rate-card { background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:var(--space-4); }
+    .fee-rate-card__label { font-size:var(--text-xs);color:var(--gray-500);font-weight:500;margin-bottom:var(--space-2); }
+    .fee-rate-input-wrap { display:flex;align-items:center;gap:var(--space-2); }
+    .fee-rate-input-wrap input { flex:1;min-width:0; }
+    .fee-rate-input-wrap span { font-size:var(--text-sm);color:var(--gray-500);white-space:nowrap; }
+    .calc-alert-dup { background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.25);border-radius:var(--radius-md);
+      padding:var(--space-3) var(--space-4);font-size:var(--text-sm);color:var(--danger);margin-bottom:var(--space-4);display:none; }
+
     @media(max-width:768px){
       .da-tab { padding:var(--space-2) var(--space-3);font-size:var(--text-xs); }
       /* 支払い状況テーブル：スマホではパート・区分列を非表示にしてスクロール不要に */
@@ -128,6 +188,21 @@
 
     <!-- ① 支払い状況確認 -->
     <div class="da-panel active" id="panel-status">
+
+      <!-- 今月の支払いを登録ボタン -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-3);margin-bottom:var(--space-5);">
+        <div>
+          <p class="page-header__eyebrow" style="margin-bottom:2px;">REGISTER INCOME</p>
+          <p style="font-size:var(--text-sm);color:var(--gray-500);">支払い確認が完了したら出納帳に収入を記録します。</p>
+        </div>
+        <button class="btn btn-gold" id="btn-open-register">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+          </svg>
+          今月の支払いを登録
+        </button>
+      </div>
+
       <div style="display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-4);flex-wrap:wrap;">
         <div style="display:flex;gap:var(--space-3);">
           <span style="display:inline-flex;align-items:center;gap:4px;font-size:var(--text-xs);color:var(--gray-600);">
@@ -273,6 +348,92 @@
   </main>
 </div>
 
+<!-- ═══════════════════════════════════════
+     団費収入登録モーダル
+     ═══════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-register">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal__header">
+      <h2 class="modal__title" id="register-modal-title">団費収入を登録</h2>
+      <button class="modal__close" onclick="closeModal('modal-register')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+
+      <!-- 対象月選択 -->
+      <div class="form-group" style="margin-bottom:var(--space-4);">
+        <label class="form-label">対象月</label>
+        <select id="reg-month" class="form-control" style="max-width:180px;" onchange="recalculate()"></select>
+      </div>
+
+      <!-- クレカ手数料設定 -->
+      <p style="font-size:var(--text-xs);font-weight:700;color:var(--gold-500);letter-spacing:.15em;text-transform:uppercase;border-bottom:1px solid var(--gray-200);padding-bottom:var(--space-2);margin-bottom:var(--space-4);">クレジットカード手数料（1人あたり）</p>
+      <div class="fee-rate-grid">
+        <div class="fee-rate-card">
+          <p class="fee-rate-card__label">正団員</p>
+          <div class="fee-rate-input-wrap">
+            <input type="number" id="cc-fee-regular" class="form-control" min="0" step="1" onchange="recalculate()">
+            <span>円 / 人</span>
+          </div>
+          <p style="font-size:var(--text-xs);color:var(--gray-400);margin-top:4px;" id="cc-fee-regular-pct"></p>
+        </div>
+        <div class="fee-rate-card">
+          <p class="fee-rate-card__label">正団員（学生）</p>
+          <div class="fee-rate-input-wrap">
+            <input type="number" id="cc-fee-student" class="form-control" min="0" step="1" onchange="recalculate()">
+            <span>円 / 人</span>
+          </div>
+          <p style="font-size:var(--text-xs);color:var(--gray-400);margin-top:4px;" id="cc-fee-student-pct"></p>
+        </div>
+      </div>
+
+      <!-- 重複警告 -->
+      <div class="calc-alert-dup" id="calc-alert-dup">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="16" height="16" style="flex-shrink:0;display:inline;vertical-align:middle;margin-right:4px;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+        <span id="calc-alert-dup-text"></span>
+      </div>
+
+      <!-- 計算結果 -->
+      <p style="font-size:var(--text-xs);font-weight:700;color:var(--gold-500);letter-spacing:.15em;text-transform:uppercase;border-bottom:1px solid var(--gray-200);padding-bottom:var(--space-2);margin-bottom:var(--space-4);">計算内訳</p>
+      <div id="calc-breakdown"></div>
+
+      <!-- 合計金額 -->
+      <div class="calc-total-box" id="calc-total-box">
+        <span class="calc-total-box__label">収入合計（出納帳登録額）</span>
+        <span class="calc-total-box__amount" id="calc-total-amount">¥0</span>
+      </div>
+
+      <!-- 出納帳への登録情報 -->
+      <p style="font-size:var(--text-xs);font-weight:700;color:var(--gold-500);letter-spacing:.15em;text-transform:uppercase;border-bottom:1px solid var(--gray-200);padding-bottom:var(--space-2);margin-bottom:var(--space-4);">登録情報</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">登録日</label>
+          <input type="date" id="reg-date" class="form-control">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">カテゴリ</label>
+          <input type="text" id="reg-category" class="form-control" value="団費" readonly style="background:var(--gray-100);">
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:var(--space-4);margin-bottom:0;">
+        <label class="form-label">摘要</label>
+        <input type="text" id="reg-description" class="form-control">
+      </div>
+
+    </div><!-- /modal__body -->
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-register')">キャンセル</button>
+      <button class="btn btn-gold" id="btn-confirm-register">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+        </svg>
+        登録を確定
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 <script src="../js/supabase.js"></script>
 <script src="../js/common.js"></script>
@@ -280,7 +441,12 @@
 // ══════════════════════════════════════
 //  設定・定数
 // ══════════════════════════════════════
-const DUES_GAS_URL = 'https://script.google.com/macros/s/AKfycbwvfg_SisVkhgPg8XqWWztiRKwOx7nwAP2JIJzTltuLeYvb8n1yzh2CCxCOEg_Vy91xlg/exec';
+const DUES_GAS_URL   = 'https://script.google.com/macros/s/AKfycbwvfg_SisVkhgPg8XqWWztiRKwOx7nwAP2JIJzTltuLeYvb8n1yzh2CCxCOEg_Vy91xlg/exec';
+
+
+
+// クレカ手数料デフォルト率（%）
+const DEFAULT_CC_RATE = 3.24;
 
 const CAT_LABELS = {
   regular:'正団員', regular_student:'正団員（学生）',
@@ -614,6 +780,281 @@ ${now.getFullYear()}年${now.getMonth()+1}月末日までにお支払いをお�
 }
 
 // ══════════════════════════════════════
+//  ⑤ 団費収入登録（今月の支払いを登録）
+// ══════════════════════════════════════
+
+/** モーダルを開いて月選択と手数料を初期化し、計算を実行 */
+function openRegisterModal() {
+  // 月選択を初期化
+  const sel = document.getElementById('reg-month');
+  sel.innerHTML = months3.map(m => `<option value="${m}">${fmtMonth(m)}</option>`).join('');
+
+  // デフォルト手数料を団費から算出（DEFAULT_CC_RATE %）
+  const regularFee = duesFees['regular']         ?? 3000;
+  const studentFee = duesFees['regular_student'] ?? 2000;
+  const ccReg  = Math.round(regularFee * DEFAULT_CC_RATE / 100);
+  const ccStu  = Math.round(studentFee * DEFAULT_CC_RATE / 100);
+
+  document.getElementById('cc-fee-regular').value       = ccReg;
+  document.getElementById('cc-fee-student').value       = ccStu;
+  document.getElementById('cc-fee-regular-pct').textContent =
+    `（¥${regularFee.toLocaleString()} × ${DEFAULT_CC_RATE}%）`;
+  document.getElementById('cc-fee-student-pct').textContent =
+    `（¥${studentFee.toLocaleString()} × ${DEFAULT_CC_RATE}%）`;
+
+  // 登録日を今日に
+  document.getElementById('reg-date').valueAsDate = new Date();
+
+  // 摘要の初期値
+  const nowMonth = fmtMonth(months3[0]);
+  document.getElementById('reg-description').value = `${nowMonth}分 団費収入`;
+
+  recalculate();
+  openModal('modal-register');
+}
+
+/**
+ * 内訳を計算して表示
+ * 対象区分: regular（正団員）, regular_student（正団員・学生）
+ * 手数料控除対象: クレジット払いの人のみ
+ */
+function recalculate() {
+  const month   = document.getElementById('reg-month').value;
+  const ccReg   = parseInt(document.getElementById('cc-fee-regular').value) || 0;
+  const ccStu   = parseInt(document.getElementById('cc-fee-student').value) || 0;
+
+  // 摘要を連動更新
+  document.getElementById('reg-description').value = `${fmtMonth(month)}分 団費収入`;
+
+  const regularFee = duesFees['regular']         ?? 3000;
+  const studentFee = duesFees['regular_student'] ?? 2000;
+
+  // 休団中を除く団員のうち対象区分のみ集計
+  const targets = allMembers.filter(m => m.category !== 'rest');
+
+  // 各カテゴリ × 支払い方法の人数カウント
+  const counts = {
+    regular_cash:   0, regular_credit:   0,
+    student_cash:   0, student_credit:   0,
+    trainee_cash:   0, trainee_credit:   0,
+    support_cash:   0, support_credit:   0,
+  };
+
+  targets.forEach(m => {
+    const paid = allPayments[m.id]?.[month]?.paid ?? false;
+    if (!paid) return;
+    const pm = m.payment_method ?? 'none';
+    if (m.category === 'regular') {
+      if (pm === 'cash')   counts.regular_cash++;
+      else if (pm === 'credit') counts.regular_credit++;
+    } else if (m.category === 'regular_student') {
+      if (pm === 'cash')   counts.student_cash++;
+      else if (pm === 'credit') counts.student_credit++;
+    } else if (m.category === 'trainee') {
+      if (pm === 'cash')   counts.trainee_cash++;
+      else if (pm === 'credit') counts.trainee_credit++;
+    } else if (m.category === 'support') {
+      if (pm === 'cash')   counts.support_cash++;
+      else if (pm === 'credit') counts.support_credit++;
+    }
+  });
+
+  // 各費用
+  const traineeFee = duesFees['trainee'] ?? 2000;
+  const supportFee = duesFees['support'] ?? 1000;
+
+  // 内訳行を構築
+  const rows = [];
+
+  // 正団員
+  if (counts.regular_cash > 0 || counts.regular_credit > 0) {
+    if (counts.regular_cash > 0) {
+      const sub = counts.regular_cash * regularFee;
+      rows.push({
+        label:   '正団員（現金）',
+        formula: `${counts.regular_cash}名 × ¥${regularFee.toLocaleString()}`,
+        amount:  sub,
+        cat:     'regular',
+      });
+    }
+    if (counts.regular_credit > 0) {
+      const netFee = regularFee - ccReg;
+      const sub    = counts.regular_credit * netFee;
+      rows.push({
+        label:   '正団員（クレジット）',
+        formula: `${counts.regular_credit}名 × (¥${regularFee.toLocaleString()} − ¥${ccReg.toLocaleString()} 手数料)`,
+        amount:  sub,
+        cat:     'regular',
+      });
+    }
+  }
+
+  // 正団員（学生）
+  if (counts.student_cash > 0 || counts.student_credit > 0) {
+    if (counts.student_cash > 0) {
+      const sub = counts.student_cash * studentFee;
+      rows.push({
+        label:   '正団員（学生・現金）',
+        formula: `${counts.student_cash}名 × ¥${studentFee.toLocaleString()}`,
+        amount:  sub,
+        cat:     'regular_student',
+      });
+    }
+    if (counts.student_credit > 0) {
+      const netFee = studentFee - ccStu;
+      const sub    = counts.student_credit * netFee;
+      rows.push({
+        label:   '正団員（学生・クレジット）',
+        formula: `${counts.student_credit}名 × (¥${studentFee.toLocaleString()} − ¥${ccStu.toLocaleString()} 手数料)`,
+        amount:  sub,
+        cat:     'regular_student',
+      });
+    }
+  }
+
+  // 準団員（手数料なし区分として統一扱い）
+  if (counts.trainee_cash > 0 || counts.trainee_credit > 0) {
+    const total = (counts.trainee_cash + counts.trainee_credit) * traineeFee;
+    rows.push({
+      label:   '準団員',
+      formula: `${counts.trainee_cash + counts.trainee_credit}名 × ¥${traineeFee.toLocaleString()}`,
+      amount:  total,
+      cat:     'trainee',
+    });
+  }
+
+  // スタッフ
+  if (counts.support_cash > 0 || counts.support_credit > 0) {
+    const total = (counts.support_cash + counts.support_credit) * supportFee;
+    rows.push({
+      label:   'スタッフ',
+      formula: `${counts.support_cash + counts.support_credit}名 × ¥${supportFee.toLocaleString()}`,
+      amount:  total,
+      cat:     'support',
+    });
+  }
+
+  const grandTotal = rows.reduce((s, r) => s + r.amount, 0);
+
+  // 内訳HTMLをレンダリング
+  const breakdown = document.getElementById('calc-breakdown');
+  if (rows.length === 0) {
+    breakdown.innerHTML = `
+      <div style="text-align:center;padding:var(--space-8);color:var(--gray-500);">
+        <p style="font-size:var(--text-sm);">${fmtMonth(month)}の支払い済みデータがありません。</p>
+      </div>`;
+    document.getElementById('calc-total-amount').textContent = '¥0';
+    return;
+  }
+
+  breakdown.innerHTML = `
+    <div class="calc-section">
+      <div class="calc-section__head">内訳</div>
+      ${rows.map(r => `
+        <div class="calc-row">
+          <div>
+            <div class="calc-row__label">${escHtml(r.label)}</div>
+            <div class="calc-row__formula">${escHtml(r.formula)}</div>
+          </div>
+          <div class="calc-row__amount">¥${r.amount.toLocaleString()}</div>
+        </div>`).join('')}
+      <div class="calc-row subtotal">
+        <div class="calc-row__label">合計</div>
+        <div class="calc-row__amount">¥${grandTotal.toLocaleString()}</div>
+      </div>
+    </div>`;
+
+  document.getElementById('calc-total-amount').textContent = `¥${grandTotal.toLocaleString()}`;
+}
+
+/** 出納帳への登録を確定 */
+async function confirmRegister() {
+  const month       = document.getElementById('reg-month').value;
+  const dateVal     = document.getElementById('reg-date').value;
+  const description = document.getElementById('reg-description').value.trim();
+  const amountText  = document.getElementById('calc-total-amount').textContent.replace(/[¥,]/g, '');
+  const amount      = parseInt(amountText);
+
+  if (!dateVal)     { showToast('登録日を入力してください', 'error'); return; }
+  if (!description) { showToast('摘要を入力してください', 'error'); return; }
+  if (!amount || amount <= 0) {
+    showToast('登録金額が¥0です。支払い済み団員がいないか確認してください', 'error'); return;
+  }
+
+  const btn = document.getElementById('btn-confirm-register');
+  btn.disabled = true;
+  btn.textContent = '登録中…';
+
+  let successCount = 0;
+  const errors     = [];
+  const isLedgerOk = DUES_GAS_URL && !DUES_GAS_URL.includes('YOUR_LEDGER_SCRIPT_ID');
+
+  // 送信先がどちらも未設定の場合は事前警告
+  if (!_sb && !isLedgerOk) {
+    btn.disabled    = false;
+    btn.textContent = '登録を確定';
+    showToast('Supabaseも出納帳GAS URLも未設定です。supabase.js と DUES_GAS_URL を設定してください。', 'error');
+    return;
+  }
+
+  const entry = {
+    date:        dateVal,
+    type:        'income',
+    category:    '団費',
+    amount,
+    description,
+    vendor:      '',
+  };
+
+  // ── ① Supabase ledger_entries テーブルに記録 ──
+  if (_sb) {
+    try {
+      const { error } = await _sb.from('ledger_entries').insert(entry);
+      if (error) throw new Error(error.message);
+      successCount++;
+    } catch (e) {
+      // ledger_entries テーブルが存在しない場合もここで捕捉
+      errors.push(`Supabase出納帳: ${e.message}`);
+    }
+  }
+
+  // ── ② 出納帳GASスプレッドシートに記録 ──
+  if (isLedgerOk) {
+    try {
+      const res = await fetch(DUES_GAS_URL, {
+        method:  'POST',
+        redirect:'follow',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body:    JSON.stringify(entry),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error ?? '書き込み失敗');
+      successCount++;
+    } catch (e) {
+      errors.push(`出納帳GAS: ${e.message}`);
+    }
+  }
+
+  btn.disabled    = false;
+  btn.textContent = '登録を確定';
+
+  if (successCount === 0) {
+    showToast(`登録に失敗しました: ${errors.join(' / ')}`, 'error');
+    return;
+  }
+
+  if (errors.length > 0) {
+    // 片方は成功した場合
+    showToast(`登録しましたが一部に失敗: ${errors.join(' / ')}`, 'error');
+  } else {
+    showToast(`${fmtMonth(month)}分 ¥${amount.toLocaleString()} を出納帳に登録しました`, 'success');
+  }
+
+  closeModal('modal-register');
+}
+
+// ══════════════════════════════════════
 //  ④ 団費設定
 // ══════════════════════════════════════
 function renderFeeGrid() {
@@ -727,6 +1168,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('qr-confirm').style.display = 'none';
     pendingQr = null;
   });
+
+  // 団費収入登録ボタン
+  document.getElementById('btn-open-register').addEventListener('click', openRegisterModal);
+  document.getElementById('btn-confirm-register').addEventListener('click', confirmRegister);
 
   // 団費保存
   document.getElementById('btn-save-fees').addEventListener('click', saveFees);
