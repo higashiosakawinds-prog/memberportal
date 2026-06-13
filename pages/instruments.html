@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>楽器一覧 — 東大阪吹奏楽団</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/common.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .toolbar {
+      display:flex; gap:var(--space-3); flex-wrap:wrap;
+      align-items:center; margin-bottom:var(--space-6);
+    }
+    .toolbar input, .toolbar select { flex:1; min-width:140px; }
+
+    .item-table-wrap {
+      border-radius:var(--radius-lg); overflow:hidden;
+      border:1px solid var(--gray-200);
+      overflow-x:auto; -webkit-overflow-scrolling:touch;
+    }
+    .item-table-wrap .table { min-width:760px; }
+
+    .item-thumb {
+      width:40px; height:40px; border-radius:var(--radius-sm);
+      object-fit:cover; background:var(--gray-200); flex-shrink:0;
+    }
+    .item-thumb-placeholder {
+      width:40px; height:40px; border-radius:var(--radius-sm);
+      background:var(--gray-200); display:flex; align-items:center; justify-content:center;
+      color:var(--gray-400); flex-shrink:0;
+    }
+    .item-name-cell { display:flex; align-items:center; gap:var(--space-3); }
+
+    .status-badge {
+      display:inline-flex; align-items:center; padding:2px var(--space-3);
+      border-radius:var(--radius-full); font-size:var(--text-xs); font-weight:500; white-space:nowrap;
+    }
+    .status-保管      { background:rgba(39,174,96,.12);  color:#1e8449; }
+    .status-団内貸出  { background:rgba(41,128,185,.12); color:#1a5276; }
+    .status-外部貸出  { background:rgba(201,168,76,.18); color:#8a6f1e; }
+    .status-外部借用  { background:rgba(230,126,34,.12); color:#ca6f1e; }
+    .status-団内借用  { background:rgba(41,128,185,.12); color:#1a5276; }
+    .status-返却済    { background:var(--gray-200);      color:var(--gray-500); }
+    .status-修理中    { background:rgba(192,57,43,.12);  color:var(--danger); }
+    .status-廃棄      { background:var(--gray-300);      color:var(--gray-700); }
+
+    .num-mono { font-family:var(--font-numeric); letter-spacing:0.02em; }
+
+    /* ── 登録フォーム：ステップ ── */
+    .step-wrap { display:none; }
+    .step-wrap.active { display:block; }
+
+    .num-builder {
+      display:grid; grid-template-columns: 1fr 1fr; gap:var(--space-4);
+      margin-bottom:var(--space-4);
+    }
+    .num-preview {
+      display:flex; align-items:center; justify-content:center; gap:4px;
+      padding:var(--space-4); background:var(--navy-900); border-radius:var(--radius-md);
+      margin-bottom:var(--space-4);
+    }
+    .num-preview__digit {
+      font-family:var(--font-numeric); font-size:var(--text-2xl); font-weight:700;
+      color:var(--gold-400); min-width:1.2ch; text-align:center;
+    }
+    .num-preview__digit.placeholder { color:rgba(255,255,255,0.2); }
+    .num-preview__sep { width:1px; height:24px; background:rgba(255,255,255,0.15); margin:0 4px; }
+    .num-preview__label {
+      font-size:10px; color:rgba(255,255,255,0.4); letter-spacing:.1em;
+      text-align:center; margin-top:4px;
+    }
+
+    .form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); }
+    .section-label {
+      font-size:var(--text-xs); font-weight:700; color:var(--gold-500);
+      letter-spacing:.15em; text-transform:uppercase;
+      border-bottom:1px solid var(--gray-200);
+      padding-bottom:var(--space-2); margin-bottom:var(--space-4); margin-top:var(--space-6);
+    }
+    .section-label:first-child { margin-top:0; }
+
+    .image-upload-area {
+      border:2px dashed var(--gray-300); border-radius:var(--radius-md);
+      padding:var(--space-5); text-align:center; cursor:pointer;
+      transition:all var(--transition-fast); background:var(--gray-100);
+    }
+    .image-upload-area:hover, .image-upload-area.dragover {
+      border-color:var(--navy-500); background:rgba(37,77,122,0.05);
+    }
+    .image-upload-area input[type="file"] { display:none; }
+    .image-preview-wrap {
+      display:none; margin-top:var(--space-3); text-align:center;
+    }
+    .image-preview-wrap img {
+      max-width:100%; max-height:200px; border-radius:var(--radius-md);
+      display:inline-block;
+    }
+
+    /* スマホ列非表示 */
+    @media(max-width:768px){
+      .toolbar { flex-direction:column; }
+      .toolbar input, .toolbar select { width:100%; max-width:none; }
+      .item-table-wrap .table { min-width:unset; width:100%; }
+      .col-maker, .col-owner, .col-date { display:none; }
+      .form-grid-2, .num-builder { grid-template-columns:1fr; }
+    }
+
+    /* 詳細モーダル */
+    .detail-dl { display:grid; grid-template-columns:110px 1fr; gap:var(--space-2) var(--space-4); font-size:var(--text-sm); }
+    .detail-dl dt { color:var(--gray-500); }
+    .detail-dl dd { color:var(--gray-800); font-weight:500; word-break:break-all; }
+    .detail-image {
+      width:100%; max-height:260px; object-fit:contain;
+      border-radius:var(--radius-md); background:var(--gray-100); margin-bottom:var(--space-4);
+    }
+
+    /* 貸出履歴行 */
+    .lending-row {
+      padding:var(--space-3); border:1px solid var(--gray-200); border-radius:var(--radius-md);
+      margin-bottom:var(--space-2); font-size:var(--text-sm);
+    }
+    .lending-row__head { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+    .lending-row__code { font-family:var(--font-numeric); font-size:var(--text-xs); color:var(--gray-400); }
+  </style>
+</head>
+<body>
+
+<header class="site-header" id="site-header"></header>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main-content">
+    <div class="page-header fade-in">
+      <div>
+        <p class="page-header__eyebrow">INSTRUMENTS</p>
+        <h1 class="page-header__title">楽器・備品一覧</h1>
+      </div>
+      <div class="page-header__actions" id="header-actions">
+        <button class="btn btn-gold" id="btn-open-register">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+          登録
+        </button>
+      </div>
+    </div>
+
+    <!-- 検索ツールバー -->
+    <div class="toolbar fade-in fade-in-1">
+      <input type="text" id="search-input" class="form-control" placeholder="備品番号・名称・メーカーで検索…">
+      <select id="filter-category" class="form-control" style="max-width:200px;">
+        <option value="">すべてのパート分類</option>
+        <option value="01">01 フルート・ピッコロ</option>
+        <option value="02">02 ダブルリード</option>
+        <option value="03">03 クラリネット</option>
+        <option value="04">04 サックス</option>
+        <option value="05">05 トランペット・コルネット</option>
+        <option value="06">06 ホルン</option>
+        <option value="07">07 トロンボーン</option>
+        <option value="08">08 ユーフォ</option>
+        <option value="09">09 チューバ・スーザフォン</option>
+        <option value="10">10 弦楽器</option>
+        <option value="11">11 パーカッション</option>
+        <option value="12">12 その他</option>
+        <option value="50">50 備品</option>
+      </select>
+      <select id="filter-status" class="form-control" style="max-width:160px;">
+        <option value="">すべてのステータス</option>
+        <option value="保管">保管</option>
+        <option value="団内貸出">団内貸出</option>
+        <option value="外部貸出">外部貸出</option>
+        <option value="外部借用">外部借用</option>
+        <option value="団内借用">団内借用</option>
+        <option value="返却済">返却済</option>
+        <option value="修理中">修理中</option>
+        <option value="廃棄">廃棄</option>
+      </select>
+    </div>
+
+    <!-- 一覧テーブル -->
+    <div class="item-table-wrap fade-in fade-in-2">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:130px;">備品番号</th>
+            <th>名称</th>
+            <th class="col-maker">メーカー / 製品名</th>
+            <th class="col-owner">所有者・貸出者</th>
+            <th style="width:90px;">状態</th>
+            <th class="col-date" style="width:100px;">登録日</th>
+            <th style="width:72px;"></th>
+          </tr>
+        </thead>
+        <tbody id="items-tbody">
+          <tr><td colspan="7" style="text-align:center;padding:var(--space-10);">
+            <div class="loading-spinner" style="margin:0 auto var(--space-3);"></div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══════════════════════════════════
+     登録モーダル — STEP1: 備品番号・ステータス
+     ══════════════════════════════════ -->
+<div class="modal-overlay" id="modal-register-step1">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal__header">
+      <h2 class="modal__title">楽器・備品を登録</h2>
+      <button class="modal__close" onclick="closeModal('modal-register-step1')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+
+      <p class="section-label">① 備品番号</p>
+
+      <!-- 番号プレビュー -->
+      <div class="num-preview">
+        <span class="num-preview__digit" id="preview-cat">--</span>
+        <span class="num-preview__sep"></span>
+        <span class="num-preview__digit" id="preview-own">-</span>
+        <span class="num-preview__sep"></span>
+        <span class="num-preview__digit" id="preview-part">---</span>
+        <span class="num-preview__sep"></span>
+        <span class="num-preview__digit" id="preview-overall">---</span>
+      </div>
+      <p class="num-preview__label" style="text-align:center;margin-top:-8px;margin-bottom:var(--space-4);">パート分類 ／ 管理元 ／ パート内連番 ／ 全体連番</p>
+
+      <div class="num-builder">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">パート分類 <span class="required">*</span></label>
+          <select id="reg-category" class="form-control">
+            <option value="">選択してください</option>
+            <option value="01">01 フルート・ピッコロ</option>
+            <option value="02">02 ダブルリード</option>
+            <option value="03">03 クラリネット</option>
+            <option value="04">04 サックス</option>
+            <option value="05">05 トランペット・コルネット</option>
+            <option value="06">06 ホルン</option>
+            <option value="07">07 トロンボーン</option>
+            <option value="08">08 ユーフォ</option>
+            <option value="09">09 チューバ・スーザフォン</option>
+            <option value="10">10 弦楽器</option>
+            <option value="11">11 パーカッション</option>
+            <option value="12">12 その他</option>
+            <option value="50">50 備品</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">管理元 <span class="required">*</span></label>
+          <select id="reg-ownership" class="form-control">
+            <option value="">選択してください</option>
+            <option value="0">団所有</option>
+            <option value="1">外部借用</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <p class="form-hint" id="seq-hint">パート分類・管理元を選択すると、連番が自動で割り振られます。</p>
+      </div>
+
+      <p class="section-label">② ステータス</p>
+      <div class="form-group">
+        <label class="form-label">登録時のステータス <span class="required">*</span></label>
+        <select id="reg-status" class="form-control">
+          <option value="保管">保管</option>
+          <option value="団内借用">団内借用</option>
+          <option value="外部借用">外部借用</option>
+        </select>
+      </div>
+
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-register-step1')">キャンセル</button>
+      <button class="btn btn-gold" id="btn-step1-next">
+        次へ
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     登録モーダル — STEP2: 楽器/備品詳細
+     ══════════════════════════════════ -->
+<div class="modal-overlay" id="modal-register-step2">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal__header">
+      <h2 class="modal__title" id="step2-title">詳細情報を登録</h2>
+      <button class="modal__close" onclick="closeModal('modal-register-step2')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+
+      <!-- 番号確認表示 -->
+      <div class="alert alert-info mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+        <span>備品番号：<strong id="step2-number-display" class="num-mono">—</strong> ／ ステータス：<strong id="step2-status-display">—</strong></span>
+      </div>
+
+      <p class="section-label">基本情報</p>
+
+      <div class="form-group">
+        <label class="form-label" id="label-name">楽器名 <span class="required">*</span></label>
+        <input type="text" id="reg-name" class="form-control" placeholder="例：フルート">
+      </div>
+
+      <div class="form-group" id="group-instrument-code">
+        <label class="form-label">楽器コード</label>
+        <input type="text" id="reg-instrument-code" class="form-control" placeholder="例：FL-001">
+        <span class="form-hint">構成：「楽器名アルファベット-登録番号」</span>
+      </div>
+
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">メーカー</label>
+          <input type="text" id="reg-maker" class="form-control" placeholder="例：YAMAHA">
+        </div>
+        <div class="form-group">
+          <label class="form-label">製品名</label>
+          <input type="text" id="reg-product" class="form-control" placeholder="例：YFL-212">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">所有者・貸出者</label>
+        <input type="text" id="reg-owner" class="form-control" placeholder="例：東大阪吹奏楽団 ／ 山田太郎">
+        <span class="form-hint">当団または貸し出しをした人・団体の名前</span>
+      </div>
+
+      <p class="section-label">記録・メモ</p>
+
+      <div class="form-group">
+        <label class="form-label">修理記録</label>
+        <textarea id="reg-repair" class="form-control" rows="2" placeholder="例：2024/10 パッド交換（〇〇楽器店）"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">メモ</label>
+        <textarea id="reg-memo" class="form-control" rows="2" placeholder="その他特記事項"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">登録日</label>
+        <input type="date" id="reg-date" class="form-control">
+      </div>
+
+      <p class="section-label">画像</p>
+      <div class="image-upload-area" id="image-upload-area" onclick="document.getElementById('reg-image-input').click()">
+        <input type="file" id="reg-image-input" accept="image/*" onchange="onImageSelected(event)">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--gray-400)" stroke-width="1.5" width="32" height="32" style="margin:0 auto var(--space-2);">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>
+        </svg>
+        <p style="font-size:var(--text-sm);color:var(--gray-500);">クリックして画像を選択</p>
+      </div>
+      <div class="image-preview-wrap" id="image-preview-wrap">
+        <img id="image-preview" src="" alt="プレビュー">
+        <div style="margin-top:var(--space-2);">
+          <button class="btn btn-sm btn-outline" type="button" onclick="clearImage()">画像をクリア</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" id="btn-step2-back">戻る</button>
+      <button class="btn btn-gold" id="btn-step2-submit">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+        登録する
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     詳細モーダル
+     ══════════════════════════════════ -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal__header">
+      <h2 class="modal__title" id="detail-title">詳細</h2>
+      <button class="modal__close" onclick="closeModal('modal-detail')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body" id="detail-body"></div>
+    <div class="modal__footer" style="justify-content:space-between;">
+      <button class="btn btn-danger" id="btn-delete-item" style="display:none;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+        削除
+      </button>
+      <div style="display:flex;gap:var(--space-3);">
+        <button class="btn btn-outline" onclick="closeModal('modal-detail')">閉じる</button>
+        <button class="btn btn-gold" id="btn-edit-item" style="display:none;">編集する</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     編集モーダル
+     ══════════════════════════════════ -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal__header">
+      <h2 class="modal__title">情報を編集</h2>
+      <button class="modal__close" onclick="closeModal('modal-edit')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+
+      <div class="alert alert-info mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+        <span>備品番号：<strong id="edit-number-display" class="num-mono">—</strong></span>
+      </div>
+
+      <p class="section-label">② ステータス</p>
+      <div class="form-group">
+        <label class="form-label">ステータス <span class="required">*</span></label>
+        <select id="edit-status" class="form-control">
+          <option value="保管">保管</option>
+          <option value="団内貸出">団内貸出</option>
+          <option value="外部貸出">外部貸出</option>
+          <option value="外部借用">外部借用</option>
+          <option value="団内借用">団内借用</option>
+          <option value="返却済">返却済</option>
+          <option value="修理中">修理中</option>
+          <option value="廃棄">廃棄</option>
+        </select>
+      </div>
+
+      <p class="section-label">基本情報</p>
+      <div class="form-group">
+        <label class="form-label" id="edit-label-name">名称 <span class="required">*</span></label>
+        <input type="text" id="edit-name" class="form-control">
+      </div>
+      <div class="form-group" id="edit-group-instrument-code">
+        <label class="form-label">楽器コード</label>
+        <input type="text" id="edit-instrument-code" class="form-control">
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">メーカー</label>
+          <input type="text" id="edit-maker" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">製品名</label>
+          <input type="text" id="edit-product" class="form-control">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">所有者・貸出者</label>
+        <input type="text" id="edit-owner" class="form-control">
+      </div>
+
+      <p class="section-label">記録・メモ</p>
+      <div class="form-group">
+        <label class="form-label">修理記録</label>
+        <textarea id="edit-repair" class="form-control" rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">メモ</label>
+        <textarea id="edit-memo" class="form-control" rows="2"></textarea>
+      </div>
+
+      <p class="section-label">画像</p>
+      <div class="image-upload-area" id="edit-image-upload-area" onclick="document.getElementById('edit-image-input').click()">
+        <input type="file" id="edit-image-input" accept="image/*" onchange="onEditImageSelected(event)">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--gray-400)" stroke-width="1.5" width="32" height="32" style="margin:0 auto var(--space-2);">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>
+        </svg>
+        <p style="font-size:var(--text-sm);color:var(--gray-500);">クリックして画像を変更</p>
+      </div>
+      <div class="image-preview-wrap" id="edit-image-preview-wrap">
+        <img id="edit-image-preview" src="" alt="プレビュー">
+        <div style="margin-top:var(--space-2);">
+          <button class="btn btn-sm btn-outline" type="button" onclick="clearEditImage()">画像をクリア</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-edit')">キャンセル</button>
+      <button class="btn btn-gold" id="btn-save-edit">保存する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<script src="../js/supabase.js"></script>
+<script src="../js/common.js"></script>
+<script>
+// ══════════════════════════════════════
+//  定数
+// ══════════════════════════════════════
+const CATEGORY_LABELS = {
+  '01':'フルート・ピッコロ', '02':'ダブルリード', '03':'クラリネット',
+  '04':'サックス', '05':'トランペット・コルネット', '06':'ホルン',
+  '07':'トロンボーン', '08':'ユーフォ', '09':'チューバ・スーザフォン',
+  '10':'弦楽器', '11':'パーカッション', '12':'その他', '50':'備品',
+};
+const OWNERSHIP_LABELS = { '0':'団所有', '1':'外部借用' };
+
+// 編集可能ロール
+const EDITOR_ROLES = ['gm', 'leader','subleader', 'equipment'];
+
+// ══════════════════════════════════════
+//  状態
+// ══════════════════════════════════════
+let allItems = [];
+let pendingRegister = {};   // STEP1で確定した番号・ステータス情報
+let selectedImageFile = null;
+let editingItem = null;
+let editImageFile = null;
+let editImageCleared = false;
+
+// ══════════════════════════════════════
+//  XSS対策
+// ══════════════════════════════════════
+function escHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function canEdit() {
+  const user = getSessionUser();
+  if (!user) return false;
+  const roles = Array.isArray(user.roles) ? user.roles : [user.role].filter(Boolean);
+  return roles.some(r => EDITOR_ROLES.includes(r));
+}
+
+// ══════════════════════════════════════
+//  備品番号の構築
+//  形式: [パート分類2桁][管理元1桁][パート内連番3桁][全体連番3桁]
+//  例: 0100100100 → 01 / 0 / 001 / 001
+// ══════════════════════════════════════
+function buildInstrumentNumber(cat, own, partSeq, overallSeq) {
+  return `${cat}${own}${partSeq}${overallSeq}`;
+}
+
+function updateNumberPreview() {
+  const cat = document.getElementById('reg-category').value;
+  const own = document.getElementById('reg-ownership').value;
+
+  document.getElementById('preview-cat').textContent = cat || '--';
+  document.getElementById('preview-cat').className = 'num-preview__digit' + (cat ? '' : ' placeholder');
+  document.getElementById('preview-own').textContent = own !== '' ? own : '-';
+  document.getElementById('preview-own').className = 'num-preview__digit' + (own !== '' ? '' : ' placeholder');
+
+  if (cat && own !== '') {
+    const { partSeq, overallSeq } = calcNextSeq(cat, own);
+    document.getElementById('preview-part').textContent = partSeq;
+    document.getElementById('preview-part').className = 'num-preview__digit';
+    document.getElementById('preview-overall').textContent = overallSeq;
+    document.getElementById('preview-overall').className = 'num-preview__digit';
+    document.getElementById('seq-hint').textContent =
+      `この分類・管理元での登録は ${parseInt(partSeq,10)} 件目、全体では ${parseInt(overallSeq,10)} 件目になります。`;
+  } else {
+    document.getElementById('preview-part').textContent = '---';
+    document.getElementById('preview-part').className = 'num-preview__digit placeholder';
+    document.getElementById('preview-overall').textContent = '---';
+    document.getElementById('preview-overall').className = 'num-preview__digit placeholder';
+    document.getElementById('seq-hint').textContent = 'パート分類・管理元を選択すると、連番が自動で割り振られます。';
+  }
+}
+
+// パート内連番・全体連番の次の値を計算
+function calcNextSeq(cat, own) {
+  // パート内連番：同じ part_category かつ ownership_type の最大値+1
+  const sameGroup = allItems.filter(it => it.part_category === cat && it.ownership_type === own);
+  const maxPart = sameGroup.reduce((max, it) => Math.max(max, parseInt(it.part_seq, 10) || 0), 0);
+  const partSeq = String(maxPart + 1).padStart(3, '0');
+
+  // 全体連番：全アイテムの overall_seq の最大値+1
+  const maxOverall = allItems.reduce((max, it) => Math.max(max, parseInt(it.overall_seq, 10) || 0), 0);
+  const overallSeq = String(maxOverall + 1).padStart(3, '0');
+
+  return { partSeq, overallSeq };
+}
+
+// ══════════════════════════════════════
+//  STEP1 → STEP2
+// ══════════════════════════════════════
+function openRegisterModal() {
+  document.getElementById('reg-category').value = '';
+  document.getElementById('reg-ownership').value = '';
+  document.getElementById('reg-status').value = '保管';
+  updateNumberPreview();
+  openModal('modal-register-step1');
+}
+
+document.getElementById('reg-category').addEventListener('change', updateNumberPreview);
+document.getElementById('reg-ownership').addEventListener('change', updateNumberPreview);
+
+document.getElementById('btn-step1-next').addEventListener('click', () => {
+  const cat    = document.getElementById('reg-category').value;
+  const own    = document.getElementById('reg-ownership').value;
+  const status = document.getElementById('reg-status').value;
+
+  if (!cat) { showToast('パート分類を選択してください', 'error'); return; }
+  if (own === '') { showToast('管理元を選択してください', 'error'); return; }
+  if (!status) { showToast('ステータスを選択してください', 'error'); return; }
+
+  const { partSeq, overallSeq } = calcNextSeq(cat, own);
+  const itemType = cat === '50' ? 'equipment' : 'instrument';
+
+  pendingRegister = {
+    part_category: cat,
+    ownership_type: own,
+    part_seq: partSeq,
+    overall_seq: overallSeq,
+    instrument_number: buildInstrumentNumber(cat, own, partSeq, overallSeq),
+    status,
+    item_type: itemType,
+  };
+
+  // STEP2 フォームをリセット
+  ['reg-name','reg-instrument-code','reg-maker','reg-product','reg-owner','reg-repair','reg-memo'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('reg-date').valueAsDate = new Date();
+  clearImage();
+
+  // ラベル切り替え
+  const isInstrument = itemType === 'instrument';
+  document.getElementById('step2-title').textContent = isInstrument ? '楽器登録詳細' : '備品登録詳細';
+  document.getElementById('label-name').innerHTML = isInstrument
+    ? '楽器名 <span class="required">*</span>'
+    : '備品名 <span class="required">*</span>';
+  document.getElementById('reg-name').placeholder = isInstrument ? '例：フルート' : '例：譜面台';
+  document.getElementById('group-instrument-code').style.display = isInstrument ? 'block' : 'none';
+
+  // 番号・ステータス表示
+  document.getElementById('step2-number-display').textContent = pendingRegister.instrument_number;
+  document.getElementById('step2-status-display').textContent = pendingRegister.status;
+
+  closeModal('modal-register-step1');
+  openModal('modal-register-step2');
+});
+
+document.getElementById('btn-step2-back').addEventListener('click', () => {
+  closeModal('modal-register-step2');
+  openModal('modal-register-step1');
+});
+
+// ══════════════════════════════════════
+//  画像選択
+// ══════════════════════════════════════
+function onImageSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { showToast('画像ファイルを選択してください', 'error'); return; }
+  selectedImageFile = file;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('image-preview').src = e.target.result;
+    document.getElementById('image-preview-wrap').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImage() {
+  selectedImageFile = null;
+  document.getElementById('reg-image-input').value = '';
+  document.getElementById('image-preview-wrap').style.display = 'none';
+  document.getElementById('image-preview').src = '';
+}
+
+// ドラッグ＆ドロップ
+document.addEventListener('DOMContentLoaded', () => {
+  const area = document.getElementById('image-upload-area');
+  if (!area) return;
+  area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('dragover'); });
+  area.addEventListener('dragleave', () => area.classList.remove('dragover'));
+  area.addEventListener('drop', e => {
+    e.preventDefault();
+    area.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (!file || !file.type.startsWith('image/')) { showToast('画像ファイルを選択してください', 'error'); return; }
+    selectedImageFile = file;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('image-preview').src = ev.target.result;
+      document.getElementById('image-preview-wrap').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  });
+});
+
+// ══════════════════════════════════════
+//  STEP2: 登録実行
+// ══════════════════════════════════════
+document.getElementById('btn-step2-submit').addEventListener('click', async () => {
+  const name = document.getElementById('reg-name').value.trim();
+  if (!name) { showToast('名称を入力してください', 'error'); return; }
+
+  if (!_sb) { showToast('Supabase未接続のため登録できません', 'error'); return; }
+
+  const btn = document.getElementById('btn-step2-submit');
+  btn.disabled = true; btn.textContent = '登録中…';
+
+  const sessionUser = getSessionUser();
+
+  const payload = {
+    instrument_number: pendingRegister.instrument_number,
+    part_category:     pendingRegister.part_category,
+    ownership_type:     pendingRegister.ownership_type,
+    part_seq:           pendingRegister.part_seq,
+    overall_seq:        pendingRegister.overall_seq,
+    status:             pendingRegister.status,
+    item_type:          pendingRegister.item_type,
+    name_ja:            name,
+    instrument_code:    document.getElementById('reg-instrument-code').value.trim() || null,
+    maker:              document.getElementById('reg-maker').value.trim() || null,
+    product_name:       document.getElementById('reg-product').value.trim() || null,
+    owner_lender:       document.getElementById('reg-owner').value.trim() || null,
+    repair_history:     document.getElementById('reg-repair').value.trim() || null,
+    memo:               document.getElementById('reg-memo').value.trim() || null,
+    registered_date:    document.getElementById('reg-date').value || new Date().toISOString().slice(0,10),
+    created_by:         sessionUser?.id ?? null,
+  };
+
+  // 画像アップロード
+  if (selectedImageFile) {
+    const ext = (selectedImageFile.name.split('.').pop() || 'jpg').toLowerCase();
+    const storagePath = `${payload.instrument_number}_${Date.now()}.${ext}`;
+    const { error: upErr } = await _sb.storage.from('instruments').upload(storagePath, selectedImageFile, {
+      cacheControl: '3600', upsert: true,
+    });
+    if (upErr) {
+      showToast(`画像アップロード失敗: ${upErr.message}`, 'error');
+    } else {
+      payload.image_path = storagePath;
+    }
+  }
+
+  const { data, error } = await _sb.from('instruments').insert(payload).select().single();
+
+  btn.disabled = false; btn.textContent = '登録する';
+
+  if (error) {
+    showToast(`登録失敗: ${error.message}`, 'error');
+    return;
+  }
+
+  allItems.push(data);
+  closeModal('modal-register-step2');
+  showToast('登録しました', 'success');
+  renderTable();
+});
+
+// ══════════════════════════════════════
+//  画像URL取得
+// ══════════════════════════════════════
+function getImageUrl(imagePath) {
+  if (!imagePath || !_sb) return null;
+  const { data } = _sb.storage.from('instruments').getPublicUrl(imagePath);
+  return data?.publicUrl ?? null;
+}
+
+// ══════════════════════════════════════
+//  一覧描画
+// ══════════════════════════════════════
+function fmtNumber(n) {
+  return `${n.part_category}-${n.ownership_type}-${n.part_seq}-${n.overall_seq}`;
+}
+
+function renderTable() {
+  const kw     = document.getElementById('search-input').value.toLowerCase();
+  const cat    = document.getElementById('filter-category').value;
+  const status = document.getElementById('filter-status').value;
+
+  const filtered = allItems.filter(it => {
+    const text = `${it.instrument_number}${it.name_ja}${it.maker ?? ''}${it.product_name ?? ''}${it.instrument_code ?? ''}`.toLowerCase();
+    if (kw && !text.includes(kw)) return false;
+    if (cat && it.part_category !== cat) return false;
+    if (status && it.status !== status) return false;
+    return true;
+  });
+
+  const tbody = document.getElementById('items-tbody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:var(--space-10);color:var(--gray-500);">該当する楽器・備品がありません</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(it => {
+    const imgUrl = getImageUrl(it.image_path);
+    const thumb = imgUrl
+      ? `<img class="item-thumb" src="${escHtml(imgUrl)}" alt="">`
+      : `<div class="item-thumb-placeholder"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg></div>`;
+
+    return `
+    <tr>
+      <td class="num-mono" style="font-size:var(--text-xs);color:var(--gray-500);">${escHtml(fmtNumber(it))}</td>
+      <td>
+        <div class="item-name-cell">
+          ${thumb}
+          <div>
+            <div style="font-weight:700;color:var(--navy-800);">${escHtml(it.name_ja)}</div>
+            <div style="font-size:var(--text-xs);color:var(--gray-400);">${escHtml(CATEGORY_LABELS[it.part_category] ?? it.part_category)}${it.instrument_code ? ' / ' + escHtml(it.instrument_code) : ''}</div>
+          </div>
+        </div>
+      </td>
+      <td class="col-maker" style="font-size:var(--text-sm);color:var(--gray-600);">
+        ${it.maker || it.product_name ? `${escHtml(it.maker ?? '—')}${it.product_name ? ' / ' + escHtml(it.product_name) : ''}` : '—'}
+      </td>
+      <td class="col-owner" style="font-size:var(--text-sm);color:var(--gray-600);">${escHtml(it.owner_lender || '—')}</td>
+      <td><span class="status-badge status-${escHtml(it.status)}">${escHtml(it.status)}</span></td>
+      <td class="col-date" style="font-size:var(--text-xs);color:var(--gray-500);">${escHtml(it.registered_date ?? '—')}</td>
+      <td><button class="btn btn-sm btn-outline" onclick="openDetailModal('${it.id}')">詳細</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════
+//  詳細モーダル
+// ══════════════════════════════════════
+async function openDetailModal(id) {
+  const it = allItems.find(x => x.id === id);
+  if (!it) return;
+
+  const isInstrument = it.item_type === 'instrument';
+  document.getElementById('detail-title').textContent = it.name_ja;
+
+  const imgUrl = getImageUrl(it.image_path);
+
+  // 貸出履歴を取得
+  let lendingHtml = '';
+  if (_sb) {
+    const { data: records } = await _sb
+      .from('instrument_lending_records')
+      .select('*')
+      .eq('instrument_id', id)
+      .order('created_at', { ascending: false });
+
+    if (records && records.length > 0) {
+      lendingHtml = `
+        <p style="font-size:var(--text-xs);font-weight:700;color:var(--navy-800);letter-spacing:.1em;text-transform:uppercase;margin-top:var(--space-6);margin-bottom:var(--space-3);">貸出・借用履歴</p>
+        ${records.map(r => `
+          <div class="lending-row">
+            <div class="lending-row__head">
+              <span style="font-weight:600;color:var(--navy-800);">${escHtml(r.borrower_name)}</span>
+              <span class="badge ${r.returned ? 'badge-navy' : 'badge-warning'}" style="font-size:10px;">${r.returned ? '返却済' : escHtml(r.lending_type)}</span>
+            </div>
+            <p style="font-size:var(--text-xs);color:var(--gray-500);">
+              ${escHtml(r.start_date)} 〜 ${r.due_date ? escHtml(r.due_date) : '期日未設定'}
+            </p>
+            <p class="lending-row__code">${escHtml(r.lending_code)}</p>
+          </div>
+        `).join('')}`;
+    }
+  }
+
+  document.getElementById('detail-body').innerHTML = `
+    ${imgUrl ? `<img class="detail-image" src="${escHtml(imgUrl)}" alt="${escHtml(it.name_ja)}">` : ''}
+    <dl class="detail-dl mb-2">
+      <dt>備品番号</dt><dd class="num-mono">${escHtml(fmtNumber(it))}（${escHtml(it.instrument_number)}）</dd>
+      <dt>パート分類</dt><dd>${escHtml(it.part_category)} ${escHtml(CATEGORY_LABELS[it.part_category] ?? '')}</dd>
+      <dt>管理元</dt><dd>${escHtml(OWNERSHIP_LABELS[it.ownership_type] ?? '—')}</dd>
+      <dt>ステータス</dt><dd><span class="status-badge status-${escHtml(it.status)}">${escHtml(it.status)}</span></dd>
+      ${isInstrument && it.instrument_code ? `<dt>楽器コード</dt><dd>${escHtml(it.instrument_code)}</dd>` : ''}
+      ${it.maker ? `<dt>メーカー</dt><dd>${escHtml(it.maker)}</dd>` : ''}
+      ${it.product_name ? `<dt>製品名</dt><dd>${escHtml(it.product_name)}</dd>` : ''}
+      ${it.owner_lender ? `<dt>所有者・貸出者</dt><dd>${escHtml(it.owner_lender)}</dd>` : ''}
+      ${it.repair_history ? `<dt>修理記録</dt><dd style="white-space:pre-wrap;">${escHtml(it.repair_history)}</dd>` : ''}
+      ${it.memo ? `<dt>メモ</dt><dd style="white-space:pre-wrap;">${escHtml(it.memo)}</dd>` : ''}
+      <dt>登録日</dt><dd>${escHtml(it.registered_date ?? '—')}</dd>
+    </dl>
+    ${lendingHtml}
+  `;
+
+  const showEdit = canEdit();
+  document.getElementById('btn-edit-item').style.display   = showEdit ? 'inline-flex' : 'none';
+  document.getElementById('btn-delete-item').style.display = showEdit ? 'inline-flex' : 'none';
+  document.getElementById('btn-edit-item').onclick   = () => openEditModal(id);
+  document.getElementById('btn-delete-item').onclick = () => deleteItem(id);
+
+  openModal('modal-detail');
+}
+
+// ══════════════════════════════════════
+//  編集モーダル
+// ══════════════════════════════════════
+function openEditModal(id) {
+  const it = allItems.find(x => x.id === id);
+  if (!it) return;
+  editingItem = it;
+  editImageFile = null;
+  editImageCleared = false;
+
+  const isInstrument = it.item_type === 'instrument';
+
+  document.getElementById('edit-number-display').textContent = it.instrument_number;
+  document.getElementById('edit-status').value = it.status;
+  document.getElementById('edit-label-name').innerHTML = isInstrument
+    ? '楽器名 <span class="required">*</span>'
+    : '備品名 <span class="required">*</span>';
+  document.getElementById('edit-name').value = it.name_ja ?? '';
+  document.getElementById('edit-instrument-code').value = it.instrument_code ?? '';
+  document.getElementById('edit-group-instrument-code').style.display = isInstrument ? 'block' : 'none';
+  document.getElementById('edit-maker').value = it.maker ?? '';
+  document.getElementById('edit-product').value = it.product_name ?? '';
+  document.getElementById('edit-owner').value = it.owner_lender ?? '';
+  document.getElementById('edit-repair').value = it.repair_history ?? '';
+  document.getElementById('edit-memo').value = it.memo ?? '';
+
+  // 画像プレビュー
+  document.getElementById('edit-image-input').value = '';
+  const imgUrl = getImageUrl(it.image_path);
+  if (imgUrl) {
+    document.getElementById('edit-image-preview').src = imgUrl;
+    document.getElementById('edit-image-preview-wrap').style.display = 'block';
+  } else {
+    document.getElementById('edit-image-preview-wrap').style.display = 'none';
+    document.getElementById('edit-image-preview').src = '';
+  }
+
+  closeModal('modal-detail');
+  openModal('modal-edit');
+}
+
+function onEditImageSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { showToast('画像ファイルを選択してください', 'error'); return; }
+  editImageFile = file;
+  editImageCleared = false;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('edit-image-preview').src = e.target.result;
+    document.getElementById('edit-image-preview-wrap').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearEditImage() {
+  editImageFile = null;
+  editImageCleared = true;
+  document.getElementById('edit-image-input').value = '';
+  document.getElementById('edit-image-preview-wrap').style.display = 'none';
+  document.getElementById('edit-image-preview').src = '';
+}
+
+document.getElementById('btn-save-edit').addEventListener('click', async () => {
+  if (!editingItem || !_sb) return;
+
+  const name = document.getElementById('edit-name').value.trim();
+  if (!name) { showToast('名称を入力してください', 'error'); return; }
+
+  const btn = document.getElementById('btn-save-edit');
+  btn.disabled = true; btn.textContent = '保存中…';
+
+  const payload = {
+    status:           document.getElementById('edit-status').value,
+    name_ja:          name,
+    instrument_code:  document.getElementById('edit-instrument-code').value.trim() || null,
+    maker:            document.getElementById('edit-maker').value.trim() || null,
+    product_name:     document.getElementById('edit-product').value.trim() || null,
+    owner_lender:     document.getElementById('edit-owner').value.trim() || null,
+    repair_history:   document.getElementById('edit-repair').value.trim() || null,
+    memo:             document.getElementById('edit-memo').value.trim() || null,
+  };
+
+  // 画像変更処理
+  if (editImageFile) {
+    const ext = (editImageFile.name.split('.').pop() || 'jpg').toLowerCase();
+    const storagePath = `${editingItem.instrument_number}_${Date.now()}.${ext}`;
+    const { error: upErr } = await _sb.storage.from('instruments').upload(storagePath, editImageFile, {
+      cacheControl: '3600', upsert: true,
+    });
+    if (upErr) {
+      showToast(`画像アップロード失敗: ${upErr.message}`, 'error');
+    } else {
+      // 旧画像を削除
+      if (editingItem.image_path) {
+        await _sb.storage.from('instruments').remove([editingItem.image_path]);
+      }
+      payload.image_path = storagePath;
+    }
+  } else if (editImageCleared) {
+    if (editingItem.image_path) {
+      await _sb.storage.from('instruments').remove([editingItem.image_path]);
+    }
+    payload.image_path = null;
+  }
+
+  const { error } = await _sb.from('instruments').update(payload).eq('id', editingItem.id);
+
+  btn.disabled = false; btn.textContent = '保存する';
+
+  if (error) {
+    showToast(`更新失敗: ${error.message}`, 'error');
+    return;
+  }
+
+  Object.assign(editingItem, payload);
+  closeModal('modal-edit');
+  showToast('更新しました', 'success');
+  renderTable();
+});
+
+// ══════════════════════════════════════
+//  削除
+// ══════════════════════════════════════
+async function deleteItem(id) {
+  const it = allItems.find(x => x.id === id);
+  if (!it || !_sb) return;
+
+  if (!confirm(`「${it.name_ja}」（${fmtNumber(it)}）を削除しますか？\nこの操作は元に戻せません。`)) return;
+
+  const btn = document.getElementById('btn-delete-item');
+  btn.disabled = true; btn.textContent = '削除中…';
+
+  // 画像削除
+  if (it.image_path) {
+    await _sb.storage.from('instruments').remove([it.image_path]);
+  }
+
+  const { error } = await _sb.from('instruments').delete().eq('id', id);
+
+  btn.disabled = false; btn.textContent = '削除';
+
+  if (error) {
+    showToast(`削除失敗: ${error.message}`, 'error');
+    return;
+  }
+
+  allItems = allItems.filter(x => x.id !== id);
+  closeModal('modal-detail');
+  showToast('削除しました', 'success');
+  renderTable();
+}
+
+// ══════════════════════════════════════
+//  データ読み込み
+// ══════════════════════════════════════
+async function loadItems() {
+  if (!_sb) {
+    document.getElementById('items-tbody').innerHTML =
+      `<tr><td colspan="7" style="text-align:center;padding:var(--space-10);color:var(--gray-500);">Supabase未接続のためデータを取得できません。</td></tr>`;
+    return;
+  }
+
+  const { data, error } = await _sb
+    .from('instruments')
+    .select('*')
+    .order('part_category', { ascending: true })
+    .order('overall_seq', { ascending: true });
+
+  if (error) {
+    console.error('[HighasuiDX] instruments取得エラー:', error.message);
+    document.getElementById('items-tbody').innerHTML =
+      `<tr><td colspan="7" style="text-align:center;padding:var(--space-10);color:var(--danger);">データの取得に失敗しました。</td></tr>`;
+    return;
+  }
+
+  allItems = data ?? [];
+  renderTable();
+}
+
+// ══════════════════════════════════════
+//  初期化
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  // 登録ボタンは編集権限がある場合のみ表示
+  if (!canEdit()) {
+    document.getElementById('header-actions').style.display = 'none';
+  } else {
+    document.getElementById('btn-open-register').addEventListener('click', openRegisterModal);
+  }
+
+  document.getElementById('search-input').addEventListener('input', renderTable);
+  document.getElementById('filter-category').addEventListener('change', renderTable);
+  document.getElementById('filter-status').addEventListener('change', renderTable);
+
+  await loadItems();
+});
+</script>
+</body>
+</html>
