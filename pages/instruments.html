@@ -8,6 +8,18 @@
   <link rel="stylesheet" href="../css/common.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
+    .view-tabs {
+      display:flex; gap:var(--space-2); margin-bottom:var(--space-6); flex-wrap:wrap;
+    }
+    .view-tab {
+      padding:var(--space-2) var(--space-5); border-radius:var(--radius-full);
+      border:1px solid var(--gray-300); font-size:var(--text-sm); font-weight:500;
+      color:var(--gray-600); cursor:pointer; background:var(--white);
+      transition:all var(--transition-fast);
+    }
+    .view-tab:hover { border-color:var(--navy-500); color:var(--navy-700); }
+    .view-tab.active { background:var(--navy-800); color:var(--gold-300); border-color:var(--navy-800); }
+
     .toolbar {
       display:flex; gap:var(--space-3); flex-wrap:wrap;
       align-items:center; margin-bottom:var(--space-6);
@@ -135,8 +147,8 @@
   <main class="main-content">
     <div class="page-header fade-in">
       <div>
-        <p class="page-header__eyebrow">INSTRUMENTS</p>
-        <h1 class="page-header__title">楽器・備品一覧</h1>
+        <p class="page-header__eyebrow" id="page-eyebrow">INSTRUMENTS</p>
+        <h1 class="page-header__title" id="page-title">楽器一覧</h1>
       </div>
       <div class="page-header__actions" id="header-actions">
         <button class="btn btn-gold" id="btn-open-register">
@@ -144,6 +156,12 @@
           登録
         </button>
       </div>
+    </div>
+
+    <!-- ビュー切替タブ -->
+    <div class="view-tabs fade-in fade-in-1">
+      <button class="view-tab active" data-view="instrument">楽器一覧</button>
+      <button class="view-tab" data-view="equipment">備品一覧</button>
     </div>
 
     <!-- 検索ツールバー -->
@@ -163,7 +181,6 @@
         <option value="10">10 弦楽器</option>
         <option value="11">11 パーカッション</option>
         <option value="12">12 その他</option>
-        <option value="50">50 備品</option>
       </select>
       <select id="filter-status" class="form-control" style="max-width:160px;">
         <option value="">すべてのステータス</option>
@@ -188,7 +205,7 @@
             <th class="col-maker">メーカー / 製品名</th>
             <th class="col-owner">所有者・貸出者</th>
             <th style="width:90px;">状態</th>
-            <th class="col-date" style="width:100px;">登録日</th>
+            <th class="col-date" style="width:100px;">更新日</th>
             <th style="width:72px;"></th>
           </tr>
         </thead>
@@ -514,6 +531,7 @@ const EDITOR_ROLES = ['gm', 'leader','subleader', 'equipment'];
 //  状態
 // ══════════════════════════════════════
 let allItems = [];
+let currentView = 'instrument'; // 'instrument' | 'equipment'
 let pendingRegister = {};   // STEP1で確定した番号・ステータス情報
 let selectedImageFile = null;
 let editingItem = null;
@@ -772,22 +790,34 @@ function fmtNumber(n) {
   return `${n.part_category}-${n.ownership_type}-${n.part_seq}-${n.overall_seq}`;
 }
 
+// ── 日時フォーマット ──
+function fmtUpdatedAt(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return '—';
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+}
+
 function renderTable() {
   const kw     = document.getElementById('search-input').value.toLowerCase();
   const cat    = document.getElementById('filter-category').value;
   const status = document.getElementById('filter-status').value;
 
   const filtered = allItems.filter(it => {
+    // ビュー切替：楽器一覧(01-12) / 備品一覧(50)
+    if (currentView === 'instrument' && it.item_type !== 'instrument') return false;
+    if (currentView === 'equipment'  && it.item_type !== 'equipment')  return false;
+
     const text = `${it.instrument_number}${it.name_ja}${it.maker ?? ''}${it.product_name ?? ''}${it.instrument_code ?? ''}`.toLowerCase();
     if (kw && !text.includes(kw)) return false;
     if (cat && it.part_category !== cat) return false;
     if (status && it.status !== status) return false;
     return true;
-  });
+  }).sort((a, b) => a.instrument_number.localeCompare(b.instrument_number));
 
   const tbody = document.getElementById('items-tbody');
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:var(--space-10);color:var(--gray-500);">該当する楽器・備品がありません</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:var(--space-10);color:var(--gray-500);">該当する${currentView === 'instrument' ? '楽器' : '備品'}がありません</td></tr>`;
     return;
   }
 
@@ -805,7 +835,7 @@ function renderTable() {
           ${thumb}
           <div>
             <div style="font-weight:700;color:var(--navy-800);">${escHtml(it.name_ja)}</div>
-            <div style="font-size:var(--text-xs);color:var(--gray-400);">${escHtml(CATEGORY_LABELS[it.part_category] ?? it.part_category)}${it.instrument_code ? ' / ' + escHtml(it.instrument_code) : ''}</div>
+            ${it.instrument_code ? `<div style="font-size:var(--text-xs);color:var(--gray-400);">${escHtml(it.instrument_code)}</div>` : ''}
           </div>
         </div>
       </td>
@@ -814,7 +844,7 @@ function renderTable() {
       </td>
       <td class="col-owner" style="font-size:var(--text-sm);color:var(--gray-600);">${escHtml(it.owner_lender || '—')}</td>
       <td><span class="status-badge status-${escHtml(it.status)}">${escHtml(it.status)}</span></td>
-      <td class="col-date" style="font-size:var(--text-xs);color:var(--gray-500);">${escHtml(it.registered_date ?? '—')}</td>
+      <td class="col-date" style="font-size:var(--text-xs);color:var(--gray-500);">${fmtUpdatedAt(it.updated_at)}</td>
       <td><button class="btn btn-sm btn-outline" onclick="openDetailModal('${it.id}')">詳細</button></td>
     </tr>`;
   }).join('');
@@ -873,6 +903,7 @@ async function openDetailModal(id) {
       ${it.repair_history ? `<dt>修理記録</dt><dd style="white-space:pre-wrap;">${escHtml(it.repair_history)}</dd>` : ''}
       ${it.memo ? `<dt>メモ</dt><dd style="white-space:pre-wrap;">${escHtml(it.memo)}</dd>` : ''}
       <dt>登録日</dt><dd>${escHtml(it.registered_date ?? '—')}</dd>
+      <dt>更新日</dt><dd>${fmtUpdatedAt(it.updated_at)}</dd>
     </dl>
     ${lendingHtml}
   `;
@@ -1053,8 +1084,7 @@ async function loadItems() {
   const { data, error } = await _sb
     .from('instruments')
     .select('*')
-    .order('part_category', { ascending: true })
-    .order('overall_seq', { ascending: true });
+    .order('instrument_number', { ascending: true });
 
   if (error) {
     console.error('[HighasuiDX] instruments取得エラー:', error.message);
@@ -1077,6 +1107,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
     document.getElementById('btn-open-register').addEventListener('click', openRegisterModal);
   }
+
+  // ビュー切替タブ
+  document.querySelectorAll('.view-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentView = tab.dataset.view;
+
+      const isInstrument = currentView === 'instrument';
+      document.getElementById('page-title').textContent   = isInstrument ? '楽器一覧' : '備品一覧';
+      document.getElementById('page-eyebrow').textContent = isInstrument ? 'INSTRUMENTS' : 'EQUIPMENT';
+
+      // パート分類フィルタの表示切替（備品一覧では不要）
+      const catFilter = document.getElementById('filter-category');
+      catFilter.style.display = isInstrument ? '' : 'none';
+      catFilter.value = '';
+
+      renderTable();
+    });
+  });
 
   document.getElementById('search-input').addEventListener('input', renderTable);
   document.getElementById('filter-category').addEventListener('change', renderTable);
