@@ -22,16 +22,16 @@ const MAINTENANCE_CONFIG = {
   members:            false,  // 団員一覧
   scores:             false,  // 楽譜一覧
   'score-editor':     false,  // 楽譜管理（編集）
-  distribution:       false,  // 配布・貸出管理
-  repertoire:         false,  // 曲目リスト
+  distribution:       true,  // 配布・貸出管理
+  repertoire:         true,  // 曲目リスト
   ledger:             false,  // 出納帳
-  dues:               false,  // 団費登録
-  'dues-admin':       false,  // 団費管理
-  instruments:        false,  // 楽器一覧
-  'instrument-lending': false, // 楽器貸出管理
-  qrcode:             false,  // QRコード印刷
+  dues:               true,  // 団費登録
+  'dues-admin':       true,  // 団費管理
+  instruments:        true,  // 楽器一覧
+  'instrument-lending': true, // 楽器貸出管理
+  qrcode:             true,  // QRコード印刷
   contact:            false,  // 連絡網
-  requests:           false,  // 団員申請
+  requests:           true,  // 団員申請
   settings:           false,  // 設定
 };
 
