@@ -3,6 +3,45 @@
  * 共通UI部品生成・ナビゲーション管理
  */
 
+ 
+// ═══════════════════════════════════════════════════════
+//  ★ メンテナンス設定テーブル
+//
+//  各ページIDに対して true を設定するとメンテナンス中になります。
+//  メンテナンス中のページは leader のみ閲覧可能で、
+//  それ以外のユーザーにはメンテナンス案内が表示されます。
+//
+//  ページIDはURLのファイル名から拡張子を除いたものです。
+//  例: scores.html → 'scores'  /  index.html → 'dashboard'
+//
+//  【設定方法】
+//    true  → メンテナンス中（leader のみ閲覧可）
+//    false → 通常公開
+// ═══════════════════════════════════════════════════════
+const MAINTENANCE_CONFIG = {
+  dashboard:          false,  // ダッシュボード (index.html)
+  members:            false,  // 団員一覧
+  scores:             false,  // 楽譜一覧
+  'score-editor':     false,  // 楽譜管理（編集）
+  distribution:       true,  // 配布・貸出管理
+  repertoire:         true,  // 曲目リスト
+  ledger:             false,  // 出納帳
+  dues:               false,  // 団費登録
+  'dues-admin':       true,  // 団費管理
+  instruments:        true,  // 楽器一覧
+  'instrument-lending': true, // 楽器貸出管理
+  qrcode:              true,  // QRコード印刷
+  contact:            false,  // 連絡網
+  requests:           true,  // 団員申請
+  settings:           false,  // 設定
+};
+ 
+// メンテナンス中ページの閲覧を許可するロール
+// この配列にあるロールを持つユーザーは「メンテナンス中」でも閲覧できます
+const MAINTENANCE_BYPASS_ROLES = ['leader'];
+
+
+
 // ═══════════════════════════════════════════════════════
 //  ★ 権限設定テーブル（ここを編集するだけで全ページの
 //    表示・操作権限を変更できます）
