@@ -3,7 +3,6 @@
  * 共通UI部品生成・ナビゲーション管理
  */
 
- 
 // ═══════════════════════════════════════════════════════
 //  ★ メンテナンス設定テーブル
 //
@@ -23,24 +22,22 @@ const MAINTENANCE_CONFIG = {
   members:            false,  // 団員一覧
   scores:             false,  // 楽譜一覧
   'score-editor':     false,  // 楽譜管理（編集）
-  distribution:       true,  // 配布・貸出管理
-  repertoire:         true,  // 曲目リスト
+  distribution:       false,  // 配布・貸出管理
+  repertoire:         false,  // 曲目リスト
   ledger:             false,  // 出納帳
   dues:               false,  // 団費登録
-  'dues-admin':       true,  // 団費管理
-  instruments:        true,  // 楽器一覧
-  'instrument-lending': true, // 楽器貸出管理
-  qrcode:              true,  // QRコード印刷
+  'dues-admin':       false,  // 団費管理
+  instruments:        false,  // 楽器一覧
+  'instrument-lending': false, // 楽器貸出管理
+  qrcode:             false,  // QRコード印刷
   contact:            false,  // 連絡網
-  requests:           true,  // 団員申請
+  requests:           false,  // 団員申請
   settings:           false,  // 設定
 };
- 
+
 // メンテナンス中ページの閲覧を許可するロール
 // この配列にあるロールを持つユーザーは「メンテナンス中」でも閲覧できます
-const MAINTENANCE_BYPASS_ROLES = ['leader'];
-
-
+const MAINTENANCE_BYPASS_ROLES = ['leader', 'gm'];
 
 // ═══════════════════════════════════════════════════════
 //  ★ 権限設定テーブル（ここを編集するだけで全ページの
@@ -263,6 +260,156 @@ function getCurrentPageId() {
 }
 
 // ─────────────────────────────────────────
+// ページ表示名を取得（メンテナンス案内用）
+// ─────────────────────────────────────────
+function getPageLabel(pageId) {
+  const labels = {
+    dashboard:            'ダッシュボード',
+    members:              '団員一覧',
+    scores:               '楽譜管理',
+    'score-editor':       '楽譜管理（編集）',
+    distribution:         '配布・貸出管理',
+    repertoire:           '曲目リスト',
+    ledger:               '出納帳',
+    dues:                 '団費登録',
+    'dues-admin':         '団費管理',
+    instruments:          '楽器一覧',
+    'instrument-lending': '楽器貸出管理',
+    qrcode:               'QRコード印刷',
+    contact:              '連絡網',
+    requests:             '団員申請',
+    settings:             '設定',
+  };
+  return labels[pageId] ?? pageId;
+}
+
+// ─────────────────────────────────────────
+// メンテナンスチェック
+// 戻り値: true = メンテナンス中かつアクセス不可
+// ─────────────────────────────────────────
+function isPageUnderMaintenance(pageId) {
+  return MAINTENANCE_CONFIG[pageId] === true;
+}
+
+function canBypassMaintenance() {
+  const user = getSessionUser();
+  if (!user) return false;
+  const userRoles = Array.isArray(user.roles) ? user.roles : [user.role].filter(Boolean);
+  return userRoles.some(r => MAINTENANCE_BYPASS_ROLES.includes(r));
+}
+
+// ─────────────────────────────────────────
+// メンテナンス案内オーバーレイを表示
+// ページ全体のコンテンツをブロックする
+// ─────────────────────────────────────────
+function showMaintenanceOverlay(pageId) {
+  const pageName = getPageLabel(pageId);
+
+  // すでに存在する場合はスキップ
+  if (document.getElementById('maintenance-overlay')) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'maintenance-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    inset: 0;
+    z-index: 8000;
+    background: var(--gray-100);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+  `;
+
+  overlay.innerHTML = `
+    <div style="
+      width: 100%;
+      max-width: 480px;
+      background: var(--white);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--gray-200);
+      box-shadow: var(--shadow-lg);
+      padding: var(--space-10) var(--space-8);
+      text-align: center;
+      animation: fadeInUp 0.4s ease both;
+    ">
+      <div style="
+        width: 72px; height: 72px;
+        background: var(--navy-900);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto var(--space-6);
+      ">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+             stroke="var(--gold-400)" stroke-width="1.5" width="36" height="36">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877
+               M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766
+               M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63
+               m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336
+               l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276
+               a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95
+               l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5
+               L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437
+               m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/>
+        </svg>
+      </div>
+      <p style="
+        font-size: var(--text-xs); font-weight: 500;
+        color: var(--gold-500); letter-spacing: 0.2em;
+        text-transform: uppercase; margin-bottom: var(--space-3);
+      ">MAINTENANCE</p>
+      <h1 style="
+        font-family: var(--font-display);
+        font-size: var(--text-2xl); font-weight: 700;
+        color: var(--navy-800); margin-bottom: var(--space-4);
+        line-height: 1.3;
+      ">「${pageName}」は<br>ただいまメンテナンス中です。</h1>
+      <p style="
+        font-size: var(--text-sm); color: var(--gray-500); line-height: 1.8;
+        margin-bottom: var(--space-8);
+      ">運用再開までお待ちください。</p>
+      <a href="${window.location.pathname.includes('/pages/') ? '../' : ''}index.html"
+         style="
+           display: inline-flex; align-items: center; gap: var(--space-2);
+           padding: var(--space-3) var(--space-6);
+           background: var(--navy-800); color: var(--gold-300);
+           border-radius: var(--radius-md); font-size: var(--text-sm);
+           font-weight: 500; text-decoration: none;
+           transition: background var(--transition-fast);
+         "
+         onmouseover="this.style.background='var(--navy-700)'"
+         onmouseout="this.style.background='var(--navy-800)'">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+             stroke="currentColor" stroke-width="2" width="15" height="15">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>
+        </svg>
+        ダッシュボードに戻る
+      </a>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // メインコンテンツをスクロール不可にする
+  document.body.style.overflow = 'hidden';
+}
+
+// ─────────────────────────────────────────
+// メンテナンス判定を実行してオーバーレイ表示
+// DOMContentLoaded 内で呼び出す
+// ─────────────────────────────────────────
+function checkMaintenance() {
+  const pageId = getCurrentPageId();
+  if (isPageUnderMaintenance(pageId) && !canBypassMaintenance()) {
+    showMaintenanceOverlay(pageId);
+    return true; // メンテナンス中
+  }
+  return false; // 通常表示
+}
+
+// ─────────────────────────────────────────
 // ヘッダー生成（役職バッジ付き）
 // ─────────────────────────────────────────
 function renderHeader(options = {}) {
@@ -331,15 +478,21 @@ function renderSidebar() {
     html += `
       <div class="sidebar-section">
         <p class="sidebar-section__label">${section.label}</p>
-        ${visibleItems.map(item => `
+        ${visibleItems.map(item => {
+          const isMaintenance = isPageUnderMaintenance(item.id);
+          const maintenanceBadge = (isMaintenance && canBypassMaintenance())
+            ? `<span class="sidebar-badge" style="background:var(--warning);color:var(--white);font-size:9px;">工事中</span>`
+            : '';
+          return `
           <a href="${rootPrefix}${item.href}"
              class="sidebar-item ${item.id === currentPageId ? 'active' : ''}"
              data-page="${item.id}">
             ${item.icon}
             <span>${item.label}</span>
             ${item.badge ? `<span class="sidebar-badge">${item.badge}</span>` : ''}
-          </a>
-        `).join('')}
+            ${maintenanceBadge}
+          </a>`;
+        }).join('')}
       </div>
     `;
   });
@@ -434,6 +587,11 @@ document.addEventListener('DOMContentLoaded', () => {
   renderHeader({ currentUser: sessionUser });
   renderSidebar();
   initMobileMenu();
+
+  // ── メンテナンスチェック ──
+  // メンテナンス中のページは、MAINTENANCE_BYPASS_ROLES 以外のユーザーに
+  // オーバーレイを表示してコンテンツをブロックする
+  checkMaintenance();
 
   // モーダル外クリックで閉じる
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
