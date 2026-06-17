@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>活動記録 — 東大阪吹奏楽団</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/common.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* ── タブ ── */
+    .act-tabs {
+      display:flex;gap:0;border-bottom:2px solid var(--gray-200);margin-bottom:var(--space-8);flex-wrap:wrap;
+    }
+    .act-tab {
+      padding:var(--space-3) var(--space-6);font-size:var(--text-sm);font-weight:500;
+      color:var(--gray-500);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;
+      transition:all var(--transition-fast);background:none;border-top:none;border-left:none;border-right:none;
+    }
+    .act-tab:hover { color:var(--navy-700); }
+    .act-tab.active { color:var(--navy-800);border-bottom-color:var(--gold-500);font-weight:700; }
+    .act-panel { display:none; }
+    .act-panel.active { display:block; }
+
+    /* ── ツールバー ── */
+    .toolbar {
+      display:flex;gap:var(--space-3);flex-wrap:wrap;align-items:center;margin-bottom:var(--space-5);
+    }
+    .toolbar input, .toolbar select { flex:1;min-width:140px; }
+
+    /* ── テーブルラッパー ── */
+    .act-table-wrap {
+      border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--gray-200);
+      overflow-x:auto;-webkit-overflow-scrolling:touch;
+    }
+    .act-table-wrap .table { min-width:720px; }
+
+    /* ── 活動種別バッジ ── */
+    .type-practice { background:rgba(26,46,74,.1); color:var(--navy-700); }
+    .type-concert  { background:rgba(201,168,76,.18); color:#8a6f1e; }
+    .type-event    { background:rgba(39,174,96,.12); color:#1e8449; }
+    .type-meeting  { background:rgba(230,126,34,.12); color:#ca6f1e; }
+    .type-other    { background:var(--gray-200);color:var(--gray-500); }
+
+    /* ── 参加状況バッジ ── */
+    .att-attending   { background:rgba(39,174,96,.12);  color:#1e8449; }
+    .att-absent      { background:rgba(192,57,43,.12);  color:var(--danger); }
+    .att-late        { background:rgba(230,126,34,.12); color:#ca6f1e; }
+    .att-early_leave { background:rgba(41,128,185,.12); color:#1a5276; }
+    .att-none        { background:var(--gray-200);color:var(--gray-400); }
+
+    /* ── サマリーバー ── */
+    .att-summary {
+      display:flex;gap:var(--space-3);flex-wrap:wrap;
+      margin-bottom:var(--space-4);
+    }
+    .att-summary__item {
+      display:flex;align-items:center;gap:var(--space-2);
+      padding:var(--space-2) var(--space-4);border-radius:var(--radius-full);
+      font-size:var(--text-sm);font-weight:600;border:1px solid transparent;
+    }
+    .att-summary__count { font-family:var(--font-numeric);font-size:var(--text-lg); }
+
+    /* ── 活動選択ドロップダウン ── */
+    .att-select-wrap { margin-bottom:var(--space-5);max-width:480px; }
+
+    /* ── フォームグリッド ── */
+    .form-grid-2 { display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4); }
+    .section-label {
+      font-size:var(--text-xs);font-weight:700;color:var(--gold-500);
+      letter-spacing:.15em;text-transform:uppercase;
+      border-bottom:1px solid var(--gray-200);
+      padding-bottom:var(--space-2);margin-bottom:var(--space-4);margin-top:var(--space-6);
+    }
+    .section-label:first-child { margin-top:0; }
+
+    /* ── キャンセル斜線 ── */
+    .cancelled-row td { opacity:.5;text-decoration:line-through; }
+    .cancelled-row td:last-child { text-decoration:none;opacity:1; }
+
+    @media(max-width:768px){
+      .act-tab { padding:var(--space-2) var(--space-3);font-size:var(--text-xs); }
+      .toolbar { flex-direction:column; }
+      .toolbar input,.toolbar select { width:100%;max-width:none; }
+      .form-grid-2 { grid-template-columns:1fr; }
+      .act-table-wrap .table { min-width:unset;width:100%; }
+      .col-time,.col-location { display:none; }
+    }
+  </style>
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main-content">
+
+    <div class="page-header fade-in">
+      <div>
+        <p class="page-header__eyebrow">SCHEDULE · ADMIN</p>
+        <h1 class="page-header__title">活動記録</h1>
+      </div>
+      <div class="page-header__actions" id="header-actions">
+        <button class="btn btn-gold" id="btn-add-activity">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+          活動を追加
+        </button>
+      </div>
+    </div>
+
+    <!-- タブ -->
+    <div class="act-tabs fade-in fade-in-1">
+      <button class="act-tab active" data-tab="list">活動一覧</button>
+      <button class="act-tab" data-tab="attendance">参加状況確認</button>
+    </div>
+
+    <!-- ── 活動一覧タブ ── -->
+    <div class="act-panel active" id="panel-list">
+      <div class="toolbar fade-in fade-in-2">
+        <input type="text" id="search-input" class="form-control" placeholder="タイトル・場所で検索…">
+        <select id="filter-type" class="form-control" style="max-width:180px;">
+          <option value="">すべての種別</option>
+          <option value="practice">練習</option>
+          <option value="concert">演奏会</option>
+          <option value="event">イベント</option>
+          <option value="meeting">ミーティング</option>
+          <option value="other">その他</option>
+        </select>
+        <select id="filter-period" class="form-control" style="max-width:180px;">
+          <option value="upcoming">今後の予定</option>
+          <option value="past">過去の記録</option>
+          <option value="all">すべて</option>
+        </select>
+      </div>
+
+      <div class="act-table-wrap fade-in fade-in-3">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:110px;">日付</th>
+              <th style="width:90px;">種別</th>
+              <th>タイトル</th>
+              <th class="col-time" style="width:110px;">時間</th>
+              <th class="col-location">場所</th>
+              <th style="width:80px;text-align:center;">参加登録</th>
+              <th style="width:100px;"></th>
+            </tr>
+          </thead>
+          <tbody id="activity-tbody">
+            <tr><td colspan="7" style="text-align:center;padding:var(--space-10);">
+              <div class="loading-spinner" style="margin:0 auto var(--space-3);"></div>
+              <p style="font-size:var(--text-sm);color:var(--gray-500);">読み込み中…</p>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── 参加状況確認タブ ── -->
+    <div class="act-panel" id="panel-attendance">
+      <div class="att-select-wrap fade-in fade-in-2">
+        <div class="form-group">
+          <label class="form-label">活動を選択</label>
+          <select id="att-activity-select" class="form-control">
+            <option value="">— 活動を選んでください —</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="att-content">
+        <div style="text-align:center;padding:var(--space-16);color:var(--gray-500);">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1" width="48" height="48" style="margin:0 auto var(--space-4);opacity:.3;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/>
+          </svg>
+          <p style="font-size:var(--text-sm);">上のドロップダウンで活動を選択してください。</p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══ 活動 追加/編集 モーダル ══ -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal__header">
+      <h2 class="modal__title" id="modal-edit-title">活動を追加</h2>
+      <button class="modal__close" onclick="closeModal('modal-edit')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+
+      <p class="section-label">基本情報</p>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">種別 <span class="required">*</span></label>
+          <select id="edit-type" class="form-control">
+            <option value="practice">練習</option>
+            <option value="concert">演奏会</option>
+            <option value="event">イベント</option>
+            <option value="meeting">ミーティング</option>
+            <option value="other">その他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">日付 <span class="required">*</span></label>
+          <input type="date" id="edit-date" class="form-control">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">タイトル <span class="required">*</span></label>
+        <input type="text" id="edit-title" class="form-control" placeholder="例：6月 定期練習">
+      </div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">開始時間</label>
+          <input type="time" id="edit-start-time" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">終了時間</label>
+          <input type="time" id="edit-end-time" class="form-control">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">場所</label>
+        <input type="text" id="edit-location" class="form-control" placeholder="例：東大阪市民会館 大ホール">
+      </div>
+
+      <p class="section-label">詳細・メモ</p>
+      <div class="form-group">
+        <textarea id="edit-description" class="form-control" rows="3" style="resize:vertical;" placeholder="持ち物・連絡事項など"></textarea>
+      </div>
+
+      <p class="section-label">ステータス</p>
+      <div class="form-group">
+        <label style="display:inline-flex;align-items:center;gap:var(--space-3);cursor:pointer;padding:var(--space-3) var(--space-4);background:rgba(192,57,43,.06);border:1px solid rgba(192,57,43,.2);border-radius:var(--radius-md);">
+          <input type="checkbox" id="edit-cancelled" style="width:18px;height:18px;accent-color:var(--danger);">
+          <div>
+            <div style="font-weight:700;color:var(--navy-800);font-size:var(--text-sm);">中止・キャンセル</div>
+            <div style="font-size:var(--text-xs);color:var(--gray-500);">チェックを入れると一覧で「中止」として表示されます。</div>
+          </div>
+        </label>
+      </div>
+
+    </div>
+    <div class="modal__footer" style="justify-content:space-between;">
+      <button class="btn btn-danger" id="btn-delete-activity" style="display:none;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+        削除
+      </button>
+      <div style="display:flex;gap:var(--space-3);">
+        <button class="btn btn-outline" onclick="closeModal('modal-edit')">キャンセル</button>
+        <button class="btn btn-gold" id="btn-save-activity">保存する</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<script src="../js/supabase.js"></script>
+<script src="../js/common.js"></script>
+<script>
+// ══════════════════════════════════════
+//  設定
+// ══════════════════════════════════════
+const ACTIVITY_GAS_URL = 'https://script.google.com/macros/s/AKfycbzpDrOSmqliAEMOsPsTMIuiU8ScAxqLGFpOfdi-nGJ5TK2gVK95Pr4F5H4D4ceP-16R/exec';
+
+const TYPE_LABELS = { practice:'練習', concert:'演奏会', event:'イベント', meeting:'ミーティング', other:'その他' };
+const TYPE_CSS    = { practice:'type-practice', concert:'type-concert', event:'type-event', meeting:'type-meeting', other:'type-other' };
+const ATT_LABELS  = { attending:'参加', absent:'不参加', late:'遅刻', early_leave:'早退' };
+const ATT_CSS     = { attending:'att-attending', absent:'att-absent', late:'att-late', early_leave:'att-early_leave' };
+const PART_LABELS = {
+  piccolo:'Pic',flute:'Fl',oboe:'Ob',clarinet:'Cl',bassclarinet:'B.Cl',bassoon:'Fg',
+  ssaxophone:'S.Sax',asaxophone:'A.Sax',tsaxophone:'T.Sax',bsaxophone:'B.Sax',
+  horn:'Hr',trumpet:'Tp',trombone:'Tb',euphonium:'Euph',tuba:'Tu',
+  percussion:'Perc',contrabass:'CB',piano:'Pf',staff:'Staff',other:'他',
+};
+
+// ── 状態 ──
+let allActivities = [];
+let allMembers    = [];
+let allAttendance = {}; // { activityId: [records] }
+let editingId     = null;
+const isGasOk = () => ACTIVITY_GAS_URL && !ACTIVITY_GAS_URL.includes('YOUR_ACTIVITY');
+
+// ── ユーティリティ ──
+const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d + 'T00:00:00');
+  const DAYS = ['日','月','火','水','木','金','土'];
+  return `${dt.getMonth()+1}/${dt.getDate()}(${DAYS[dt.getDay()]})`;
+}
+
+function fmtTime(t) { return t ? t.slice(0,5) : ''; }
+
+// ══════════════════════════════════════
+//  データ取得
+// ══════════════════════════════════════
+async function loadActivities() {
+  if (!_sb) return;
+  const { data, error } = await _sb
+    .from('activities')
+    .select('*')
+    .order('activity_date', { ascending: false });
+  if (!error) allActivities = data ?? [];
+}
+
+async function loadMembers() {
+  if (!_sb) return;
+  const { data } = await _sb
+    .from('profiles')
+    .select('id,last_name,first_name,part,category')
+    .order('part').order('last_name');
+  allMembers = (data ?? []).filter(m => m.category !== 'rest');
+}
+
+async function loadAllAttendance() {
+  if (!isGasOk()) return;
+  try {
+    const res  = await fetch(`${ACTIVITY_GAS_URL}?action=getAllAttendanceAll`, { method:'GET', redirect:'follow' });
+    const json = await res.json();
+    if (json.ok) allAttendance = json.data ?? {};
+  } catch (e) { console.warn('参加状況取得失敗:', e.message); }
+}
+
+async function loadAttendanceForActivity(activityId) {
+  if (!isGasOk()) return [];
+  try {
+    const res  = await fetch(`${ACTIVITY_GAS_URL}?action=getAllAttendance&activityId=${encodeURIComponent(activityId)}`, { method:'GET', redirect:'follow' });
+    const json = await res.json();
+    return json.ok ? (json.data ?? []) : [];
+  } catch (e) { return []; }
+}
+
+// ══════════════════════════════════════
+//  活動一覧テーブル
+// ══════════════════════════════════════
+function renderActivityTable() {
+  const kw     = document.getElementById('search-input')?.value.toLowerCase() ?? '';
+  const type   = document.getElementById('filter-type')?.value ?? '';
+  const period = document.getElementById('filter-period')?.value ?? 'upcoming';
+  const today  = new Date().toISOString().slice(0,10);
+
+  const filtered = allActivities.filter(a => {
+    const text = `${a.title}${a.location ?? ''}`.toLowerCase();
+    if (kw   && !text.includes(kw))               return false;
+    if (type && a.activity_type !== type)           return false;
+    if (period === 'upcoming' && a.activity_date < today) return false;
+    if (period === 'past'     && a.activity_date >= today) return false;
+    return true;
+  });
+
+  const tbody = document.getElementById('activity-tbody');
+  if (!tbody) return;
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:var(--space-10);color:var(--gray-500);">活動が登録されていません</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(a => {
+    const records = allAttendance[a.id] ?? [];
+    const attCount = records.length;
+    const typeBadge = `<span class="badge ${TYPE_CSS[a.activity_type] ?? ''}">${TYPE_LABELS[a.activity_type] ?? a.activity_type}</span>`;
+    const timeStr   = fmtTime(a.start_time) + (a.end_time ? ` — ${fmtTime(a.end_time)}` : '');
+
+    return `
+      <tr class="${a.is_cancelled ? 'cancelled-row' : ''}">
+        <td style="font-weight:600;color:var(--navy-800);white-space:nowrap;">${escHtml(fmtDate(a.activity_date))}</td>
+        <td>${typeBadge}${a.is_cancelled ? `<span class="badge badge-danger" style="margin-left:4px;font-size:10px;">中止</span>` : ''}</td>
+        <td>
+          <div style="font-weight:600;color:var(--navy-800);">${escHtml(a.title)}</div>
+          ${a.description ? `<div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:2px;">${escHtml(a.description.slice(0,50))}${a.description.length>50?'…':''}</div>` : ''}
+        </td>
+        <td class="col-time" style="font-size:var(--text-sm);white-space:nowrap;">${escHtml(timeStr)||'—'}</td>
+        <td class="col-location" style="font-size:var(--text-sm);color:var(--gray-600);">${escHtml(a.location||'—')}</td>
+        <td style="text-align:center;">
+          <button class="btn btn-sm btn-outline" onclick="jumpToAttendance('${a.id}')"
+            style="font-size:11px;padding:3px 10px;">
+            ${attCount ? `${attCount}名` : '0名'}
+          </button>
+        </td>
+        <td>
+          <button class="btn btn-sm btn-outline" onclick="openEditModal('${a.id}')">編集</button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// 参加状況タブへジャンプ
+function jumpToAttendance(activityId) {
+  document.querySelector('.act-tab[data-tab="attendance"]').click();
+  const sel = document.getElementById('att-activity-select');
+  if (sel) { sel.value = activityId; renderAttendance(activityId); }
+}
+
+// ══════════════════════════════════════
+//  参加状況タブ
+// ══════════════════════════════════════
+function buildAttendanceSelect() {
+  const sel = document.getElementById('att-activity-select');
+  if (!sel) return;
+  const today = new Date().toISOString().slice(0,10);
+  const sorted = [...allActivities].sort((a,b) => b.activity_date.localeCompare(a.activity_date));
+  sel.innerHTML = `<option value="">— 活動を選んでください —</option>` +
+    sorted.map(a => {
+      const upcoming = a.activity_date >= today;
+      return `<option value="${a.id}">[${upcoming?'予定':'済'}] ${fmtDate(a.activity_date)} ${escHtml(a.title)}</option>`;
+    }).join('');
+}
+
+async function renderAttendance(activityId) {
+  const content = document.getElementById('att-content');
+  if (!activityId) {
+    content.innerHTML = `<div style="text-align:center;padding:var(--space-10);color:var(--gray-500);">活動を選択してください。</div>`;
+    return;
+  }
+
+  const activity = allActivities.find(a => a.id === activityId);
+  if (!activity) return;
+
+  content.innerHTML = `<div style="text-align:center;padding:var(--space-6);"><div class="loading-spinner" style="margin:0 auto;"></div></div>`;
+
+  const records = await loadAttendanceForActivity(activityId);
+  // memberId→record のマップ
+  const recMap = {};
+  records.forEach(r => { recMap[r.memberId] = r; });
+
+  // 集計
+  const counts = { attending:0, absent:0, late:0, early_leave:0, none:0 };
+  allMembers.forEach(m => {
+    const rec = recMap[m.id];
+    if (rec) counts[rec.status] = (counts[rec.status] || 0) + 1;
+    else counts.none++;
+  });
+
+  const typeBadge = `<span class="badge ${TYPE_CSS[activity.activity_type] ?? ''}">${TYPE_LABELS[activity.activity_type] ?? ''}</span>`;
+  const timeStr   = fmtTime(activity.start_time) + (activity.end_time ? ` — ${fmtTime(activity.end_time)}` : '');
+
+  const tableRows = allMembers.map(m => {
+    const rec    = recMap[m.id];
+    const status = rec?.status ?? null;
+    const badgeClass = status ? (ATT_CSS[status] || '') : 'att-none';
+    const badgeLabel = status ? (ATT_LABELS[status] || status) : '未登録';
+    const part   = PART_LABELS[m.part] ?? m.part ?? '—';
+    const regAt  = rec?.registeredAt ? new Date(rec.registeredAt).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+
+    return `<tr>
+      <td style="font-weight:600;color:var(--navy-800);">${escHtml(m.last_name)} ${escHtml(m.first_name)}</td>
+      <td style="font-size:var(--text-sm);">${escHtml(part)}</td>
+      <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
+      <td style="font-size:var(--text-sm);color:var(--gray-600);">${escHtml(rec?.note || '—')}</td>
+      <td style="font-size:var(--text-xs);color:var(--gray-400);white-space:nowrap;">${escHtml(regAt)}</td>
+    </tr>`;
+  }).join('');
+
+  content.innerHTML = `
+    <!-- 活動情報ヘッダー -->
+    <div class="card mb-5">
+      <div class="card__body" style="padding:var(--space-4) var(--space-5);">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:var(--space-3);">
+          <div>
+            ${typeBadge}
+            <p style="font-size:var(--text-xl);font-weight:700;color:var(--navy-800);margin-top:var(--space-1);">${escHtml(activity.title)}</p>
+            <p style="font-size:var(--text-sm);color:var(--gray-500);">
+              📅 ${escHtml(activity.activity_date)}（${fmtDate(activity.activity_date).split('(')[1]?.replace(')','') || ''}）
+              ${timeStr ? ` ⏱ ${escHtml(timeStr)}` : ''}
+              ${activity.location ? ` 📍 ${escHtml(activity.location)}` : ''}
+            </p>
+          </div>
+          <button class="btn btn-outline" onclick="printAttendance('${activityId}')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.056 48.056 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z"/></svg>
+            PDF印刷・ダウンロード
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 集計バー -->
+    <div class="att-summary mb-4">
+      <div class="att-summary__item" style="background:rgba(39,174,96,.1);border-color:rgba(39,174,96,.3);">
+        <span class="att-summary__count" style="color:#1e8449;">${counts.attending}</span>
+        <span style="font-size:var(--text-sm);color:#1e8449;">参加</span>
+      </div>
+      <div class="att-summary__item" style="background:rgba(192,57,43,.08);border-color:rgba(192,57,43,.25);">
+        <span class="att-summary__count" style="color:var(--danger);">${counts.absent}</span>
+        <span style="font-size:var(--text-sm);color:var(--danger);">不参加</span>
+      </div>
+      <div class="att-summary__item" style="background:rgba(230,126,34,.08);border-color:rgba(230,126,34,.25);">
+        <span class="att-summary__count" style="color:#ca6f1e;">${counts.late}</span>
+        <span style="font-size:var(--text-sm);color:#ca6f1e;">遅刻</span>
+      </div>
+      <div class="att-summary__item" style="background:rgba(41,128,185,.08);border-color:rgba(41,128,185,.25);">
+        <span class="att-summary__count" style="color:#1a5276;">${counts.early_leave}</span>
+        <span style="font-size:var(--text-sm);color:#1a5276;">早退</span>
+      </div>
+      <div class="att-summary__item" style="background:var(--gray-100);border-color:var(--gray-300);">
+        <span class="att-summary__count" style="color:var(--gray-500);">${counts.none}</span>
+        <span style="font-size:var(--text-sm);color:var(--gray-500);">未登録</span>
+      </div>
+    </div>
+
+    <!-- 団員テーブル -->
+    <div style="border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--gray-200);overflow-x:auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>氏名</th>
+            <th style="width:60px;">パート</th>
+            <th style="width:80px;">参加状況</th>
+            <th>メモ</th>
+            <th style="width:110px;">登録日時</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows || '<tr><td colspan="5" style="text-align:center;padding:var(--space-6);color:var(--gray-500);">団員データがありません</td></tr>'}</tbody>
+      </table>
+    </div>`;
+}
+
+// ══════════════════════════════════════
+//  PDF印刷
+// ══════════════════════════════════════
+async function printAttendance(activityId) {
+  const activity = allActivities.find(a => a.id === activityId);
+  if (!activity) return;
+
+  const records = await loadAttendanceForActivity(activityId);
+  const recMap  = {};
+  records.forEach(r => { recMap[r.memberId] = r; });
+
+  const ATT_LABELS = { attending:'参加', absent:'不参加', late:'遅刻', early_leave:'早退' };
+  const fmtT  = t => t ? t.slice(0,5) : '';
+  const timeStr = fmtT(activity.start_time) + (activity.end_time ? ` ～ ${fmtT(activity.end_time)}` : '');
+  const today = new Date().toLocaleDateString('ja-JP', {year:'numeric',month:'long',day:'numeric'});
+
+  const rows = allMembers.map(m => {
+    const rec = recMap[m.id];
+    const status = rec ? (ATT_LABELS[rec.status] ?? rec.status) : '未登録';
+    const statusColor = !rec ? '#999' : rec.status === 'attending' ? '#1e8449' : rec.status === 'absent' ? '#c0392b' : rec.status === 'late' ? '#ca6f1e' : '#1a5276';
+    return `<tr>
+      <td>${m.last_name} ${m.first_name}</td>
+      <td>${PART_LABELS[m.part] ?? m.part ?? ''}</td>
+      <td style="color:${statusColor};font-weight:bold;">${status}</td>
+      <td>${rec?.note ?? ''}</td>
+    </tr>`;
+  }).join('');
+
+  const counts = { attending:0, absent:0, late:0, early_leave:0, none:0 };
+  allMembers.forEach(m => {
+    const s = recMap[m.id]?.status;
+    if (s) counts[s] = (counts[s]||0)+1;
+    else counts.none++;
+  });
+
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+  <title>参加登録状況 — ${activity.title}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Noto Sans JP',sans-serif;font-size:12px;color:#1a1a1a;padding:20mm 15mm;}
+    h1{font-size:18px;font-weight:700;color:#132238;margin-bottom:6px;}
+    .meta{font-size:11px;color:#555;margin-bottom:16px;display:flex;gap:16px;flex-wrap:wrap;}
+    .summary{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+    .sum-item{padding:4px 14px;border-radius:20px;font-weight:700;font-size:11px;}
+    table{width:100%;border-collapse:collapse;font-size:11px;}
+    th{background:#132238;color:#c9a84c;padding:6px 8px;text-align:left;font-weight:600;}
+    td{padding:5px 8px;border-bottom:1px solid #e0e0e0;}
+    tr:nth-child(even) td{background:#f9f9f9;}
+    .footer{margin-top:20px;font-size:10px;color:#999;text-align:right;}
+    @media print{body{padding:10mm;}}
+  </style></head><body>
+  <h1>${activity.title}</h1>
+  <div class="meta">
+    <span>📅 ${activity.activity_date} (${fmtDate(activity.activity_date).split('(')[1]?.replace(')','') || ''})</span>
+    ${timeStr ? `<span>⏱ ${timeStr}</span>` : ''}
+    ${activity.location ? `<span>📍 ${activity.location}</span>` : ''}
+    <span>出力日：${today}</span>
+  </div>
+  <div class="summary">
+    <span class="sum-item" style="background:rgba(39,174,96,.15);color:#1e8449;">参加 ${counts.attending}名</span>
+    <span class="sum-item" style="background:rgba(192,57,43,.12);color:#c0392b;">不参加 ${counts.absent}名</span>
+    <span class="sum-item" style="background:rgba(230,126,34,.1);color:#ca6f1e;">遅刻 ${counts.late}名</span>
+    <span class="sum-item" style="background:rgba(41,128,185,.1);color:#1a5276;">早退 ${counts.early_leave}名</span>
+    <span class="sum-item" style="background:#eee;color:#777;">未登録 ${counts.none}名</span>
+  </div>
+  <table>
+    <thead><tr><th>氏名</th><th>パート</th><th>参加状況</th><th>メモ</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">東大阪吹奏楽団 DXシステム</div>
+  <script>window.onload=()=>{window.print();}<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
+// ══════════════════════════════════════
+//  追加・編集モーダル
+// ══════════════════════════════════════
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modal-edit-title').textContent = '活動を追加';
+  document.getElementById('edit-type').value = 'practice';
+  document.getElementById('edit-date').value = '';
+  document.getElementById('edit-title').value = '';
+  document.getElementById('edit-start-time').value = '';
+  document.getElementById('edit-end-time').value = '';
+  document.getElementById('edit-location').value = '';
+  document.getElementById('edit-description').value = '';
+  document.getElementById('edit-cancelled').checked = false;
+  document.getElementById('btn-delete-activity').style.display = 'none';
+  openModal('modal-edit');
+}
+
+function openEditModal(id) {
+  const a = allActivities.find(x => x.id === id);
+  if (!a) return;
+  editingId = id;
+  document.getElementById('modal-edit-title').textContent = '活動を編集';
+  document.getElementById('edit-type').value = a.activity_type ?? 'practice';
+  document.getElementById('edit-date').value = a.activity_date ?? '';
+  document.getElementById('edit-title').value = a.title ?? '';
+  document.getElementById('edit-start-time').value = a.start_time ? a.start_time.slice(0,5) : '';
+  document.getElementById('edit-end-time').value = a.end_time ? a.end_time.slice(0,5) : '';
+  document.getElementById('edit-location').value = a.location ?? '';
+  document.getElementById('edit-description').value = a.description ?? '';
+  document.getElementById('edit-cancelled').checked = a.is_cancelled ?? false;
+  document.getElementById('btn-delete-activity').style.display = 'inline-flex';
+  openModal('modal-edit');
+}
+
+// ══════════════════════════════════════
+//  保存・削除
+// ══════════════════════════════════════
+async function saveActivity() {
+  const date  = document.getElementById('edit-date').value;
+  const title = document.getElementById('edit-title').value.trim();
+  if (!date)  { showToast('日付を入力してください', 'error'); return; }
+  if (!title) { showToast('タイトルを入力してください', 'error'); return; }
+  if (!_sb)   { showToast('Supabase未接続', 'error'); return; }
+
+  const btn = document.getElementById('btn-save-activity');
+  btn.disabled = true; btn.textContent = '保存中…';
+
+  const sessionUser = getSessionUser();
+  const payload = {
+    activity_type: document.getElementById('edit-type').value,
+    activity_date: date,
+    title,
+    start_time:   document.getElementById('edit-start-time').value || null,
+    end_time:     document.getElementById('edit-end-time').value || null,
+    location:     document.getElementById('edit-location').value.trim() || null,
+    description:  document.getElementById('edit-description').value.trim() || null,
+    is_cancelled: document.getElementById('edit-cancelled').checked,
+  };
+
+  let error;
+  if (!editingId) {
+    payload.created_by = sessionUser?.id ?? null;
+    const res = await _sb.from('activities').insert(payload).select().single();
+    error = res.error;
+    if (!error && res.data) allActivities.unshift(res.data);
+  } else {
+    const res = await _sb.from('activities').update(payload).eq('id', editingId);
+    error = res.error;
+    if (!error) {
+      const idx = allActivities.findIndex(x => x.id === editingId);
+      if (idx !== -1) Object.assign(allActivities[idx], payload);
+    }
+  }
+
+  btn.disabled = false; btn.textContent = '保存する';
+  if (error) { showToast('保存失敗: ' + error.message, 'error'); return; }
+
+  closeModal('modal-edit');
+  showToast(editingId ? '活動を更新しました' : '活動を追加しました', 'success');
+  buildAttendanceSelect();
+  renderActivityTable();
+}
+
+async function deleteActivity() {
+  if (!editingId || !_sb) return;
+  const a = allActivities.find(x => x.id === editingId);
+  if (!confirm(`「${a?.title}」を削除しますか？\n参加登録データは残ります。`)) return;
+
+  const { error } = await _sb.from('activities').delete().eq('id', editingId);
+  if (error) { showToast('削除失敗: ' + error.message, 'error'); return; }
+
+  allActivities = allActivities.filter(x => x.id !== editingId);
+  closeModal('modal-edit');
+  showToast('削除しました', 'success');
+  buildAttendanceSelect();
+  renderActivityTable();
+}
+
+// ══════════════════════════════════════
+//  初期化
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  // 権限チェック
+  if (!canDo('nav_activities')) {
+    document.getElementById('header-actions').style.display = 'none';
+  }
+
+  await Promise.all([loadActivities(), loadMembers(), loadAllAttendance()]);
+
+  renderActivityTable();
+  buildAttendanceSelect();
+
+  // タブ
+  document.querySelectorAll('.act-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.act-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.act-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
+    });
+  });
+
+  // フィルター
+  document.getElementById('search-input').addEventListener('input', renderActivityTable);
+  document.getElementById('filter-type').addEventListener('change', renderActivityTable);
+  document.getElementById('filter-period').addEventListener('change', renderActivityTable);
+
+  // 参加状況選択
+  document.getElementById('att-activity-select').addEventListener('change', e => {
+    renderAttendance(e.target.value);
+  });
+
+  // 追加ボタン
+  document.getElementById('btn-add-activity').addEventListener('click', openAddModal);
+  document.getElementById('btn-save-activity').addEventListener('click', saveActivity);
+  document.getElementById('btn-delete-activity').addEventListener('click', deleteActivity);
+});
+</script>
+</body>
+</html>

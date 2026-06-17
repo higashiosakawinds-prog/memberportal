@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>活動予定 — 東大阪吹奏楽団</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/common.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* ── フィルタータブ ── */
+    .filter-tabs {
+      display:flex;gap:var(--space-2);flex-wrap:wrap;margin-bottom:var(--space-6);
+    }
+    .filter-tab {
+      padding:var(--space-2) var(--space-5);border-radius:var(--radius-full);
+      border:1px solid var(--gray-300);font-size:var(--text-sm);font-weight:500;
+      color:var(--gray-600);cursor:pointer;background:var(--white);
+      transition:all var(--transition-fast);
+    }
+    .filter-tab:hover  { border-color:var(--navy-500);color:var(--navy-700); }
+    .filter-tab.active { background:var(--navy-800);color:var(--gold-300);border-color:var(--navy-800); }
+
+    /* ── タイムライン ── */
+    .timeline { display:flex;flex-direction:column;gap:var(--space-3); }
+
+    .timeline-month {
+      display:flex;align-items:center;gap:var(--space-3);margin:var(--space-4) 0 var(--space-2);
+    }
+    .timeline-month__label {
+      font-family:var(--font-display);font-size:var(--text-sm);font-weight:700;
+      color:var(--gold-500);letter-spacing:.15em;text-transform:uppercase;white-space:nowrap;
+    }
+    .timeline-month__line { flex:1;height:1px;background:var(--gray-200); }
+
+    /* ── 活動カード ── */
+    .activity-card {
+      background:var(--white);border:1px solid var(--gray-200);border-radius:var(--radius-lg);
+      display:grid;grid-template-columns:80px 1fr;overflow:hidden;
+      transition:box-shadow var(--transition-base),transform var(--transition-base);
+      position:relative;
+    }
+    .activity-card:hover { box-shadow:var(--shadow-md);transform:translateY(-1px); }
+    .activity-card.is-cancelled { opacity:.6; }
+    .activity-card.is-past { border-left:3px solid var(--gray-300); }
+    .activity-card.is-upcoming { border-left:3px solid var(--gold-500); }
+
+    /* 左：日付パネル */
+    .activity-card__date {
+      background:var(--navy-900);display:flex;flex-direction:column;
+      align-items:center;justify-content:center;padding:var(--space-4) var(--space-2);
+      gap:2px;
+    }
+    .activity-card__month {
+      font-size:var(--text-xs);color:var(--gold-400);letter-spacing:.1em;font-weight:500;
+    }
+    .activity-card__day {
+      font-family:var(--font-display);font-size:var(--text-3xl);font-weight:700;
+      color:var(--white);line-height:1;
+    }
+    .activity-card__weekday {
+      font-size:var(--text-xs);color:rgba(255,255,255,.5);margin-top:2px;
+    }
+    /* 曜日色 */
+    .activity-card__date.sun .activity-card__weekday { color:#f1948a; }
+    .activity-card__date.sat .activity-card__weekday { color:#7fb3f5; }
+
+    /* 右：コンテンツ */
+    .activity-card__body {
+      padding:var(--space-4) var(--space-5);display:flex;
+      flex-direction:column;gap:var(--space-2);
+    }
+    .activity-card__top {
+      display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-2);
+      flex-wrap:wrap;
+    }
+    .activity-card__title {
+      font-weight:700;color:var(--navy-800);font-size:var(--text-base);
+    }
+    .activity-card__meta {
+      display:flex;gap:var(--space-4);flex-wrap:wrap;
+      font-size:var(--text-sm);color:var(--gray-500);
+    }
+    .activity-card__meta-item {
+      display:flex;align-items:center;gap:var(--space-1);
+    }
+    .activity-card__meta-item svg { opacity:.6; }
+    .activity-card__desc {
+      font-size:var(--text-xs);color:var(--gray-500);line-height:1.7;
+    }
+    .activity-card__actions {
+      display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin-top:var(--space-1);
+    }
+
+    /* ── 参加状況バッジ（ボタン兼用） ── */
+    .att-badge {
+      display:inline-flex;align-items:center;gap:6px;padding:4px 14px;
+      border-radius:var(--radius-full);font-size:var(--text-xs);font-weight:700;
+      border:1px solid transparent;cursor:pointer;transition:all var(--transition-fast);
+    }
+    .att-badge.attending   { background:rgba(39,174,96,.12);  color:#1e8449; border-color:rgba(39,174,96,.3); }
+    .att-badge.absent      { background:rgba(192,57,43,.12);  color:var(--danger); border-color:rgba(192,57,43,.3); }
+    .att-badge.late        { background:rgba(230,126,34,.12); color:#ca6f1e; border-color:rgba(230,126,34,.3); }
+    .att-badge.early_leave { background:rgba(41,128,185,.12); color:#1a5276; border-color:rgba(41,128,185,.3); }
+    .att-badge.none        { background:var(--gray-100);color:var(--gray-400);border-color:var(--gray-300); }
+
+    /* ── 参加登録モーダル ── */
+    .status-options {
+      display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-5);
+    }
+    .status-option {
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:var(--space-2);padding:var(--space-5) var(--space-3);
+      border:2px solid var(--gray-200);border-radius:var(--radius-lg);
+      cursor:pointer;transition:all var(--transition-fast);text-align:center;
+      background:var(--white);
+    }
+    .status-option:hover { border-color:var(--navy-500);background:var(--gray-100); }
+    .status-option.selected { border-color:var(--gold-500);background:rgba(201,168,76,.08); }
+    .status-option__icon { font-size:1.8rem;line-height:1; }
+    .status-option__label { font-size:var(--text-sm);font-weight:700;color:var(--navy-800); }
+    .status-option__sub   { font-size:var(--text-xs);color:var(--gray-500); }
+
+    /* ── 活動種別バッジ ── */
+    .type-practice { background:rgba(26,46,74,.1); color:var(--navy-700); }
+    .type-concert  { background:rgba(201,168,76,.18); color:#8a6f1e; }
+    .type-event    { background:rgba(39,174,96,.12); color:#1e8449; }
+    .type-meeting  { background:rgba(230,126,34,.12); color:#ca6f1e; }
+    .type-other    { background:var(--gray-200);color:var(--gray-500); }
+
+    /* ── カレンダー追加ボタン ── */
+    .cal-btn {
+      display:inline-flex;align-items:center;gap:5px;
+      padding:3px 12px;border-radius:var(--radius-full);font-size:var(--text-xs);
+      font-weight:500;border:1px solid var(--gray-300);color:var(--gray-600);
+      background:var(--white);cursor:pointer;transition:all var(--transition-fast);
+    }
+    .cal-btn:hover { border-color:var(--navy-500);color:var(--navy-700);background:var(--gray-100); }
+
+    /* ── モーダル内活動情報 ── */
+    .modal-activity-info {
+      background:var(--gray-100);border-radius:var(--radius-md);
+      padding:var(--space-4);margin-bottom:var(--space-5);
+    }
+
+    @media(max-width:640px){
+      .activity-card { grid-template-columns:64px 1fr; }
+      .activity-card__date { padding:var(--space-3) var(--space-1); }
+      .activity-card__day  { font-size:var(--text-2xl); }
+      .activity-card__body { padding:var(--space-3) var(--space-4); }
+      .status-options { grid-template-columns:1fr 1fr; gap:var(--space-2); }
+      .status-option  { padding:var(--space-4) var(--space-2); }
+      .filter-tab     { padding:var(--space-1) var(--space-3);font-size:var(--text-xs); }
+    }
+  </style>
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main-content">
+
+    <div class="page-header fade-in">
+      <div>
+        <p class="page-header__eyebrow">SCHEDULE</p>
+        <h1 class="page-header__title">活動予定</h1>
+      </div>
+      <div class="page-header__actions">
+        <button class="btn btn-outline" id="btn-export-all-cal" title="全予定をカレンダーアプリに追加">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5m-9-6h.008v.008H12V12zm0 3h.008v.008H12v-.008zm0 3h.008v.008H12v-.008zm-3-6h.008v.008H9V12zm0 3h.008v.008H9v-.008zm0 3h.008v.008H9v-.008zm3-9h.008v.008H12V9zm3 0h.008v.008H15V9z"/></svg>
+          全予定をカレンダーに追加
+        </button>
+      </div>
+    </div>
+
+    <!-- フィルタータブ -->
+    <div class="filter-tabs fade-in fade-in-1">
+      <button class="filter-tab active" data-filter="upcoming">今後の予定</button>
+      <button class="filter-tab" data-filter="attending">参加予定のみ</button>
+      <button class="filter-tab" data-filter="past">過去の記録</button>
+      <button class="filter-tab" data-filter="all">すべて</button>
+    </div>
+
+    <!-- タイムライン -->
+    <div class="timeline fade-in fade-in-2" id="timeline">
+      <div style="text-align:center;padding:var(--space-16);color:var(--gray-500);">
+        <div class="loading-spinner" style="margin:0 auto var(--space-4);"></div>
+        <p style="font-size:var(--text-sm);">活動データを読み込み中…</p>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══ 参加登録モーダル ══ -->
+<div class="modal-overlay" id="modal-register">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal__header">
+      <h2 class="modal__title">参加登録</h2>
+      <button class="modal__close" onclick="closeModal('modal-register')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+
+      <!-- 活動情報 -->
+      <div class="modal-activity-info" id="modal-activity-info"></div>
+
+      <!-- 参加状況選択 -->
+      <p style="font-size:var(--text-sm);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-3);">参加状況を選択してください</p>
+      <div class="status-options">
+        <div class="status-option" data-status="attending" onclick="selectStatus('attending')">
+          <span class="status-option__icon">✅</span>
+          <span class="status-option__label">参加</span>
+          <span class="status-option__sub">通常どおり参加</span>
+        </div>
+        <div class="status-option" data-status="absent" onclick="selectStatus('absent')">
+          <span class="status-option__icon">❌</span>
+          <span class="status-option__label">不参加</span>
+          <span class="status-option__sub">欠席します</span>
+        </div>
+        <div class="status-option" data-status="late" onclick="selectStatus('late')">
+          <span class="status-option__icon">🕐</span>
+          <span class="status-option__label">遅刻</span>
+          <span class="status-option__sub">途中から参加</span>
+        </div>
+        <div class="status-option" data-status="early_leave" onclick="selectStatus('early_leave')">
+          <span class="status-option__icon">🚪</span>
+          <span class="status-option__label">早退</span>
+          <span class="status-option__sub">途中で退席</span>
+        </div>
+      </div>
+
+      <!-- メモ -->
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" for="att-note">メモ（任意）</label>
+        <input type="text" id="att-note" class="form-control" placeholder="例：15時頃から参加、16時30分退席予定">
+        <span class="form-hint">幹事・管理者に伝えたいことがあれば記入してください。</span>
+      </div>
+
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-register')">閉じる</button>
+      <button class="btn btn-outline btn-danger-subtle" id="btn-cancel-att" style="display:none;">
+        登録を取り消す
+      </button>
+      <button class="btn btn-gold" id="btn-submit-att" disabled>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+        登録する
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ カレンダー追加成功モーダル ══ -->
+<div class="modal-overlay" id="modal-cal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal__header">
+      <h2 class="modal__title">登録完了</h2>
+      <button class="modal__close" onclick="closeModal('modal-cal')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div style="text-align:center;padding:var(--space-6) 0;">
+        <div style="width:64px;height:64px;background:rgba(39,174,96,.12);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto var(--space-4);">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#1e8449" stroke-width="1.5" width="32" height="32"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <p style="font-size:var(--text-lg);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-2);" id="cal-success-title">参加登録が完了しました</p>
+        <p style="font-size:var(--text-sm);color:var(--gray-500);line-height:1.7;" id="cal-success-desc"></p>
+      </div>
+      <div class="alert alert-info">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5"/></svg>
+        <span style="font-size:var(--text-sm);">この活動をカレンダーアプリに追加できます。ダウンロードしたファイルを開くと自動でカレンダーに登録されます。</span>
+      </div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-cal')">閉じる</button>
+      <button class="btn btn-gold" id="btn-add-calendar">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5"/></svg>
+        カレンダーに追加する
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<script src="../js/supabase.js"></script>
+<script src="../js/common.js"></script>
+<script>
+// ══════════════════════════════════════
+//  設定
+// ══════════════════════════════════════
+const ACTIVITY_GAS_URL = 'https://script.google.com/macros/s/AKfycbzpDrOSmqliAEMOsPsTMIuiU8ScAxqLGFpOfdi-nGJ5TK2gVK95Pr4F5H4D4ceP-16R/exec';
+
+const TYPE_LABELS = { practice:'練習', concert:'演奏会', event:'イベント', meeting:'ミーティング', other:'その他' };
+const TYPE_CSS    = { practice:'type-practice', concert:'type-concert', event:'type-event', meeting:'type-meeting', other:'type-other' };
+const ATT_LABELS  = { attending:'参加', absent:'不参加', late:'遅刻', early_leave:'早退' };
+const ATT_CSS     = { attending:'attending', absent:'absent', late:'late', early_leave:'early_leave' };
+const ATT_ICON    = { attending:'✅', absent:'❌', late:'🕐', early_leave:'🚪' };
+const WEEKDAYS    = ['日','月','火','水','木','金','土'];
+
+// ── 状態 ──
+let allActivities = [];
+let myAttendance  = {};  // { activityId: { status, note, registeredAt } }
+let currentFilter = 'upcoming';
+let pendingActivity = null;   // 登録中の活動
+let selectedStatus  = null;   // 選択された参加状況
+const isGasOk = () => ACTIVITY_GAS_URL && !ACTIVITY_GAS_URL.includes('YOUR_ACTIVITY');
+
+// ── ユーティリティ ──
+const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function fmtTime(t) { return t ? t.slice(0,5) : ''; }
+
+// ══════════════════════════════════════
+//  データ取得
+// ══════════════════════════════════════
+async function loadActivities() {
+  if (!_sb) return;
+  const { data, error } = await _sb
+    .from('activities')
+    .select('*')
+    .eq('is_cancelled', false)
+    .order('activity_date', { ascending: true });
+  if (!error) allActivities = data ?? [];
+}
+
+async function loadMyAttendance() {
+  const user = getSessionUser();
+  if (!user || !isGasOk()) return;
+  try {
+    const res  = await fetch(
+      `${ACTIVITY_GAS_URL}?action=getMyAttendance&memberId=${encodeURIComponent(user.id)}`,
+      { method:'GET', redirect:'follow' }
+    );
+    const json = await res.json();
+    if (json.ok) myAttendance = json.data ?? {};
+  } catch (e) { console.warn('参加状況取得失敗:', e.message); }
+}
+
+// ══════════════════════════════════════
+//  タイムライン描画
+// ══════════════════════════════════════
+function renderTimeline() {
+  const today     = new Date().toISOString().slice(0,10);
+  const inOneMonth = new Date();
+  inOneMonth.setMonth(inOneMonth.getMonth() + 1);
+  const oneMonthStr = inOneMonth.toISOString().slice(0,10);
+
+  let filtered = allActivities.filter(a => {
+    if (currentFilter === 'upcoming')  return a.activity_date >= today;
+    if (currentFilter === 'past')      return a.activity_date <  today;
+    if (currentFilter === 'attending') {
+      const rec = myAttendance[a.id];
+      return a.activity_date >= today && rec && rec.status === 'attending';
+    }
+    return true;
+  });
+
+  // 過去は降順（新しい順）、今後は昇順（近い順）
+  if (currentFilter === 'past') {
+    filtered = filtered.sort((a,b) => b.activity_date.localeCompare(a.activity_date));
+  }
+
+  const timeline = document.getElementById('timeline');
+
+  if (!filtered.length) {
+    const msgs = {
+      upcoming: '今後の活動予定がありません。',
+      attending: '参加登録した今後の予定はありません。',
+      past:      '過去の活動記録がありません。',
+      all:       '活動が登録されていません。',
+    };
+    timeline.innerHTML = `
+      <div style="text-align:center;padding:var(--space-16);color:var(--gray-500);">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1" width="48" height="48" style="margin:0 auto var(--space-4);opacity:.3;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5"/>
+        </svg>
+        <p style="font-size:var(--text-sm);">${msgs[currentFilter]}</p>
+      </div>`;
+    return;
+  }
+
+  // 月ごとにグループ化
+  const groups = {};
+  filtered.forEach(a => {
+    const ym = a.activity_date.slice(0,7);
+    if (!groups[ym]) groups[ym] = [];
+    groups[ym].push(a);
+  });
+
+  let html = '';
+  Object.entries(groups).forEach(([ym, activities]) => {
+    const [y, m] = ym.split('-');
+    const monthLabel = `${y}年${parseInt(m)}月`;
+
+    html += `
+      <div class="timeline-month">
+        <span class="timeline-month__label">${escHtml(monthLabel)}</span>
+        <span class="timeline-month__line"></span>
+      </div>`;
+
+    activities.forEach(a => {
+      const d      = new Date(a.activity_date + 'T00:00:00');
+      const month  = d.getMonth() + 1;
+      const day    = d.getDate();
+      const wday   = WEEKDAYS[d.getDay()];
+      const wdIdx  = d.getDay();
+      const wdCls  = wdIdx === 0 ? 'sun' : wdIdx === 6 ? 'sat' : '';
+      const isPast = a.activity_date < today;
+
+      const timeStr = fmtTime(a.start_time) + (a.end_time ? ` — ${fmtTime(a.end_time)}` : '');
+      const typeBadge = `<span class="badge ${TYPE_CSS[a.activity_type] ?? ''}" style="font-size:10px;">${TYPE_LABELS[a.activity_type] ?? a.activity_type}</span>`;
+
+      const rec = myAttendance[a.id];
+      const attStatus = rec?.status ?? null;
+
+      // 参加状況バッジ
+      let attHtml = '';
+      if (attStatus) {
+        attHtml = `<span class="att-badge ${ATT_CSS[attStatus] ?? ''}">${ATT_ICON[attStatus] ?? ''} ${ATT_LABELS[attStatus] ?? attStatus}</span>`;
+      } else {
+        attHtml = `<span class="att-badge none">— 未登録</span>`;
+      }
+
+      // アクションボタン
+      const registerBtn = `
+        <button class="btn btn-sm btn-outline" onclick="openRegisterModal('${a.id}')">
+          ${attStatus ? '登録を変更する' : '参加登録する'}
+        </button>`;
+
+      // カレンダー追加ボタン（個別）
+      const calBtn = `
+        <button class="cal-btn" onclick="downloadICS(['${a.id}'])" title="カレンダーに追加">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5"/></svg>
+          カレンダーに追加
+        </button>`;
+
+      html += `
+        <div class="activity-card ${isPast ? 'is-past' : 'is-upcoming'}" id="card-${a.id}">
+          <div class="activity-card__date ${wdCls}">
+            <span class="activity-card__month">${month}月</span>
+            <span class="activity-card__day">${day}</span>
+            <span class="activity-card__weekday">${wday}曜日</span>
+          </div>
+          <div class="activity-card__body">
+            <div class="activity-card__top">
+              <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;">
+                ${typeBadge}
+                <span class="activity-card__title">${escHtml(a.title)}</span>
+              </div>
+              ${attHtml}
+            </div>
+            <div class="activity-card__meta">
+              ${timeStr ? `<span class="activity-card__meta-item">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="13" height="13"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                ${escHtml(timeStr)}
+              </span>` : ''}
+              ${a.location ? `<span class="activity-card__meta-item">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="13" height="13"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
+                ${escHtml(a.location)}
+              </span>` : ''}
+            </div>
+            ${a.description ? `<div class="activity-card__desc">${escHtml(a.description)}</div>` : ''}
+            <div class="activity-card__actions">
+              ${!isPast ? registerBtn : ''}
+              ${calBtn}
+            </div>
+            ${rec?.note ? `<p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:2px;">📝 ${escHtml(rec.note)}</p>` : ''}
+          </div>
+        </div>`;
+    });
+  });
+
+  timeline.innerHTML = html;
+}
+
+// ══════════════════════════════════════
+//  参加登録モーダル
+// ══════════════════════════════════════
+function openRegisterModal(activityId) {
+  const a = allActivities.find(x => x.id === activityId);
+  if (!a) return;
+  pendingActivity = a;
+  selectedStatus  = null;
+
+  const rec     = myAttendance[activityId];
+  const timeStr = fmtTime(a.start_time) + (a.end_time ? ` — ${fmtTime(a.end_time)}` : '');
+  const d       = new Date(a.activity_date + 'T00:00:00');
+  const dateLabel = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${WEEKDAYS[d.getDay()]}）`;
+
+  // 活動情報
+  document.getElementById('modal-activity-info').innerHTML = `
+    <div style="display:flex;align-items:flex-start;gap:var(--space-3);">
+      <div style="flex:1;">
+        <span class="badge ${TYPE_CSS[a.activity_type] ?? ''}" style="margin-bottom:4px;">${TYPE_LABELS[a.activity_type] ?? a.activity_type}</span>
+        <p style="font-weight:700;color:var(--navy-800);">${escHtml(a.title)}</p>
+        <p style="font-size:var(--text-sm);color:var(--gray-500);margin-top:4px;">
+          📅 ${escHtml(dateLabel)}
+          ${timeStr ? `　⏱ ${escHtml(timeStr)}` : ''}
+          ${a.location ? `　📍 ${escHtml(a.location)}` : ''}
+        </p>
+      </div>
+    </div>`;
+
+  // 既存登録があれば選択状態を反映
+  document.querySelectorAll('.status-option').forEach(el => el.classList.remove('selected'));
+  document.getElementById('att-note').value = rec?.note ?? '';
+  if (rec?.status) {
+    selectStatus(rec.status, false);
+  }
+  const submitBtn = document.getElementById('btn-submit-att');
+  submitBtn.disabled = !rec?.status;
+
+  // 取り消しボタン表示
+  const cancelBtn = document.getElementById('btn-cancel-att');
+  cancelBtn.style.display = rec ? 'inline-flex' : 'none';
+
+  openModal('modal-register');
+}
+
+function selectStatus(status, enableBtn = true) {
+  selectedStatus = status;
+  document.querySelectorAll('.status-option').forEach(el => {
+    el.classList.toggle('selected', el.dataset.status === status);
+  });
+  if (enableBtn) {
+    document.getElementById('btn-submit-att').disabled = false;
+  }
+}
+
+// ══════════════════════════════════════
+//  参加登録送信
+// ══════════════════════════════════════
+async function submitAttendance() {
+  if (!selectedStatus || !pendingActivity) return;
+  const user = getSessionUser();
+  if (!user) { showToast('ログインが必要です', 'error'); return; }
+
+  const btn = document.getElementById('btn-submit-att');
+  btn.disabled = true; btn.textContent = '登録中…';
+
+  const note = document.getElementById('att-note').value.trim();
+
+  // Supabase から名前を取得
+  let memberName = user.name ?? '';
+  if (_sb && !memberName) {
+    const { data } = await _sb.from('profiles').select('last_name,first_name').eq('id', user.id).single();
+    if (data) memberName = `${data.last_name}${data.first_name}`;
+  }
+
+  const a = pendingActivity;
+  let success = false;
+
+  if (isGasOk()) {
+    try {
+      const res = await fetch(ACTIVITY_GAS_URL, {
+        method: 'POST', redirect: 'follow',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action:        'recordAttendance',
+          memberId:      user.id,
+          memberName,
+          activityId:    a.id,
+          activityDate:  a.activity_date,
+          activityTitle: a.title,
+          status:        selectedStatus,
+          note,
+        }),
+      });
+      const json = await res.json();
+      success = json.ok;
+    } catch (e) { console.warn('参加登録失敗:', e.message); }
+  } else {
+    // GAS未接続でもローカル反映
+    success = true;
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg> 登録する`;
+
+  if (!success && isGasOk()) {
+    showToast('登録に失敗しました。再度お試しください。', 'error');
+    return;
+  }
+
+  // ローカル状態を更新
+  myAttendance[a.id] = { status: selectedStatus, note, registeredAt: new Date().toISOString() };
+
+  closeModal('modal-register');
+
+  // 成功モーダルを開く
+  const d       = new Date(a.activity_date + 'T00:00:00');
+  const dateLabel = `${d.getMonth()+1}月${d.getDate()}日（${WEEKDAYS[d.getDay()]}）`;
+  document.getElementById('cal-success-title').textContent = '参加登録が完了しました';
+  document.getElementById('cal-success-desc').innerHTML = `
+    <strong>${escHtml(a.title)}</strong>（${escHtml(dateLabel)}）<br>
+    参加状況：<strong>${ATT_LABELS[selectedStatus] ?? selectedStatus}</strong>${note ? `<br>メモ：${escHtml(note)}` : ''}`;
+
+  document.getElementById('btn-add-calendar').onclick = () => { downloadICS([a.id]); closeModal('modal-cal'); };
+  openModal('modal-cal');
+
+  renderTimeline();
+}
+
+// ══════════════════════════════════════
+//  参加登録取り消し
+// ══════════════════════════════════════
+async function cancelAttendance() {
+  if (!pendingActivity) return;
+  const user = getSessionUser();
+  if (!user) return;
+
+  if (!confirm('参加登録を取り消しますか？')) return;
+
+  const btn = document.getElementById('btn-cancel-att');
+  btn.disabled = true; btn.textContent = '取り消し中…';
+
+  let success = !isGasOk(); // GAS未接続時はスルー
+  if (isGasOk()) {
+    try {
+      const res = await fetch(ACTIVITY_GAS_URL, {
+        method:'POST', redirect:'follow',
+        headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action:'cancelAttendance', memberId:user.id, activityId:pendingActivity.id }),
+      });
+      const json = await res.json();
+      success = json.ok;
+    } catch (e) { console.warn(e); }
+  }
+
+  btn.disabled = false; btn.textContent = '登録を取り消す';
+
+  if (!success) { showToast('取り消しに失敗しました', 'error'); return; }
+
+  delete myAttendance[pendingActivity.id];
+  closeModal('modal-register');
+  showToast('参加登録を取り消しました', 'success');
+  renderTimeline();
+}
+
+// ══════════════════════════════════════
+//  ICSカレンダーファイル生成・ダウンロード
+// ══════════════════════════════════════
+function escICS(str) {
+  return String(str ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\n/g, '\\n');
+}
+
+function generateICS(activityIds) {
+  const targets = activityIds.length
+    ? allActivities.filter(a => activityIds.includes(a.id))
+    : allActivities;
+
+  const events = targets.map(a => {
+    let dtstart, dtend;
+
+    if (a.start_time) {
+      // JST→UTC変換（JST = UTC+9）
+      const fmt = d => d.toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
+      const startJST = new Date(`${a.activity_date}T${a.start_time}+09:00`);
+      const endJST   = a.end_time
+        ? new Date(`${a.activity_date}T${a.end_time}+09:00`)
+        : new Date(startJST.getTime() + 2 * 60 * 60 * 1000); // デフォルト2時間
+      dtstart = `DTSTART:${fmt(startJST)}`;
+      dtend   = `DTEND:${fmt(endJST)}`;
+    } else {
+      // 終日イベント
+      const ds = a.activity_date.replace(/-/g,'');
+      dtstart = `DTSTART;VALUE=DATE:${ds}`;
+      dtend   = `DTEND;VALUE=DATE:${ds}`;
+    }
+
+    const title    = `【東大阪吹奏楽団】${a.title}`;
+    const location = a.location ?? '';
+    const desc     = a.description ?? '';
+
+    return [
+      'BEGIN:VEVENT',
+      `UID:higasui-activity-${a.id}@higasui-winds.jp`,
+      dtstart,
+      dtend,
+      `SUMMARY:${escICS(title)}`,
+      location ? `LOCATION:${escICS(location)}` : null,
+      desc     ? `DESCRIPTION:${escICS(desc)}`  : null,
+      `STATUS:${a.is_cancelled ? 'CANCELLED' : 'CONFIRMED'}`,
+      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g,'').split('.')[0]}Z`,
+      'END:VEVENT',
+    ].filter(Boolean).join('\r\n');
+  }).join('\r\n');
+
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Higasui Winds//DX System//JA',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:東大阪吹奏楽団',
+    'X-WR-TIMEZONE:Asia/Tokyo',
+    events,
+    'END:VCALENDAR',
+  ].join('\r\n');
+}
+
+function downloadICS(activityIds) {
+  const ics     = generateICS(activityIds);
+  const blob    = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url     = URL.createObjectURL(blob);
+  const a       = document.createElement('a');
+  const suffix  = activityIds.length === 1
+    ? (allActivities.find(x => x.id === activityIds[0])?.activity_date ?? 'activity')
+    : '東大阪吹奏楽団_全予定';
+  a.href     = url;
+  a.download = `活動予定_${suffix}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('ICSファイルをダウンロードしました。カレンダーアプリで開いてください。', 'success');
+}
+
+// ══════════════════════════════════════
+//  初期化
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  await Promise.all([loadActivities(), loadMyAttendance()]);
+
+  renderTimeline();
+
+  // フィルタータブ
+  document.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentFilter = tab.dataset.filter;
+      renderTimeline();
+    });
+  });
+
+  // 参加登録ボタン
+  document.getElementById('btn-submit-att').addEventListener('click', submitAttendance);
+  document.getElementById('btn-cancel-att').addEventListener('click', cancelAttendance);
+
+  // 全予定カレンダー追加
+  document.getElementById('btn-export-all-cal').addEventListener('click', () => {
+    const upcoming = allActivities.filter(a => {
+      const today = new Date().toISOString().slice(0,10);
+      return a.activity_date >= today && !a.is_cancelled;
+    });
+    if (!upcoming.length) { showToast('今後の予定がありません', 'error'); return; }
+    downloadICS(upcoming.map(a => a.id));
+  });
+});
+</script>
+</body>
+</html>
