@@ -33,6 +33,8 @@ const MAINTENANCE_CONFIG = {
   contact:            false,  // 連絡網
   requests:           true,  // 団員申請
   settings:           false,  // 設定
+  schedule:           true,   //スケジュール
+  activities:         true,   //活動記録
 };
 
 // メンテナンス中ページの閲覧を許可するロール
@@ -72,6 +74,8 @@ const ROLE_PERMISSIONS = {
   nav_qrcode:             ['gm', 'leader','subleader'],
   nav_contact:            ['gm', 'leader','subleader', 'safety'],        // 連絡網（役職限定）
   nav_requests:           ['gm', 'leader','subleader'],
+  nav_schedule:    ['all'],                              // 活動予定（全員）
+  nav_activities:  ['gm', 'leader', 'subleader'],        // 活動記録管理（幹部）
 
   // ── 各ページの操作（編集・追加・削除）権限 ──
   // ページ内で canDo('キー名') を呼び出して判定します
@@ -229,6 +233,20 @@ const NAV_ITEMS = [
       {
         id: 'qrcode', permKey: 'nav_qrcode', label: 'QRコード印刷', href: 'pages/qrcode.html',
         icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z"/><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z"/></svg>`,
+      },
+    ],
+  },
+    {
+    section: 'SCHEDULE',
+    label: 'スケジュール',
+    items: [
+      {
+        id: 'schedule', permKey: 'nav_schedule', label: '活動予定', href: 'pages/schedule.html',
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5m-9-6h.008v.008H12V12zm0 3h.008v.008H12v-.008zm0 3h.008v.008H12v-.008zm-3-6h.008v.008H9V12zm0 3h.008v.008H9v-.008zm0 3h.008v.008H9v-.008zm3-9h.008v.008H12V9zm3 0h.008v.008H15V9z"/></svg>`,
+      },
+      {
+        id: 'activities', permKey: 'nav_activities', label: '活動記録管理', href: 'pages/activities.html',
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/></svg>`,
       },
     ],
   },
