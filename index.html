@@ -117,6 +117,18 @@
   </div>
 </div>
 
+<!-- 今後の活動予定 -->
+<div class="mb-6 fade-in fade-in-4">
+  <p class="page-header__eyebrow">SCHEDULE</p>
+  <h2 class="page-header__title" style="font-size:var(--text-2xl);">今後の活動予定</h2>
+</div>
+<div id="upcoming-activities-wrap" class="mb-8 fade-in fade-in-4">
+  <div style="text-align:center;padding:var(--space-8);color:var(--gray-500);">
+    <div class="loading-spinner" style="margin:0 auto var(--space-3);"></div>
+    <p style="font-size:var(--text-sm);">活動データを読み込み中…</p>
+  </div>
+</div>
+
 <!-- 団費支払い -->
 <div class="mb-6 fade-in fade-in-4">
   <p class="page-header__eyebrow">ACCOUNTING</p>
@@ -428,6 +440,9 @@ await loadMyLendingStatus();
 
   // ─── 団費支払いセクション ───
   await loadDuesStatus();
+
+    // ─── 今後の活動予定 ───
+  await loadUpcomingActivities();
 });
 
 // ── 楽譜貸出申請ステータス読み込み（グローバル） ──
@@ -531,6 +546,105 @@ async function openLendingQrModal(requestId, mode) {
   wrap.innerHTML = '';
   new QRCode(wrap, { text: qrData, width: 240, height: 240, colorDark: '#0d1b2a', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.L });
   openModal('modal-lending-qr');
+}
+
+// ─── 今後の活動予定（ダッシュボード） ───
+async function loadUpcomingActivities() {
+  const wrap = document.getElementById('upcoming-activities-wrap');
+  if (!_sb) {
+    wrap.innerHTML = `
+      <div style="text-align:center;padding:var(--space-6);color:var(--gray-500);
+                  background:var(--white);border-radius:var(--radius-lg);border:1px dashed var(--gray-300);">
+        <p style="font-size:var(--text-sm);">Supabase未接続のため活動データを取得できません。</p>
+      </div>`;
+    return;
+  }
+
+  try {
+    const today     = new Date().toISOString().slice(0, 10);
+    const nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    const nextMonthStr = nextMonth.toISOString().slice(0, 10);
+
+    const { data, error } = await _sb
+      .from('activities')
+      .select('id, title, activity_date, start_time, end_time, location, activity_type, is_cancelled')
+      .gte('activity_date', today)
+      .lte('activity_date', nextMonthStr)
+      .eq('is_cancelled', false)
+      .order('activity_date', { ascending: true });
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      wrap.innerHTML = `
+        <div style="text-align:center;padding:var(--space-6);color:var(--gray-500);
+                    background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--gray-200);">
+          <p style="font-size:var(--text-sm);">今後1か月の活動予定はありません。</p>
+        </div>`;
+      return;
+    }
+
+    const WDAYS      = ['日','月','火','水','木','金','土'];
+    const TYPE_LABEL = { practice:'練習', concert:'演奏会', event:'イベント', meeting:'ミーティング', other:'その他' };
+    const TYPE_CSS   = { practice:'badge-navy', concert:'badge-gold', event:'badge-success', meeting:'badge-warning', other:'' };
+    const fmtT = t  => t ? t.slice(0, 5) : '';
+
+    const rows = data.map(a => {
+      const d        = new Date(a.activity_date + 'T00:00:00');
+      const dateStr  = `${d.getMonth()+1}/${d.getDate()}(${WDAYS[d.getDay()]})`;
+      const timeStr  = fmtT(a.start_time) + (a.end_time ? ` — ${fmtT(a.end_time)}` : '');
+      const typeBadge = `<span class="badge ${TYPE_CSS[a.activity_type] ?? ''}" style="font-size:10px;">${escHtml(TYPE_LABEL[a.activity_type] ?? a.activity_type)}</span>`;
+
+      // 今日の活動はハイライト
+      const isToday  = a.activity_date === today;
+
+      return `
+        <tr${isToday ? ' style="background:rgba(201,168,76,.06);"' : ''}>
+          <td style="font-weight:${isToday ? '700' : '600'};color:var(--navy-800);white-space:nowrap;">
+            ${isToday ? '<span class="badge badge-gold" style="font-size:10px;margin-right:4px;">本日</span>' : ''}
+            ${escHtml(dateStr)}
+          </td>
+          <td>${typeBadge}</td>
+          <td style="font-weight:600;color:var(--navy-800);">${escHtml(a.title)}</td>
+          <td style="font-size:var(--text-sm);color:var(--gray-500);white-space:nowrap;">${escHtml(timeStr) || '—'}</td>
+          <td style="font-size:var(--text-sm);color:var(--gray-500);">${escHtml(a.location || '—')}</td>
+          <td>
+            <a href="pages/schedule.html" class="btn btn-sm btn-outline" style="font-size:11px;">参加登録</a>
+          </td>
+        </tr>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <div style="border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--gray-200);overflow-x:auto;">
+        <table class="table" style="min-width:480px;">
+          <thead>
+            <tr>
+              <th>日付</th>
+              <th style="width:70px;">種別</th>
+              <th>タイトル</th>
+              <th style="width:110px;">時間</th>
+              <th>場所</th>
+              <th style="width:80px;"></th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div style="margin-top:var(--space-4);text-align:right;">
+        <a href="pages/schedule.html" class="btn btn-sm btn-outline" style="font-size:var(--text-xs);">
+          活動予定をすべて見る →
+        </a>
+      </div>`;
+
+  } catch (e) {
+    console.warn('[HighasuiDX] 活動予定の取得失敗:', e.message);
+    wrap.innerHTML = `
+      <div style="text-align:center;padding:var(--space-6);color:var(--gray-500);
+                  background:var(--white);border-radius:var(--radius-lg);border:1px dashed var(--gray-300);">
+        <p style="font-size:var(--text-sm);">活動データの取得に失敗しました。</p>
+      </div>`;
+  }
 }
 
 // ── 連絡メッセージの取得・表示 ──
