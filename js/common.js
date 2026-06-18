@@ -33,8 +33,8 @@ const MAINTENANCE_CONFIG = {
   contact:            false,  // 連絡網
   requests:           true,  // 団員申請
   settings:           false,  // 設定
-  schedule:           false,   //スケジュール
-  activities:         false,   //活動記録
+  schedule:           true,   //スケジュール
+  activities:         true,   //活動記録
 };
 
 // メンテナンス中ページの閲覧を許可するロール
