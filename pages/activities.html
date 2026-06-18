@@ -264,7 +264,7 @@
 // ══════════════════════════════════════
 //  設定
 // ══════════════════════════════════════
-const ACTIVITY_GAS_URL = 'https://script.google.com/macros/s/AKfycbzpDrOSmqliAEMOsPsTMIuiU8ScAxqLGFpOfdi-nGJ5TK2gVK95Pr4F5H4D4ceP-16R/exec';
+const ACTIVITY_GAS_URL = 'https://script.google.com/macros/s/AKfycbx-mwLTKGdHA2zjvQZiMOylDGDgT2Xl4abynm2kQV7968muF95uWAJ602yiEyKGveXJ/exec';
 
 const TYPE_LABELS = { practice:'練習', concert:'演奏会', event:'イベント', meeting:'ミーティング', other:'その他' };
 const TYPE_CSS    = { practice:'type-practice', concert:'type-concert', event:'type-event', meeting:'type-meeting', other:'type-other' };
@@ -321,7 +321,7 @@ async function loadMembers() {
 async function loadAllAttendance() {
   if (!isGasOk()) return;
   try {
-    const res  = await fetch(`${ACTIVITY_GAS_URL}?action=getAllAttendanceAll`, { method:'GET', redirect:'follow' });
+    const res  = await fetch(`${ACTIVITY_GAS_URL}?action=getAllAttendanceAll&_t=${Date.now()}`, { method:'GET', redirect:'follow' });
     const json = await res.json();
     if (json.ok) allAttendance = json.data ?? {};
   } catch (e) { console.warn('参加状況取得失敗:', e.message); }
@@ -330,7 +330,7 @@ async function loadAllAttendance() {
 async function loadAttendanceForActivity(activityId) {
   if (!isGasOk()) return [];
   try {
-    const res  = await fetch(`${ACTIVITY_GAS_URL}?action=getAllAttendance&activityId=${encodeURIComponent(activityId)}`, { method:'GET', redirect:'follow' });
+    const res  = await fetch(`${ACTIVITY_GAS_URL}?action=getAllAttendance&activityId=${encodeURIComponent(activityId)}&_t=${Date.now()}`, { method:'GET', redirect:'follow' });
     const json = await res.json();
     return json.ok ? (json.data ?? []) : [];
   } catch (e) { return []; }
@@ -712,11 +712,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // タブ
   document.querySelectorAll('.act-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
+    tab.addEventListener('click', async () => {
       document.querySelectorAll('.act-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.act-panel').forEach(p => p.classList.remove('active'));
       tab.classList.add('active');
       document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
+
+      // 「参加状況確認」タブに切り替えたとき参加件数を最新に更新
+      if (tab.dataset.tab === 'attendance') {
+        await loadAllAttendance();
+        renderActivityTable(); // 一覧タブの参加登録数バッジも更新
+      }
     });
   });
 
