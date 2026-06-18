@@ -34,7 +34,7 @@ const MAINTENANCE_CONFIG = {
   requests:           true,  // 団員申請
   settings:           false,  // 設定
   schedule:           false,   //スケジュール
-  activities:         true,   //活動記録
+  activities:         false,   //活動記録
 };
 
 // メンテナンス中ページの閲覧を許可するロール
