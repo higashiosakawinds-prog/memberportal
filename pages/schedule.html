@@ -292,7 +292,7 @@
 // ══════════════════════════════════════
 //  設定
 // ══════════════════════════════════════
-const ACTIVITY_GAS_URL = 'https://script.google.com/macros/s/AKfycbzpDrOSmqliAEMOsPsTMIuiU8ScAxqLGFpOfdi-nGJ5TK2gVK95Pr4F5H4D4ceP-16R/exec';
+const ACTIVITY_GAS_URL = 'https://script.google.com/macros/s/AKfycbx-mwLTKGdHA2zjvQZiMOylDGDgT2Xl4abynm2kQV7968muF95uWAJ602yiEyKGveXJ/exec';
 
 const TYPE_LABELS = { practice:'練習', concert:'演奏会', event:'イベント', meeting:'ミーティング', other:'その他' };
 const TYPE_CSS    = { practice:'type-practice', concert:'type-concert', event:'type-event', meeting:'type-meeting', other:'type-other' };
@@ -333,7 +333,7 @@ async function loadMyAttendance() {
   if (!user || !isGasOk()) return;
   try {
     const res  = await fetch(
-      `${ACTIVITY_GAS_URL}?action=getMyAttendance&memberId=${encodeURIComponent(user.id)}`,
+      `${ACTIVITY_GAS_URL}?action=getMyAttendance&memberId=${encodeURIComponent(user.id)}&_t=${Date.now()}`,
       { method:'GET', redirect:'follow' }
     );
     const json = await res.json();
@@ -564,6 +564,7 @@ async function submitAttendance() {
           action:        'recordAttendance',
           memberId:      user.id,
           memberName,
+          memberPart:    user.part ?? '',
           activityId:    a.id,
           activityDate:  a.activity_date,
           activityTitle: a.title,
