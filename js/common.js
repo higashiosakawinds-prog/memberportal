@@ -25,16 +25,16 @@ const MAINTENANCE_CONFIG = {
   distribution:       true,  // 配布・貸出管理
   repertoire:         true,  // 曲目リスト
   ledger:             false,  // 出納帳
-  dues:               true,  // 団費登録
-  'dues-admin':       true,  // 団費管理
-  instruments:        true,  // 楽器一覧
-  'instrument-lending': true, // 楽器貸出管理
+  dues:               false,  // 団費登録
+  'dues-admin':       false,  // 団費管理
+  instruments:        false,  // 楽器一覧
+  'instrument-lending': false, // 楽器貸出管理
   qrcode:             true,  // QRコード印刷
   contact:            false,  // 連絡網
   requests:           true,  // 団員申請
   settings:           false,  // 設定
-  schedule:           true,   //スケジュール
-  activities:         true,   //活動記録
+  schedule:           false,   //スケジュール
+  activities:         false,   //活動記録
 };
 
 // メンテナンス中ページの閲覧を許可するロール
@@ -63,19 +63,19 @@ const ROLE_PERMISSIONS = {
   nav_dashboard:          ['all'],
   nav_members:            ['all'],
   nav_scores:             ['all'],
-  nav_scoreedit:          ['all'],
+  nav_scoreedit:          ['gm', 'leader','subleader','librarian'],
   nav_distribution:       ['gm', 'leader','subleader'],
   nav_repertoire:         ['gm', 'leader','subleader'],
-  nav_ledger:             ['all'],
+  nav_ledger:             ['gm','leader','subleader', 'treasurer','reserver','librarian'],
   nav_dues:               ['all'],                           // 団費登録（全員）
   nav_dues_admin:         ['gm','leader','subleader', 'treasurer'],      // 団費管理（GM・幹部・会計のみ）
-  nav_instruments:        ['gm', 'leader','subleader'],
-  nav_instrument_lending: ['gm', 'leader','subleader'],
+  nav_instruments:        ['all'],
+  nav_instrument_lending: ['gm', 'leader','subleader','equipment'],
   nav_qrcode:             ['gm', 'leader','subleader'],
   nav_contact:            ['gm', 'leader','subleader', 'safety'],        // 連絡網（役職限定）
   nav_requests:           ['gm', 'leader','subleader'],
   nav_schedule:    ['all'],                              // 活動予定（全員）
-  nav_activities:  ['gm', 'leader', 'subleader'],        // 活動記録管理（幹部）
+  nav_activities:  ['gm', 'leader', 'subleader','reserver'],        // 活動記録管理（幹部）
 
   // ── 各ページの操作（編集・追加・削除）権限 ──
   // ページ内で canDo('キー名') を呼び出して判定します
@@ -86,10 +86,10 @@ const ROLE_PERMISSIONS = {
 
   // 団費関連
   dues_view:              ['all'],                           // 団費登録ページ閲覧
-  dues_admin:             ['gm', 'leader','subleader', 'treasurer'],      // 団費管理ページ全般
-  dues_payment_approve:   ['gm', 'leader','subleader', 'treasurer'],      // QR承認・手動支払い変更
-  dues_fee_edit:          ['gm','leader','subleader', 'treasurer'],      // 金額変更
-  dues_method_edit:       ['gm', 'leader','subleader', 'treasurer'],      // 支払い方法変更
+  dues_admin:            ['all'],      // 団費管理ページ全般
+  dues_payment_approve:   ['all'],      // QR承認・手動支払い変更
+  dues_fee_edit:          ['all'],      // 金額変更
+  dues_method_edit:       ['all'],      // 支払い方法変更
 
   instruments_edit:       ['all'],
   lending_edit:           ['all'],
