@@ -549,6 +549,8 @@ async function openLendingQrModal(requestId, mode) {
 }
 
 // ─── 今後の活動予定（ダッシュボード） ───
+const ACTIVITY_GAS_URL_DASH = 'https://script.google.com/macros/s/AKfycbzpDrOSmqliAEMOsPsTMIuiU8ScAxqLGFpOfdi-nGJ5TK2gVK95Pr4F5H4D4ceP-16R/exec';
+
 async function loadUpcomingActivities() {
   const wrap = document.getElementById('upcoming-activities-wrap');
   if (!_sb) {
@@ -566,17 +568,27 @@ async function loadUpcomingActivities() {
     nextMonth.setMonth(nextMonth.getMonth() + 1);
     const nextMonthStr = nextMonth.toISOString().slice(0, 10);
 
-    const { data, error } = await _sb
-      .from('activities')
-      .select('id, title, activity_date, start_time, end_time, location, activity_type, is_cancelled')
-      .gte('activity_date', today)
-      .lte('activity_date', nextMonthStr)
-      .eq('is_cancelled', false)
-      .order('activity_date', { ascending: true });
+    // 活動一覧と自分の参加状況を並行取得
+    const sessionUser = getSessionUser();
+    const gasOk = ACTIVITY_GAS_URL_DASH && !ACTIVITY_GAS_URL_DASH.includes('YOUR_ACTIVITY');
 
-    if (error) throw error;
+    const [actResult, myAtt] = await Promise.all([
+      _sb.from('activities')
+        .select('id, title, activity_date, start_time, end_time, location, activity_type, is_cancelled')
+        .gte('activity_date', today)
+        .lte('activity_date', nextMonthStr)
+        .eq('is_cancelled', false)
+        .order('activity_date', { ascending: true }),
+      (sessionUser && gasOk)
+        ? fetch(`${ACTIVITY_GAS_URL_DASH}?action=getMyAttendance&memberId=${encodeURIComponent(sessionUser.id)}&_t=${Date.now()}`, { method:'GET', redirect:'follow' })
+            .then(r => r.json()).then(j => j.ok ? (j.data ?? {}) : {}).catch(() => ({}))
+        : Promise.resolve({}),
+    ]);
 
-    if (!data || data.length === 0) {
+    if (actResult.error) throw actResult.error;
+    const data = actResult.data ?? [];
+
+    if (!data.length) {
       wrap.innerHTML = `
         <div style="text-align:center;padding:var(--space-6);color:var(--gray-500);
                     background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--gray-200);">
@@ -588,16 +600,35 @@ async function loadUpcomingActivities() {
     const WDAYS      = ['日','月','火','水','木','金','土'];
     const TYPE_LABEL = { practice:'練習', concert:'演奏会', event:'イベント', meeting:'ミーティング', other:'その他' };
     const TYPE_CSS   = { practice:'badge-navy', concert:'badge-gold', event:'badge-success', meeting:'badge-warning', other:'' };
-    const fmtT = t  => t ? t.slice(0, 5) : '';
+    // 参加状況バッジ定義
+    const ATT_LABEL  = { attending:'参加', absent:'不参加', late:'遅刻', early_leave:'早退' };
+    const ATT_STYLE  = {
+      attending:   'background:rgba(39,174,96,.12);color:#1e8449;border:1px solid rgba(39,174,96,.3);',
+      absent:      'background:rgba(192,57,43,.12);color:#c0392b;border:1px solid rgba(192,57,43,.3);',
+      late:        'background:rgba(230,126,34,.12);color:#ca6f1e;border:1px solid rgba(230,126,34,.3);',
+      early_leave: 'background:rgba(41,128,185,.12);color:#1a5276;border:1px solid rgba(41,128,185,.3);',
+    };
+    const ATT_ICON   = { attending:'✅', absent:'❌', late:'🕐', early_leave:'🚪' };
+    const fmtT = t => t ? t.slice(0, 5) : '';
 
     const rows = data.map(a => {
-      const d        = new Date(a.activity_date + 'T00:00:00');
-      const dateStr  = `${d.getMonth()+1}/${d.getDate()}(${WDAYS[d.getDay()]})`;
-      const timeStr  = fmtT(a.start_time) + (a.end_time ? ` — ${fmtT(a.end_time)}` : '');
+      const d       = new Date(a.activity_date + 'T00:00:00');
+      const dateStr = `${d.getMonth()+1}/${d.getDate()}(${WDAYS[d.getDay()]})`;
+      const timeStr = fmtT(a.start_time) + (a.end_time ? ` — ${fmtT(a.end_time)}` : '');
       const typeBadge = `<span class="badge ${TYPE_CSS[a.activity_type] ?? ''}" style="font-size:10px;">${escHtml(TYPE_LABEL[a.activity_type] ?? a.activity_type)}</span>`;
+      const isToday = a.activity_date === today;
 
-      // 今日の活動はハイライト
-      const isToday  = a.activity_date === today;
+      // 自分の出欠バッジ
+      const rec = myAtt[a.id];
+      let attCell;
+      if (!sessionUser) {
+        attCell = '<span style="font-size:var(--text-xs);color:var(--gray-400);">—</span>';
+      } else if (rec?.status) {
+        const s = rec.status;
+        attCell = `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:9999px;font-size:10px;font-weight:700;${ATT_STYLE[s] ?? ''}">${ATT_ICON[s] ?? ''}${ATT_LABEL[s] ?? s}</span>`;
+      } else {
+        attCell = `<a href="pages/schedule.html" style="font-size:10px;color:var(--gray-400);text-decoration:underline;text-underline-offset:2px;">未登録</a>`;
+      }
 
       return `
         <tr${isToday ? ' style="background:rgba(201,168,76,.06);"' : ''}>
@@ -609,15 +640,16 @@ async function loadUpcomingActivities() {
           <td style="font-weight:600;color:var(--navy-800);">${escHtml(a.title)}</td>
           <td style="font-size:var(--text-sm);color:var(--gray-500);white-space:nowrap;">${escHtml(timeStr) || '—'}</td>
           <td style="font-size:var(--text-sm);color:var(--gray-500);">${escHtml(a.location || '—')}</td>
+          <td style="text-align:center;">${attCell}</td>
           <td>
-            <a href="pages/schedule.html" class="btn btn-sm btn-outline" style="font-size:11px;">参加登録</a>
+            <a href="pages/schedule.html" class="btn btn-sm btn-outline" style="font-size:11px;">詳細</a>
           </td>
         </tr>`;
     }).join('');
 
     wrap.innerHTML = `
       <div style="border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--gray-200);overflow-x:auto;">
-        <table class="table" style="min-width:480px;">
+        <table class="table" style="min-width:540px;">
           <thead>
             <tr>
               <th>日付</th>
@@ -625,7 +657,8 @@ async function loadUpcomingActivities() {
               <th>タイトル</th>
               <th style="width:110px;">時間</th>
               <th>場所</th>
-              <th style="width:80px;"></th>
+              <th style="width:80px;text-align:center;">出欠</th>
+              <th style="width:60px;"></th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
