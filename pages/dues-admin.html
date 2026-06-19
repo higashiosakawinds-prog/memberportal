@@ -443,7 +443,7 @@
 // ══════════════════════════════════════
 const DUES_GAS_URL   = 'https://script.google.com/macros/s/AKfycbwvfg_SisVkhgPg8XqWWztiRKwOx7nwAP2JIJzTltuLeYvb8n1yzh2CCxCOEg_Vy91xlg/exec';
 // 出納帳スプレッドシートのGAS URL（ledger.htmlと同じURLを設定してください）
-const LEDGER_GAS_URL = 'https://script.google.com/macros/s/AKfycbwvfg_SisVkhgPg8XqWWztiRKwOx7nwAP2JIJzTltuLeYvb8n1yzh2CCxCOEg_Vy91xlg/exec';
+const LEDGER_GAS_URL = 'https://script.google.com/macros/s/AKfycbx-mwLTKGdHA2zjvQZiMOylDGDgT2Xl4abynm2kQV7968muF95uWAJ602yiEyKGveXJ/exec';
 
 // クレカ手数料デフォルト率（%）
 const DEFAULT_CC_RATE = 3.24;
@@ -1126,8 +1126,9 @@ async function updatePm(sel) {
   const id  = sel.dataset.id;
   const val = sel.value;
   if (!_sb){ showToast('Supabase未接続','error'); return; }
-  const { error } = await _sb.from('profiles').update({ payment_method: val||null }).eq('id',id);
-  if (error) { showToast('更新失敗: '+error.message,'error'); return; }
+　const { data: updated, error } = await _sb.from('profiles').update({ payment_method: val||null }).eq('id',id).select('id');
+　if (error) { showToast('更新失敗: '+error.message,'error'); return; }
+　if (!updated || updated.length === 0) { showToast('権限がないため更新できませんでした','error'); return; }
   const m = allMembers.find(x => x.id === id);
   if (m) m.payment_method = val || null;
   showToast('支払い方法を更新しました','success');
