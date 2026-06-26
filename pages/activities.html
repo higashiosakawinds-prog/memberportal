@@ -430,27 +430,40 @@ async function renderAttendance(activityId) {
   const recMap = {};
   records.forEach(r => { recMap[r.memberId] = r; });
 
-  // 集計
+  // 集計（有効なステータスのみカウント。それ以外は未登録扱い）
+  const VALID_STATUSES = new Set(['attending', 'absent', 'late', 'early_leave']);
   const counts = { attending:0, absent:0, late:0, early_leave:0, none:0 };
   allMembers.forEach(m => {
     const rec = recMap[m.id];
-    if (rec) counts[rec.status] = (counts[rec.status] || 0) + 1;
-    else counts.none++;
+    if (rec && VALID_STATUSES.has(rec.status)) {
+      counts[rec.status]++;
+    } else {
+      counts.none++;
+    }
   });
 
+  // 有効なステータスを持つ記録のみ「登録済み」と見なす
+  const registeredMemberIds = new Set(
+    Object.entries(recMap)
+      .filter(([, r]) => VALID_STATUSES.has(r.status))
+      .map(([id]) => id)
+  );
+
   // 未登録者リスト（メール送信用）
-  const unregisteredMembers = allMembers.filter(m => !recMap[m.id] && m.email);
+  const unregisteredMembers = allMembers.filter(m => !registeredMemberIds.has(m.id) && m.email);
 
   const typeBadge = `<span class="badge ${TYPE_CSS[activity.activity_type] ?? ''}">${TYPE_LABELS[activity.activity_type] ?? ''}</span>`;
   const timeStr   = fmtTime(activity.start_time) + (activity.end_time ? ` — ${fmtTime(activity.end_time)}` : '');
 
   const tableRows = allMembers.map(m => {
     const rec    = recMap[m.id];
-    const status = rec?.status ?? null;
+    const status = (rec && VALID_STATUSES.has(rec.status)) ? rec.status : null;
     const badgeClass = status ? (ATT_CSS[status] || '') : 'att-none';
     const badgeLabel = status ? (ATT_LABELS[status] || status) : '未登録';
     const part   = PART_LABELS[m.part] ?? m.part ?? '—';
-    const regAt  = rec?.registeredAt ? new Date(rec.registeredAt).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+    const regAt  = (status && rec?.registeredAt)
+      ? new Date(rec.registeredAt).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})
+      : '—';
 
     return `<tr>
       <td style="font-weight:600;color:var(--navy-800);">${escHtml(m.last_name)} ${escHtml(m.first_name)}</td>
@@ -543,7 +556,9 @@ async function mailToUnregistered(activityId) {
   if (!activity) return;
 
   const records = await loadAttendanceForActivity(activityId);
-  const registeredIds = new Set(records.map(r => r.memberId));
+  // 有効なステータスを持つ記録のみ「登録済み」と見なす
+  const VALID = new Set(['attending', 'absent', 'late', 'early_leave']);
+  const registeredIds = new Set(records.filter(r => VALID.has(r.status)).map(r => r.memberId));
   const unregistered  = allMembers.filter(m => !registeredIds.has(m.id) && m.email);
 
   if (!unregistered.length) {
