@@ -247,7 +247,7 @@
  
       <!-- メモ -->
       <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label" for="att-note">メモ（任意）</label>
+        <label class="form-label" for="att-note">備考</label>
         <input type="text" id="att-note" class="form-control" placeholder="例：15時頃から参加、16時30分退席予定">
         <span class="form-hint">幹部に伝えたいことがあれば記入してください。</span>
       </div>
@@ -991,104 +991,63 @@ async function openAttOverviewModal(activityId) {
     } catch (e) { console.warn('出欠取得失敗:', e.message); }
   }
 
-  // 集計
-  const counts = { attending:0, absent:0, late:0, early_leave:0, none:0 };
-  const recMap = {};
+  // ステータス別にグループ化
+  const myId = getSessionUser()?.id;
+  const groups = { attending:[], late:[], early_leave:[], absent:[] };
   records.forEach(r => {
-    recMap[r.memberId] = r;
-    if (counts[r.status] !== undefined) counts[r.status]++;
+    if (groups[r.status]) groups[r.status].push(r);
   });
 
-  // 集計バー表示
-  const summaryItems = [
-    { key:'attending',   label:'参加',   color:'rgba(39,174,96,.12)',  border:'rgba(39,174,96,.3)',  text:'#1e8449' },
-    { key:'absent',      label:'不参加', color:'rgba(192,57,43,.12)',  border:'rgba(192,57,43,.3)',  text:'#c0392b' },
-    { key:'late',        label:'遅刻',   color:'rgba(230,126,34,.12)', border:'rgba(230,126,34,.3)', text:'#ca6f1e' },
-    { key:'early_leave', label:'早退',   color:'rgba(41,128,185,.12)', border:'rgba(41,128,185,.3)', text:'#1a5276' },
-    { key:'none',        label:'未回答', color:'var(--gray-100)',       border:'var(--gray-300)',     text:'var(--gray-500)' },
+  // 集計バッジ定義
+  const statusDefs = [
+    { key:'attending',   label:'参加',   icon:'✅', color:'rgba(39,174,96,.12)',  border:'rgba(39,174,96,.3)',  text:'#1e8449' },
+    { key:'late',        label:'遅刻',   icon:'🕐', color:'rgba(230,126,34,.12)', border:'rgba(230,126,34,.3)', text:'#ca6f1e' },
+    { key:'early_leave', label:'早退',   icon:'🚪', color:'rgba(41,128,185,.12)', border:'rgba(41,128,185,.3)', text:'#1a5276' },
+    { key:'absent',      label:'不参加', icon:'❌', color:'rgba(192,57,43,.12)',  border:'rgba(192,57,43,.3)',  text:'#c0392b' },
   ];
-  // none = 登録者数のうちrecordsになかった人は別途計算不可（GASが全団員データを持たない場合あり）
-  // → recordsにない人はここでは「未回答」として記録に含まない
-  document.getElementById('att-overview-summary').innerHTML = summaryItems
-    .filter(s => s.key !== 'none' ? counts[s.key] > 0 : records.length >= 0)
-    .map(s => {
-      const cnt = s.key === 'none' ? (records.length === 0 ? 0 : 0) : counts[s.key]; // noneは後で別表示
-      if (s.key === 'none') return '';
-      if (!cnt) return '';
-      return `<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 14px;border-radius:9999px;font-size:var(--text-xs);font-weight:700;background:${s.color};color:${s.text};border:1px solid ${s.border};">
-        ${ATT_ICON[s.key] ?? ''} ${s.label} ${cnt}名
-      </span>`;
-    }).join('') + (records.length === 0
-      ? '<span style="font-size:var(--text-sm);color:var(--gray-400);">まだ回答がありません</span>'
-      : ''
-    );
 
-  // 名前付きリスト表示
-  if (records.length === 0) {
+  const totalRegistered = records.length;
+  document.getElementById('att-overview-summary').innerHTML = totalRegistered === 0
+    ? '<span style="font-size:var(--text-sm);color:var(--gray-400);">まだ回答がありません</span>'
+    : statusDefs
+        .filter(s => groups[s.key].length > 0)
+        .map(s => `<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 14px;border-radius:9999px;font-size:var(--text-xs);font-weight:700;background:${s.color};color:${s.text};border:1px solid ${s.border};">
+          ${s.icon} ${s.label} ${groups[s.key].length}名
+        </span>`).join('');
+
+  // 名前リスト：ステータスごとのブロック表示
+  if (totalRegistered === 0) {
     document.getElementById('att-overview-body').innerHTML = `
       <p style="text-align:center;padding:var(--space-6);font-size:var(--text-sm);color:var(--gray-400);">
         まだ出欠登録がありません。
       </p>`;
   } else {
-    // ステータス順にソート: attending → late → early_leave → absent
-    const order = { attending:0, late:1, early_leave:2, absent:3 };
-    const sorted = [...records].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+    const blocks = statusDefs
+      .filter(s => groups[s.key].length > 0)
+      .map(s => {
+        const names = groups[s.key].map(r => {
+          const isMe = r.memberId === myId;
+          return `<span style="font-size:var(--text-sm);${isMe ? 'font-weight:700;color:var(--navy-800);' : 'color:var(--gray-700);'}">
+            ${escHtml(r.memberName ?? '—')}${isMe ? ' <span class="badge badge-gold" style="font-size:9px;vertical-align:middle;">自分</span>' : ''}
+          </span>`;
+        }).join('<span style="color:var(--gray-300);margin:0 2px;">・</span>');
 
-    const myId = getSessionUser()?.id;
-    const ATT_STYLE_MAP = {
-      attending:   'background:rgba(39,174,96,.12);color:#1e8449;border:1px solid rgba(39,174,96,.3);',
-      absent:      'background:rgba(192,57,43,.12);color:#c0392b;border:1px solid rgba(192,57,43,.3);',
-      late:        'background:rgba(230,126,34,.12);color:#ca6f1e;border:1px solid rgba(230,126,34,.3);',
-      early_leave: 'background:rgba(41,128,185,.12);color:#1a5276;border:1px solid rgba(41,128,185,.3);',
-    };
+        return `<div style="margin-bottom:var(--space-4);">
+          <div style="display:inline-flex;align-items:center;gap:5px;padding:3px 12px;border-radius:9999px;font-size:var(--text-xs);font-weight:700;background:${s.color};color:${s.text};border:1px solid ${s.border};margin-bottom:var(--space-2);">
+            ${s.icon} ${s.label}（${groups[s.key].length}名）
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:var(--space-1);align-items:center;padding-left:var(--space-1);">
+            ${names}
+          </div>
+        </div>`;
+      }).join('');
 
-    // パート別グループ
-    const groups = {};
-    sorted.forEach(r => {
-      const part = r.memberPart || 'other';
-      if (!groups[part]) groups[part] = [];
-      groups[part].push(r);
-    });
-
-    // テーブル形式で表示（グループなし・シンプル）
-    const rows = sorted.map(r => {
-      const isMe    = r.memberId === myId;
-      const badge   = `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:9999px;font-size:10px;font-weight:700;${ATT_STYLE_MAP[r.status] ?? ''}">${ATT_ICON[r.status] ?? ''}${ATT_LABELS[r.status] ?? r.status}</span>`;
-      return `<tr${isMe ? ' style="background:rgba(201,168,76,.06);"' : ''}>
-        <td style="font-weight:${isMe ? '700' : '500'};color:var(--navy-800);">
-          ${escHtml(r.memberName ?? '—')}${isMe ? ' <span class="badge badge-gold" style="font-size:9px;">自分</span>' : ''}
-        </td>
-        <td style="font-size:var(--text-xs);color:var(--gray-500);">${escHtml(r.memberPart ? (PART_LABELS_SHORT[r.memberPart] ?? r.memberPart) : '—')}</td>
-        <td>${badge}</td>
-        <td style="font-size:var(--text-xs);color:var(--gray-500);">${escHtml(r.note || '')}</td>
-      </tr>`;
-    }).join('');
-
-    document.getElementById('att-overview-body').innerHTML = `
-      <table class="table" style="font-size:var(--text-sm);">
-        <thead>
-          <tr>
-            <th>氏名</th>
-            <th style="width:60px;">パート</th>
-            <th style="width:80px;">状況</th>
-            <th>メモ</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>`;
+    document.getElementById('att-overview-body').innerHTML = blocks;
   }
 
   document.getElementById('att-overview-loading').style.display = 'none';
   document.getElementById('att-overview-content').style.display = 'block';
 }
-
-// パート省略名（出欠モーダル内）
-const PART_LABELS_SHORT = {
-  piccolo:'Pic',flute:'Fl',oboe:'Ob',clarinet:'Cl',bassclarinet:'B.Cl',bassoon:'Fg',
-  ssaxophone:'S.Sax',asaxophone:'A.Sax',tsaxophone:'T.Sax',bsaxophone:'B.Sax',
-  horn:'Hr',trumpet:'Tp',trombone:'Tb',euphonium:'Euph',tuba:'Tu',
-  percussion:'Perc',contrabass:'CB',piano:'Pf',staff:'Staff',other:'他',
-};
 
 // ══════════════════════════════════════
 //  初期化
