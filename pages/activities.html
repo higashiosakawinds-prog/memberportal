@@ -438,6 +438,9 @@ async function renderAttendance(activityId) {
     else counts.none++;
   });
 
+  // 未登録者リスト（メール送信用）
+  const unregisteredMembers = allMembers.filter(m => !recMap[m.id] && m.email);
+
   const typeBadge = `<span class="badge ${TYPE_CSS[activity.activity_type] ?? ''}">${TYPE_LABELS[activity.activity_type] ?? ''}</span>`;
   const timeStr   = fmtTime(activity.start_time) + (activity.end_time ? ` — ${fmtTime(activity.end_time)}` : '');
 
@@ -458,6 +461,14 @@ async function renderAttendance(activityId) {
     </tr>`;
   }).join('');
 
+  // 未登録者メールボタン
+  const mailBtnHtml = unregisteredMembers.length > 0
+    ? `<button class="btn btn-outline" onclick="mailToUnregistered('${activityId}')" style="color:var(--warning);border-color:var(--warning);">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+        未登録${unregisteredMembers.length}名にメールを送る
+      </button>`
+    : `<span style="font-size:var(--text-sm);color:var(--success);font-weight:500;">✓ 全員登録済み</span>`;
+
   content.innerHTML = `
     <!-- 活動情報ヘッダー -->
     <div class="card mb-5">
@@ -472,10 +483,13 @@ async function renderAttendance(activityId) {
               ${activity.location ? ` 📍 ${escHtml(activity.location)}` : ''}
             </p>
           </div>
-          <button class="btn btn-outline" onclick="printAttendance('${activityId}')">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.056 48.056 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z"/></svg>
-            PDF印刷・ダウンロード
-          </button>
+          <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:center;">
+            ${mailBtnHtml}
+            <button class="btn btn-outline" onclick="printAttendance('${activityId}')">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.056 48.056 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z"/></svg>
+              PDF印刷・ダウンロード
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -519,6 +533,56 @@ async function renderAttendance(activityId) {
         <tbody>${tableRows || '<tr><td colspan="5" style="text-align:center;padding:var(--space-6);color:var(--gray-500);">団員データがありません</td></tr>'}</tbody>
       </table>
     </div>`;
+}
+
+// ══════════════════════════════════════
+//  未登録者へのメール送信
+// ══════════════════════════════════════
+async function mailToUnregistered(activityId) {
+  const activity = allActivities.find(a => a.id === activityId);
+  if (!activity) return;
+
+  const records = await loadAttendanceForActivity(activityId);
+  const registeredIds = new Set(records.map(r => r.memberId));
+  const unregistered  = allMembers.filter(m => !registeredIds.has(m.id) && m.email);
+
+  if (!unregistered.length) {
+    showToast('未登録の団員（メールアドレスあり）はいません', 'success');
+    return;
+  }
+
+  const d         = new Date(activity.activity_date + 'T00:00:00');
+  const DAYS      = ['日','月','火','水','木','金','土'];
+  const dateLabel = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${DAYS[d.getDay()]}）`;
+  const timeStr   = activity.start_time
+    ? activity.start_time.slice(0,5) + (activity.end_time ? ` ～ ${activity.end_time.slice(0,5)}` : '')
+    : '';
+
+  const subject = `【東大阪吹奏楽団】出欠登録のお願い（${dateLabel} ${escHtml(activity.title)}）`;
+  const body =
+`団員の皆様
+
+いつも活動にご参加いただきありがとうございます。
+
+以下の活動について、まだ出欠の登録が確認できておりません。
+DXシステムより出欠登録をお願いします。
+
+■ 活動名：${activity.title}
+■ 日時：${dateLabel}${timeStr ? `　${timeStr}` : ''}${activity.location ? `\n■ 場所：${activity.location}` : ''}
+
+▼ 出欠登録はこちら
+https://higasui-winds.jp/pages/schedule.html
+
+ご不明な点があれば担当者までご連絡ください。
+
+──
+東大阪吹奏楽団`;
+
+  const bcc = unregistered.map(m => m.email).join(',');
+  window.location.href =
+    `mailto:?bcc=${encodeURIComponent(bcc)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  showToast(`メールアプリを開きました（未登録 ${unregistered.length}名）`, 'success');
 }
 
 // ══════════════════════════════════════
