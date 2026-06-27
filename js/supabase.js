@@ -44,7 +44,7 @@ const Auth = {
         const roles = Array.isArray(profile.roles) && profile.roles.length > 0
           ? profile.roles
           : [profile.role].filter(Boolean);
-        sessionStorage.setItem('hs_user', JSON.stringify({
+        localStorage.setItem('hs_user', JSON.stringify({
           id:    profile.id,
           name:  `${profile.last_name}${profile.first_name}`,
           roles: roles,
@@ -57,7 +57,7 @@ const Auth = {
 
   async signOut() {
     if (_sb) await _sb.auth.signOut();
-    sessionStorage.removeItem('hs_user');
+    localStorage.removeItem('hs_user');
     const isRoot = !window.location.pathname.includes('/pages/');
     window.location.href = isRoot ? 'pages/auth/login.html' : '../pages/auth/login.html';
   },
