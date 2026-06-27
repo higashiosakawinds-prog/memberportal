@@ -580,6 +580,144 @@ function showToast(message, type = 'default') {
 }
 
 // ─────────────────────────────────────────
+// メール送信アプリ選択ピッカー
+//
+// 使い方:
+//   showMailPicker(mailtoHref);
+//   ※ window.location.href = mailtoHref; の代わりに呼び出す
+//
+// Gmail URL形式:
+//   https://mail.google.com/mail/?view=cm&fs=1&to=...&su=...&body=...&bcc=...
+// ─────────────────────────────────────────
+function showMailPicker(mailtoHref) {
+  // mailto: URL から各フィールドをパース
+  let to = '', subject = '', body = '', bcc = '', cc = '';
+  try {
+    // 'mailto:A@b.com?subject=...' → pathname='A@b.com', search='?subject=...'
+    const colonIdx = mailtoHref.indexOf(':');
+    const rest     = mailtoHref.slice(colonIdx + 1);
+    const qIdx     = rest.indexOf('?');
+    if (qIdx === -1) {
+      to = decodeURIComponent(rest);
+    } else {
+      to = decodeURIComponent(rest.slice(0, qIdx));
+      const sp = new URLSearchParams(rest.slice(qIdx + 1));
+      subject  = sp.get('subject') ?? '';
+      body     = sp.get('body')    ?? '';
+      bcc      = sp.get('bcc')     ?? '';
+      cc       = sp.get('cc')      ?? '';
+    }
+  } catch (e) {
+    console.warn('[HighasuiDX] showMailPicker: mailtoHref のパースに失敗しました', e);
+  }
+
+  // Gmail 用 URL を構築
+  const gp = new URLSearchParams();
+  gp.set('view', 'cm');
+  gp.set('fs',   '1');
+  if (to)      gp.set('to',   to);
+  if (subject) gp.set('su',   subject);
+  if (body)    gp.set('body', body);
+  if (bcc)     gp.set('bcc', bcc);
+  if (cc)      gp.set('cc',  cc);
+  const gmailHref = `https://mail.google.com/mail/?${gp.toString()}`;
+
+  // ピッカーモーダルを動的生成（初回のみ）
+  if (!document.getElementById('modal-mail-picker')) {
+    const el = document.createElement('div');
+    el.className = 'modal-overlay';
+    el.id = 'modal-mail-picker';
+    el.innerHTML = `
+      <div class="modal" style="max-width:380px;">
+        <div class="modal__header">
+          <h2 class="modal__title">メールアプリを選択</h2>
+          <button class="modal__close" onclick="closeModal('modal-mail-picker')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-5);">
+            メールを送信するアプリを選択してください。
+          </p>
+
+          <!-- Gmail -->
+          <button id="mail-picker-gmail"
+            style="display:flex;align-items:center;gap:var(--space-4);width:100%;
+                   padding:var(--space-4) var(--space-5);border:1px solid var(--gray-200);
+                   border-radius:var(--radius-lg);background:var(--white);cursor:pointer;
+                   text-align:left;transition:all var(--transition-fast);margin-bottom:var(--space-3);"
+            onmouseover="this.style.background='var(--gray-100)';this.style.borderColor='var(--navy-400)'"
+            onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--gray-200)'">
+            <span style="flex-shrink:0;width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+                          background:#fff5f5;border-radius:var(--radius-md);">
+              <svg viewBox="0 0 48 48" width="22" height="22" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#EA4335" d="M6 40h8V24L2 14v22c0 2.21 1.79 4 4 4z"/>
+                <path fill="#34A853" d="M34 40h8c2.21 0 4-1.79 4-4V14l-12 10z"/>
+                <path fill="#FBBC05" d="M34 8H14l10 8.3z"/>
+                <path fill="#4285F4" d="M14 24v16h20V24L24 16.3z"/>
+                <path fill="#EA4335" d="M2 14l12 10V8H6c-2.21 0-4 1.79-4 4z"/>
+              </svg>
+            </span>
+            <div>
+              <p style="font-weight:700;color:var(--navy-800);font-size:var(--text-sm);">Gmail で開く</p>
+              <p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:1px;">ブラウザでGmailの作成画面を開きます</p>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                 width="14" height="14" style="margin-left:auto;color:var(--gray-400);flex-shrink:0;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+            </svg>
+          </button>
+
+          <!-- 標準メールアプリ -->
+          <button id="mail-picker-default"
+            style="display:flex;align-items:center;gap:var(--space-4);width:100%;
+                   padding:var(--space-4) var(--space-5);border:1px solid var(--gray-200);
+                   border-radius:var(--radius-lg);background:var(--white);cursor:pointer;
+                   text-align:left;transition:all var(--transition-fast);"
+            onmouseover="this.style.background='var(--gray-100)';this.style.borderColor='var(--navy-400)'"
+            onmouseout="this.style.background='var(--white)';this.style.borderColor='var(--gray-200)'">
+            <span style="flex-shrink:0;width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+                          background:#f0f4ff;border-radius:var(--radius-md);">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                   stroke="var(--navy-600)" stroke-width="1.5" width="22" height="22">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75
+                     m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243
+                     a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0
+                     L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/>
+              </svg>
+            </span>
+            <div>
+              <p style="font-weight:700;color:var(--navy-800);font-size:var(--text-sm);">標準メールアプリで開く</p>
+              <p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:1px;">iPhone標準メール・Outlookなど</p>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                 width="14" height="14" style="margin-left:auto;color:var(--gray-400);flex-shrink:0;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+            </svg>
+          </button>
+        </div>
+      </div>`;
+    el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+    document.body.appendChild(el);
+  }
+
+  // ボタンのハンドラを毎回上書き（URLが変わるため）
+  document.getElementById('mail-picker-gmail').onclick = () => {
+    closeModal('modal-mail-picker');
+    window.open(gmailHref, '_blank');
+  };
+  document.getElementById('mail-picker-default').onclick = () => {
+    closeModal('modal-mail-picker');
+    window.location.href = mailtoHref;
+  };
+
+  openModal('modal-mail-picker');
+}
+
+// ─────────────────────────────────────────
 // モーダル制御
 // ─────────────────────────────────────────
 function openModal(id) {
