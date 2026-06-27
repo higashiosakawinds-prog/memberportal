@@ -585,8 +585,6 @@ async function mailToUnregistered(activityId) {
 ■ 活動名：${activity.title}
 ■ 日時：${dateLabel}${timeStr ? `　${timeStr}` : ''}${activity.location ? `\n■ 場所：${activity.location}` : ''}
 
-▼ 出欠登録はこちら（未ログインの場合はログイン後に出欠登録をしてください）
-https://higasui-winds.jp/pages/schedule.html
 
 ご不明な点があれば担当者までご連絡ください。
 
@@ -594,10 +592,10 @@ https://higasui-winds.jp/pages/schedule.html
 東大阪吹奏楽団`;
 
   const bcc = unregistered.map(m => m.email).join(',');
-  window.location.href =
-    `mailto:?bcc=${encodeURIComponent(bcc)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const _mailtoHref = `mailto:?bcc=${encodeURIComponent(bcc)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  showMailPicker(_mailtoHref);
 
-  showToast(`メールアプリを開きました（未登録 ${unregistered.length}名）`, 'success');
+  showToast(`メールアプリを選択してください（未登録 ${unregistered.length}名）`, 'success');
 }
 
 // ══════════════════════════════════════
