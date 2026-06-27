@@ -122,7 +122,7 @@ const ROLE_DEFINITIONS = [
 // ─────────────────────────────────────────
 function getSessionUser() {
   try {
-    const raw = sessionStorage.getItem('hs_user');
+    const raw = localStorage.getItem('hs_user');
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
@@ -428,6 +428,22 @@ function checkMaintenance() {
 // ─────────────────────────────────────────
 function renderHeader(options = {}) {
   const { currentUser = null } = options;
+
+    if (!document.querySelector('meta[name="apple-mobile-web-app-capable"]')) {
+    const metas = [
+      { name: 'apple-mobile-web-app-capable',       content: 'yes' },
+      { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+      { name: 'apple-mobile-web-app-title',          content: '東大阪吹奏楽団' },
+      { name: 'theme-color',                          content: '#0d1b2a' },
+    ];
+    metas.forEach(({ name, content }) => {
+      const meta = document.createElement('meta');
+      meta.name    = name;
+      meta.content = content;
+      document.head.appendChild(meta);
+    });
+  }
+  
   const header = document.getElementById('site-header');
   if (!header) return;
 
