@@ -420,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // セッションの名前を更新
     const updated = { ...sessionUser, name: `${lastName}${firstName}` };
-    sessionStorage.setItem('hs_user', JSON.stringify(updated));
+    localStorage.setItem('hs_user', JSON.stringify(updated));
     showToast('個人情報を更新しました', 'success');
   });
 
