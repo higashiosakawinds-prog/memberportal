@@ -313,7 +313,7 @@ async function loadMembers() {
   if (!_sb) return;
   const { data } = await _sb
     .from('profiles')
-    .select('id,last_name,first_name,part,category')
+    .select('id,last_name,first_name,part,category,email')
     .order('part').order('last_name');
   allMembers = (data ?? []).filter(m => m.category !== 'rest');
 }
