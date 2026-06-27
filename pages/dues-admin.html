@@ -1207,9 +1207,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       .filter(m => m.category !== 'rest' && !(allPayments[m.id]?.[month]?.paid ?? false))
       .map(m => m.email).filter(Boolean);
     if (!emails.length) { showToast('未払いの団員がいません','success'); return; }
-    window.location.href =
-      `mailto:?bcc=${encodeURIComponent(emails.join(','))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    showToast('メールアプリを開きました','success');
+    const _mailtoHref = `mailto:?bcc=${encodeURIComponent(emails.join(','))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    showMailPicker(_mailtoHref);
   });
 });
 </script>
