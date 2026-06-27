@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Supabase未接続時はデモログイン
     if (!_sb) {
       setTimeout(() => {
-        sessionStorage.setItem('hs_user', JSON.stringify({
+        localStorage.setItem('hs_user', JSON.stringify({
           id: 'demo', name: 'デモユーザー', roles: ['admin'], part: '—'
         }));
         window.location.href = '../../index.html';
@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const roles = Array.isArray(profile.roles) && profile.roles.length > 0
       ? profile.roles
       : ['member'];
-    sessionStorage.setItem('hs_user', JSON.stringify({
+    localStorage.setItem('hs_user', JSON.stringify({
       id:    profile.id,
       name:  `${profile.last_name}${profile.first_name}`,
       roles,
