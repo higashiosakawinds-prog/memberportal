@@ -410,7 +410,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // セッションに保存してダッシュボードへ
-    sessionStorage.setItem('hs_user', JSON.stringify({
+    localStorage.setItem('hs_user', JSON.stringify({
       id:    user.id,
       name:  `${lastName}${firstName}`,
       roles: selectedRoles,
