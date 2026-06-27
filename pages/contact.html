@@ -765,7 +765,7 @@ async function executeSend() {
       : `mailto:${encodeURIComponent(to)}?subject=${encSubject}&body=${encBody}`;
   }
 
-  window.location.href = mailtoHref;
+  showMailPicker(mailtoHref);
 
   // ── DB に連絡履歴を保存 ──
   if (_sb) {
@@ -796,7 +796,7 @@ async function executeSend() {
 
   // ── 後処理 ──
   closeModal('modal-preview');
-  showToast('メールアプリを開きました。内容を確認して送信してください。', 'success');
+  showToast('メールアプリを選択して内容を確認してから送信してください。', 'success');
 
   const sentType = type;
   pendingSend = null;
