@@ -424,6 +424,151 @@ function checkMaintenance() {
 }
 
 // ─────────────────────────────────────────
+// 認証が不要なページ（ログイン・登録系）
+// ─────────────────────────────────────────
+const PUBLIC_PAGES = ['login', 'register', 'profile-setup'];
+
+function isPublicPage() {
+  const path = window.location.pathname;
+  return PUBLIC_PAGES.some(p => path.includes(p));
+}
+
+// ─────────────────────────────────────────
+// 未ログイン時の警告オーバーレイを表示
+// ─────────────────────────────────────────
+function showAuthRequiredOverlay() {
+  // すでに存在する場合はスキップ
+  if (document.getElementById('auth-required-overlay')) return;
+
+  const isRoot = !window.location.pathname.includes('/pages/');
+  const loginPath = isRoot ? 'pages/auth/login.html' : '../pages/auth/login.html';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'auth-required-overlay';
+  overlay.style.cssText = `
+    position: fixed; inset: 0; z-index: 9999;
+    background: var(--navy-900);
+    display: flex; align-items: center; justify-content: center;
+    padding: var(--space-4);
+  `;
+
+  overlay.innerHTML = `
+    <div style="
+      width: 100%; max-width: 420px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(201,168,76,0.25);
+      border-radius: var(--radius-xl);
+      padding: var(--space-10) var(--space-8);
+      text-align: center;
+      animation: fadeInUp 0.4s ease both;
+    ">
+      <!-- アイコン -->
+      <div style="
+        width: 72px; height: 72px;
+        background: rgba(201,168,76,0.12);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto var(--space-6);
+        border: 1px solid rgba(201,168,76,0.3);
+      ">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+             stroke="var(--gold-400)" stroke-width="1.5" width="36" height="36">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75
+               m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25
+               v-6.75a2.25 2.25 0 00-2.25-2.25H6.75
+               a2.25 2.25 0 00-2.25 2.25v6.75
+               a2.25 2.25 0 002.25 2.25z"/>
+        </svg>
+      </div>
+
+      <!-- テキスト -->
+      <p style="
+        font-size: var(--text-xs); font-weight: 500;
+        color: var(--gold-500); letter-spacing: 0.2em;
+        text-transform: uppercase; margin-bottom: var(--space-3);
+      ">LOGIN REQUIRED</p>
+
+      <h1 style="
+        font-family: var(--font-display);
+        font-size: var(--text-2xl); font-weight: 700;
+        color: var(--white); margin-bottom: var(--space-4);
+        line-height: 1.4;
+      ">ログインが必要です</h1>
+
+      <p style="
+        font-size: var(--text-sm); color: rgba(255,255,255,0.5);
+        line-height: 1.8; margin-bottom: var(--space-8);
+      ">
+        このページを閲覧するには<br>
+        ログインが必要です。
+      </p>
+
+      <!-- カウントダウン表示 -->
+      <p style="
+        font-size: var(--text-xs); color: rgba(255,255,255,0.3);
+        margin-bottom: var(--space-4);
+      ">
+        <span id="auth-countdown">5</span>秒後に自動的にログイン画面へ移動します
+      </p>
+
+      <!-- ボタン -->
+      <a href="${loginPath}" style="
+        display: inline-flex; align-items: center; gap: var(--space-2);
+        padding: var(--space-3) var(--space-8);
+        background: var(--gold-500); color: var(--navy-900);
+        border-radius: var(--radius-md); font-size: var(--text-sm);
+        font-weight: 700; text-decoration: none;
+        transition: background var(--transition-fast), box-shadow var(--transition-fast);
+      "
+      onmouseover="this.style.background='var(--gold-400)';this.style.boxShadow='var(--shadow-gold)'"
+      onmouseout="this.style.background='var(--gold-500)';this.style.boxShadow='none'">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+             stroke="currentColor" stroke-width="2" width="15" height="15">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6
+               a2.25 2.25 0 00-2.25 2.25v13.5
+               A2.25 2.25 0 007.5 21h6
+               a2.25 2.25 0 002.25-2.25V15
+               M12 9l-3 3m0 0l3 3m-3-3h12.75"/>
+        </svg>
+        今すぐログインする
+      </a>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  document.body.style.overflow = 'hidden';
+
+  // カウントダウンして自動リダイレクト
+  let count = 5;
+  const timer = setInterval(() => {
+    count--;
+    const el = document.getElementById('auth-countdown');
+    if (el) el.textContent = count;
+    if (count <= 0) {
+      clearInterval(timer);
+      window.location.href = loginPath;
+    }
+  }, 1000);
+}
+
+// ─────────────────────────────────────────
+// 認証チェックを実行
+// 未ログインなら警告を表示して true を返す
+// ─────────────────────────────────────────
+function checkAuth() {
+  if (isPublicPage()) return false;
+
+  const sessionUser = getSessionUser();
+  if (!sessionUser) {
+    showAuthRequiredOverlay();
+    return true;
+  }
+  return false;
+}
+
+// ─────────────────────────────────────────
 // ヘッダー生成（役職バッジ付き）
 // ─────────────────────────────────────────
 function renderHeader(options = {}) {
@@ -756,9 +901,10 @@ document.addEventListener('DOMContentLoaded', () => {
   renderSidebar();
   initMobileMenu();
 
+  // ── 認証チェック（未ログインなら警告表示） ──
+  if (checkAuth()) return;
+  
   // ── メンテナンスチェック ──
-  // メンテナンス中のページは、MAINTENANCE_BYPASS_ROLES 以外のユーザーに
-  // オーバーレイを表示してコンテンツをブロックする
   checkMaintenance();
 
   // モーダル外クリックで閉じる
