@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>見学者対応 — 東大阪吹奏楽団</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/common.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* ── 統計カード（コンパクト） ── */
+    .vr-stats { display:grid; grid-template-columns:repeat(6,1fr); gap:var(--space-3); margin-bottom:var(--space-6); }
+    .vr-stat {
+      background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-lg);
+      padding:var(--space-4); cursor:pointer; transition:all var(--transition-fast);
+    }
+    .vr-stat:hover { border-color:var(--navy-500); box-shadow:var(--shadow-sm); }
+    .vr-stat.active { border-color:var(--navy-800); background:rgba(19,34,56,0.04); }
+    .vr-stat__num { font-family:var(--font-numeric); font-size:var(--text-2xl); font-weight:700; color:var(--navy-800); line-height:1; }
+    .vr-stat__label { font-size:var(--text-xs); color:var(--gray-500); margin-top:4px; }
+
+    /* ── ツールバー ── */
+    .vr-toolbar { display:flex; gap:var(--space-3); flex-wrap:wrap; margin-bottom:var(--space-5); align-items:center; }
+    .vr-toolbar input { flex:1; min-width:200px; }
+
+    /* ── 一覧（メール風リスト） ── */
+    .vr-list { display:flex; flex-direction:column; background:var(--white); border-radius:var(--radius-lg); border:1px solid var(--gray-200); overflow:hidden; }
+    .vr-row {
+      display:grid; grid-template-columns:14px 1fr auto; align-items:center; gap:var(--space-4);
+      padding:var(--space-4) var(--space-5); border-bottom:1px solid var(--gray-200);
+      cursor:pointer; transition:background var(--transition-fast);
+    }
+    .vr-row:last-child { border-bottom:none; }
+    .vr-row:hover { background:var(--gray-100); }
+    .vr-row__dot { width:8px; height:8px; border-radius:50%; background:var(--gold-500); flex-shrink:0; }
+    .vr-row__dot.read { background:transparent; }
+    .vr-row__main { min-width:0; }
+    .vr-row__top { display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; margin-bottom:3px; }
+    .vr-row__name { font-weight:700; color:var(--navy-800); font-size:var(--text-base); }
+    .vr-row__sub { font-size:var(--text-xs); color:var(--gray-500); }
+    .vr-row__meta { display:flex; align-items:center; gap:var(--space-3); flex-shrink:0; }
+    .vr-row__date { font-size:var(--text-xs); color:var(--gray-400); white-space:nowrap; min-width:64px; text-align:right; }
+    .vr-row__assignee { font-size:var(--text-xs); color:var(--gray-500); white-space:nowrap; }
+
+    .status-badge-new       { background:rgba(192,57,43,.12);  color:var(--danger); }
+    .status-badge-contacted { background:rgba(230,126,34,.12); color:#ca6f1e; }
+    .status-badge-scheduled { background:rgba(41,128,185,.12); color:#1a5276; }
+    .status-badge-visited   { background:rgba(201,168,76,.18); color:#8a6f1e; }
+    .status-badge-joined    { background:rgba(39,174,96,.12);  color:#1e8449; }
+    .status-badge-declined  { background:var(--gray-200);      color:var(--gray-500); }
+
+    /* ── 詳細モーダル ── */
+    #modal-detail .modal { max-width:640px; }
+    .vr-detail-section-label {
+      font-size:var(--text-xs); font-weight:700; color:var(--gold-500);
+      letter-spacing:.15em; text-transform:uppercase;
+      border-bottom:1px solid var(--gray-200); padding-bottom:var(--space-2);
+      margin-bottom:var(--space-3); margin-top:var(--space-5);
+    }
+    .vr-detail-section-label:first-child { margin-top:0; }
+    .vr-dl { display:grid; grid-template-columns:110px 1fr; gap:var(--space-2) var(--space-4); font-size:var(--text-sm); }
+    .vr-dl dt { color:var(--gray-500); }
+    .vr-dl dd { color:var(--gray-800); font-weight:500; word-break:break-word; }
+
+    .vr-quick-actions { display:flex; gap:var(--space-2); flex-wrap:wrap; margin-top:var(--space-3); }
+
+    .vr-status-group { display:flex; gap:var(--space-2); flex-wrap:wrap; }
+    .vr-status-btn {
+      padding:var(--space-2) var(--space-4); border-radius:var(--radius-full);
+      font-size:var(--text-xs); font-weight:600; border:1px solid var(--gray-300);
+      background:var(--white); color:var(--gray-600); cursor:pointer; transition:all var(--transition-fast);
+    }
+    .vr-status-btn:hover { border-color:var(--navy-500); }
+    .vr-status-btn.is-selected { background:var(--navy-800); color:var(--gold-300); border-color:var(--navy-800); font-weight:700; }
+
+    .vr-date-chip {
+      display:inline-flex; align-items:center; gap:6px; padding:4px 12px;
+      border-radius:var(--radius-full); font-size:var(--text-xs); font-weight:600;
+      background:rgba(41,128,185,.1); color:#1a5276; border:1px solid rgba(41,128,185,.25); margin:2px;
+    }
+
+    .vr-visit-count { display:flex; align-items:center; gap:var(--space-3); }
+    .vr-visit-count__num { font-family:var(--font-numeric); font-size:var(--text-xl); font-weight:700; color:var(--navy-800); min-width:1.5ch; text-align:center; }
+
+    @media(max-width:768px){
+      .vr-stats { grid-template-columns:repeat(3,1fr); }
+      .vr-row { grid-template-columns:10px 1fr; }
+      .vr-row__meta { grid-column:2/3; justify-content:space-between; margin-top:4px; }
+      .vr-toolbar { flex-direction:column; align-items:stretch; }
+      .vr-dl { grid-template-columns:90px 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="site-header" id="site-header"></header>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main-content">
+
+    <div class="page-header fade-in">
+      <div>
+        <p class="page-header__eyebrow">COMMUNICATION</p>
+        <h1 class="page-header__title">見学者対応</h1>
+      </div>
+    </div>
+
+    <!-- 権限なしメッセージ（JSで表示切替） -->
+    <div id="no-permission" style="display:none;padding:var(--space-16);text-align:center;">
+      <p style="font-size:var(--text-lg);font-weight:700;color:var(--danger);">このページにはアクセス権限がありません。</p>
+      <a href="../index.html" class="btn btn-outline" style="margin-top:var(--space-6);">ダッシュボードに戻る</a>
+    </div>
+
+    <div id="vr-app" style="display:none;">
+
+      <!-- 集計カード（フィルタ兼用） -->
+      <div class="vr-stats fade-in fade-in-1" id="vr-stats"></div>
+
+      <!-- ツールバー -->
+      <div class="vr-toolbar fade-in fade-in-2">
+        <input type="text" id="search-input" class="form-control" placeholder="名前・メール・電話番号で検索…">
+        <button class="btn btn-outline btn-sm" id="btn-reload">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+          更新
+        </button>
+      </div>
+
+      <!-- 一覧 -->
+      <div class="vr-list fade-in fade-in-3" id="vr-list">
+        <div style="text-align:center;padding:var(--space-10);">
+          <div class="loading-spinner" style="margin:0 auto;"></div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<!-- ══ 詳細モーダル ══ -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal">
+    <div class="modal__header">
+      <h2 class="modal__title" id="detail-title">見学者詳細</h2>
+      <button class="modal__close" onclick="closeModal('modal-detail')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body" id="detail-body">読み込み中…</div>
+    <div class="modal__footer" style="justify-content:space-between;">
+      <span id="detail-updated-hint" style="font-size:var(--text-xs);color:var(--gray-400);"></span>
+      <div style="display:flex;gap:var(--space-3);">
+        <button class="btn btn-outline" onclick="closeModal('modal-detail')">閉じる</button>
+        <button class="btn btn-gold" id="btn-save-detail">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+          変更を保存
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<script src="../js/supabase.js"></script>
+<script src="../js/common.js"></script>
+<script>
+// ══════════════════════════════════════
+//  定数
+// ══════════════════════════════════════
+const STATUS_DEFS = [
+  { key:'new',       label:'新規',           css:'status-badge-new' },
+  { key:'contacted', label:'連絡済み・日程調整中', css:'status-badge-contacted' },
+  { key:'scheduled', label:'見学予定',       css:'status-badge-scheduled' },
+  { key:'visited',   label:'見学済み',       css:'status-badge-visited' },
+  { key:'joined',    label:'入団',           css:'status-badge-joined' },
+  { key:'declined',  label:'見送り・辞退',   css:'status-badge-declined' },
+];
+const STATUS_MAP = Object.fromEntries(STATUS_DEFS.map(s => [s.key, s]));
+
+const PART_LABELS = {
+  piccolo:'Piccolo', flute:'Flute', oboe:'Oboe', clarinet:'Clarinet', bassclarinet:'Bass Clarinet',
+  bassoon:'Bassoon', ssaxophone:'Soprano Sax', asaxophone:'Alto Sax', tsaxophone:'Tenor Sax',
+  bsaxophone:'Baritone Sax', horn:'Horn', trumpet:'Trumpet', trombone:'Trombone',
+  euphonium:'Euphonium', tuba:'Tuba', percussion:'Percussion', contrabass:'Contrabass',
+  piano:'Piano', staff:'スタッフ', other:'その他', undecided:'未定・相談したい',
+};
+
+// 見学者対応の担当になれるロール（common.js の ROLE_PERMISSIONS に合わせてここでも判定に使用）
+const VISITOR_MANAGER_ROLES = ['gm','leader','subleader','safety'];
+
+// ══════════════════════════════════════
+//  状態
+// ══════════════════════════════════════
+let allRequests   = [];
+let activitiesMap = {};   // { activityId: activityRow }
+let staffMembers  = [];   // 担当者候補
+let activeFilter  = 'all';
+let currentDetail = null; // 編集中のレコード（ローカルコピー）
+
+// ══════════════════════════════════════
+//  ユーティリティ
+// ══════════════════════════════════════
+const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+}
+function fmtRelative(iso) {
+  if (!iso) return '—';
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diffMs / 86400000);
+  if (days <= 0) return '本日';
+  if (days === 1) return '昨日';
+  if (days < 7)  return `${days}日前`;
+  return new Date(iso).toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' });
+}
+function fmtActivityDate(a) {
+  if (!a) return '（削除された日程）';
+  const d = new Date(a.activity_date + 'T00:00:00');
+  const W = ['日','月','火','水','木','金','土'];
+  const t = a.start_time ? ` ${a.start_time.slice(0,5)}〜` : '';
+  return `${d.getMonth()+1}/${d.getDate()}(${W[d.getDay()]})${t}`;
+}
+
+function canManageVisitors() {
+  const user = getSessionUser();
+  if (!user) return false;
+  const roles = Array.isArray(user.roles) ? user.roles : [user.role].filter(Boolean);
+  return roles.some(r => VISITOR_MANAGER_ROLES.includes(r));
+}
+
+// ══════════════════════════════════════
+//  データ読み込み
+// ══════════════════════════════════════
+async function loadAll() {
+  if (!_sb) { showToast('Supabase未接続です', 'error'); return; }
+
+  const [reqRes, actRes, memRes] = await Promise.all([
+    _sb.from('visit_requests').select('*').order('created_at', { ascending: false }),
+    _sb.from('activities').select('id, activity_date, start_time, activity_type'),
+    _sb.from('profiles').select('id, last_name, first_name, roles'),
+  ]);
+
+  if (reqRes.error) {
+    document.getElementById('vr-list').innerHTML =
+      `<div style="text-align:center;padding:var(--space-10);color:var(--danger);">データの取得に失敗しました：${escHtml(reqRes.error.message)}</div>`;
+    return;
+  }
+
+  allRequests = reqRes.data ?? [];
+  activitiesMap = {};
+  (actRes.data ?? []).forEach(a => { activitiesMap[a.id] = a; });
+  staffMembers = (memRes.data ?? []).filter(m => {
+    const roles = Array.isArray(m.roles) ? m.roles : [];
+    return roles.some(r => VISITOR_MANAGER_ROLES.includes(r));
+  });
+
+  renderStats();
+  renderList();
+}
+
+// ══════════════════════════════════════
+//  集計カード
+// ══════════════════════════════════════
+function renderStats() {
+  const counts = { all: allRequests.length };
+  STATUS_DEFS.forEach(s => { counts[s.key] = allRequests.filter(r => r.status === s.key).length; });
+
+  const cards = [
+    { key:'all', label:'すべて' },
+    { key:'new', label:'新規' },
+    { key:'contacted', label:'連絡済み・調整中' },
+    { key:'scheduled', label:'見学予定' },
+    { key:'visited', label:'見学済み' },
+    { key:'joined', label:'入団' },
+  ];
+
+  document.getElementById('vr-stats').innerHTML = cards.map(c => `
+    <div class="vr-stat ${activeFilter === c.key ? 'active' : ''}" onclick="setFilter('${c.key}')">
+      <p class="vr-stat__num">${counts[c.key] ?? 0}</p>
+      <p class="vr-stat__label">${escHtml(c.label)}</p>
+    </div>`).join('');
+}
+
+function setFilter(key) {
+  activeFilter = key;
+  renderStats();
+  renderList();
+}
+
+// ══════════════════════════════════════
+//  一覧描画
+// ══════════════════════════════════════
+function renderList() {
+  const kw = document.getElementById('search-input').value.trim().toLowerCase();
+
+  const filtered = allRequests.filter(r => {
+    if (activeFilter !== 'all' && r.status !== activeFilter) return false;
+    if (kw) {
+      const text = `${r.name}${r.yomi ?? ''}${r.email}${r.phone ?? ''}`.toLowerCase();
+      if (!text.includes(kw)) return false;
+    }
+    return true;
+  });
+
+  const listEl = document.getElementById('vr-list');
+  if (!filtered.length) {
+    listEl.innerHTML = `<div style="text-align:center;padding:var(--space-10);color:var(--gray-500);">該当する見学申込はありません。</div>`;
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(r => {
+    const status   = STATUS_MAP[r.status] ?? STATUS_MAP.new;
+    const assignee = staffMembers.find(m => m.id === r.assigned_to);
+    const dateIds  = r.date_request_activity_ids ?? [];
+    const firstAct = dateIds.map(id => activitiesMap[id]).filter(Boolean).sort((a,b) => a.activity_date.localeCompare(b.activity_date))[0];
+    const dateSummary = dateIds.length
+      ? `${fmtActivityDate(firstAct)}${dateIds.length > 1 ? ` 他${dateIds.length - 1}件` : ''}`
+      : (r.date_request_note ? '希望日程（自由記述あり）' : '希望日程未指定');
+    const isUnread = r.status === 'new';
+
+    return `
+      <div class="vr-row" onclick="openDetail('${r.id}')">
+        <span class="vr-row__dot ${isUnread ? '' : 'read'}"></span>
+        <div class="vr-row__main">
+          <div class="vr-row__top">
+            <span class="vr-row__name">${escHtml(r.name)}</span>
+            <span class="badge ${status.css}" style="font-size:10px;">${escHtml(status.label)}</span>
+            ${r.member_type === 'minor' ? '<span class="badge badge-warning" style="font-size:10px;">未成年</span>' : ''}
+            ${PART_LABELS[r.part] ? `<span class="badge badge-navy" style="font-size:10px;">${escHtml(PART_LABELS[r.part])}</span>` : ''}
+          </div>
+          <div class="vr-row__sub">📅 ${escHtml(dateSummary)}　✉️ ${escHtml(r.email)}</div>
+        </div>
+        <div class="vr-row__meta">
+          <span class="vr-row__assignee">${assignee ? `👤 ${escHtml(assignee.last_name)}` : '未割当'}</span>
+          <span class="vr-row__date">${escHtml(fmtRelative(r.created_at))}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════
+//  詳細モーダル
+// ══════════════════════════════════════
+function openDetail(id) {
+  const r = allRequests.find(x => x.id === id);
+  if (!r) return;
+  currentDetail = { ...r }; // ローカル編集用コピー
+
+  document.getElementById('detail-title').textContent = `${r.name} さんの見学申込`;
+  document.getElementById('detail-updated-hint').textContent =
+    `申込：${fmtDateTime(r.created_at)}　更新：${fmtDateTime(r.updated_at)}`;
+
+  const dateIds = r.date_request_activity_ids ?? [];
+  const dateChips = dateIds.map(id => activitiesMap[id])
+    .sort((a,b) => (a?.activity_date ?? '').localeCompare(b?.activity_date ?? ''))
+    .map(a => `<span class="vr-date-chip">📅 ${escHtml(fmtActivityDate(a))}</span>`).join('') || '<span style="color:var(--gray-400);font-size:var(--text-sm);">指定なし</span>';
+
+  const assigneeOptions = ['<option value="">未割当</option>']
+    .concat(staffMembers.map(m => `<option value="${m.id}" ${m.id === r.assigned_to ? 'selected' : ''}>${escHtml(m.last_name)}${escHtml(m.first_name)}</option>`))
+    .join('');
+
+  document.getElementById('detail-body').innerHTML = `
+    <p class="vr-detail-section-label">基本情報</p>
+    <dl class="vr-dl">
+      <dt>お名前</dt><dd>${escHtml(r.name)} ${r.yomi ? `（${escHtml(r.yomi)}）` : ''}</dd>
+      <dt>生年月日</dt><dd>${escHtml(r.birthday ?? '—')}${r.member_type === 'minor' ? ' <span class="badge badge-warning" style="font-size:10px;">未成年</span>' : ''}</dd>
+      <dt>希望パート</dt><dd>${escHtml(PART_LABELS[r.part] ?? r.part ?? '—')}</dd>
+      <dt>メール</dt><dd><a href="mailto:${escHtml(r.email)}" style="color:var(--navy-600);text-decoration:underline;">${escHtml(r.email)}</a></dd>
+      <dt>電話番号</dt><dd>${r.phone ? `<a href="tel:${escHtml(r.phone)}" style="color:var(--navy-600);text-decoration:underline;">${escHtml(r.phone)}</a>` : '—'}</dd>
+      <dt>LINE ID</dt><dd>${escHtml(r.line_id ?? '—')}</dd>
+    </dl>
+
+    ${r.member_type === 'minor' ? `
+    <p class="vr-detail-section-label">保護者情報</p>
+    <dl class="vr-dl">
+      <dt>保護者氏名</dt><dd>${escHtml(r.guardian_name ?? '—')}</dd>
+      <dt>保護者連絡先</dt><dd>${r.emergency_phone ? `<a href="tel:${escHtml(r.emergency_phone)}" style="color:var(--navy-600);text-decoration:underline;">${escHtml(r.emergency_phone)}</a>` : '—'}</dd>
+    </dl>` : ''}
+
+    <p class="vr-detail-section-label">希望日程・コメント</p>
+    <div style="margin-bottom:var(--space-2);">${dateChips}</div>
+    ${r.date_request_note ? `<p style="font-size:var(--text-sm);color:var(--gray-700);white-space:pre-wrap;background:var(--gray-100);padding:var(--space-3);border-radius:var(--radius-md);">${escHtml(r.date_request_note)}</p>` : ''}
+    ${r.comment ? `<p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:var(--space-2);">申込時コメント：${escHtml(r.comment)}</p>` : ''}
+
+    <div class="vr-quick-actions">
+      <a class="btn btn-sm btn-outline" href="mailto:${escHtml(r.email)}?subject=${encodeURIComponent('【東大阪吹奏楽団】見学のご案内')}">✉️ メールする</a>
+      ${r.phone ? `<a class="btn btn-sm btn-outline" href="tel:${escHtml(r.phone)}">📞 電話する</a>` : ''}
+      ${r.line_id ? `<button class="btn btn-sm btn-outline" onclick="copyText('${escHtml(r.line_id)}')">💬 LINE IDをコピー</button>` : ''}
+    </div>
+
+    <p class="vr-detail-section-label">対応ステータス</p>
+    <div class="vr-status-group" id="detail-status-group">
+      ${STATUS_DEFS.map(s => `<button type="button" class="vr-status-btn ${r.status === s.key ? 'is-selected' : ''}" data-val="${s.key}" onclick="selectDetailStatus('${s.key}')">${escHtml(s.label)}</button>`).join('')}
+    </div>
+
+    <p class="vr-detail-section-label">担当者・見学回数</p>
+    <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" style="font-size:var(--text-xs);">担当者</label>
+        <select id="detail-assignee" class="form-control">${assigneeOptions}</select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" style="font-size:var(--text-xs);">見学に来た回数（最大3回）</label>
+        <div class="vr-visit-count">
+          <button type="button" class="btn btn-sm btn-outline" onclick="bumpVisitCount(-1)">−</button>
+          <span class="vr-visit-count__num" id="detail-visit-count">${r.visit_count ?? 0}</span>
+          <button type="button" class="btn btn-sm btn-outline" onclick="bumpVisitCount(1)">＋</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="vr-detail-section-label">内部メモ（申込者には非公開）</p>
+    <div class="form-group" style="margin-bottom:0;">
+      <textarea id="detail-notes" class="form-control" rows="3" placeholder="対応履歴や引き継ぎ事項など">${escHtml(r.internal_notes ?? '')}</textarea>
+    </div>
+  `;
+
+  openModal('modal-detail');
+}
+
+function selectDetailStatus(key) {
+  currentDetail.status = key;
+  document.querySelectorAll('#detail-status-group .vr-status-btn').forEach(b => {
+    b.classList.toggle('is-selected', b.dataset.val === key);
+  });
+}
+
+function bumpVisitCount(delta) {
+  const el = document.getElementById('detail-visit-count');
+  const next = Math.max(0, Math.min(3, parseInt(el.textContent) + delta));
+  el.textContent = next;
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text)
+    .then(() => showToast('コピーしました', 'success'))
+    .catch(() => showToast('コピーに失敗しました', 'error'));
+}
+
+// ══════════════════════════════════════
+//  保存
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('btn-save-detail').addEventListener('click', async () => {
+    if (!currentDetail || !_sb) return;
+
+    const btn = document.getElementById('btn-save-detail');
+    btn.disabled = true; btn.textContent = '保存中…';
+
+    const payload = {
+      status:         currentDetail.status,
+      assigned_to:    document.getElementById('detail-assignee').value || null,
+      visit_count:    parseInt(document.getElementById('detail-visit-count').textContent) || 0,
+      internal_notes: document.getElementById('detail-notes').value.trim() || null,
+    };
+
+    const { error } = await _sb.from('visit_requests').update(payload).eq('id', currentDetail.id);
+
+    btn.disabled = false; btn.textContent = '変更を保存';
+
+    if (error) { showToast('保存に失敗しました: ' + error.message, 'error'); return; }
+
+    const idx = allRequests.findIndex(x => x.id === currentDetail.id);
+    if (idx !== -1) Object.assign(allRequests[idx], payload);
+
+    showToast('保存しました', 'success');
+    closeModal('modal-detail');
+    renderStats();
+    renderList();
+  });
+
+  document.getElementById('search-input').addEventListener('input', renderList);
+  document.getElementById('btn-reload').addEventListener('click', loadAll);
+});
+
+// ══════════════════════════════════════
+//  初期化
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!canManageVisitors()) {
+    document.getElementById('no-permission').style.display = 'block';
+    return;
+  }
+  document.getElementById('vr-app').style.display = 'block';
+  await loadAll();
+});
+</script>
+</body>
+</html>
