@@ -422,7 +422,10 @@ function openDetail(id) {
       ${r.line_id ? `<button class="btn btn-sm btn-outline" onclick="copyText('${escHtml(r.line_id)}')">💬 LINE IDをコピー</button>` : ''}
     </div>
 
-    <p class="vr-detail-section-label">メールでのやりとり</p>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:var(--space-2);">
+      <p class="vr-detail-section-label" style="margin-bottom:0;">メールでのやりとり</p>
+      <span id="vr-sync-status" style="font-size:10px;color:var(--gray-400);display:flex;align-items:center;gap:5px;"></span>
+    </div>
     <div class="vr-chat-wrap" id="vr-chat-wrap">
       <div class="vr-chat-empty">読み込み中…</div>
     </div>
@@ -499,11 +502,34 @@ async function loadChatMessages(visitRequestId, opts = {}) {
 
   currentMessages = data ?? [];
   renderChat();
+  updateSyncStatus();
+}
+
+// 直近のsynced_atを「最終同期」として表示（GmailAPI側の同期が実際に反映された時刻）
+function updateSyncStatus() {
+  const el = document.getElementById('vr-sync-status');
+  if (!el) return;
+  if (!currentMessages.length) {
+    el.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:var(--gray-300);"></span> まだ同期履歴なし`;
+    return;
+  }
+  const latestSynced = currentMessages.reduce((max, m) => {
+    const t = m.synced_at ? new Date(m.synced_at).getTime() : 0;
+    return t > max ? t : max;
+  }, 0);
+  const label = latestSynced
+    ? new Date(latestSynced).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })
+    : '—';
+  el.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:var(--success);"></span> Gmail同期済み・最終更新 ${escHtml(label)}`;
 }
 
 function renderChat() {
   const wrap = document.getElementById('vr-chat-wrap');
   if (!wrap) return;
+
+  // 更新前に「一番下付近を見ていたか」を判定し、その場合だけ更新後も一番下へ追従する。
+  // 上の方をスクロールして読んでいる最中は、自動更新でスクロール位置が動かないようにする。
+  const wasNearBottom = (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight) < 60;
 
   if (!currentMessages.length) {
     wrap.innerHTML = `<div class="vr-chat-empty">まだメールのやりとりはありません。下から最初のメッセージを送信できます。</div>`;
@@ -519,7 +545,9 @@ function renderChat() {
       <div class="vr-bubble-meta">${m.direction === 'outbound' ? '自団' : '相手'}・${escHtml(fmt(m.sent_at))}</div>
     </div>`).join('');
 
-  wrap.scrollTop = wrap.scrollHeight;
+  if (wasNearBottom) {
+    wrap.scrollTop = wrap.scrollHeight;
+  }
 }
 
 // ログイン中ユーザーの氏名・役職から署名を生成
@@ -534,12 +562,15 @@ function buildSenderSignature() {
   return `\n\n──\n東大阪吹奏楽団　${user.name ?? ''}${roleStr}`;
 }
 
+// メール冒頭に入れる返信案内（件名変更なし・本文はこの行より上に書いてもらうよう依頼）
+const REPLY_NOTICE = '※このメールにご返信いただく際は、件名を変更せず「返信」ボタンからそのままご返信ください。\n　（本文はこの区切り線より上にご記入ください）\n──────────────────────';
+
 async function sendChatMessage() {
   if (!currentDetail) return;
   const textarea = document.getElementById('chat-compose-body');
   const rawBody = textarea.value.trim();
   if (!rawBody) { showToast('本文を入力してください', 'error'); return; }
-  const body = rawBody + buildSenderSignature();
+  const body = `${REPLY_NOTICE}\n\n${rawBody}${buildSenderSignature()}`;
 
   if (!isVisitorGasOk()) {
     showToast('送信用GASのURLが未設定です（visitors.htmlのVISITOR_SEND_GAS_URL）', 'error');
