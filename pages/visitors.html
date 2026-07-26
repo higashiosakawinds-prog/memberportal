@@ -428,6 +428,7 @@ function openDetail(id) {
     </div>
     <div class="vr-compose">
       <textarea id="chat-compose-body" class="form-control" placeholder="返信内容を入力…"></textarea>
+      <p style="font-size:10px;color:var(--gray-400);margin:0;">※送信者名・役職の署名は自動的に本文末尾へ追加されます。</p>
       <div class="vr-compose-row">
         <span class="vr-thread-hint">${r.gmail_thread_id ? '既存のやりとりに返信します' : '初回送信：新しいスレッドを開始します'}</span>
         <button class="btn btn-sm btn-gold" id="btn-chat-send" onclick="sendChatMessage()">
@@ -521,11 +522,24 @@ function renderChat() {
   wrap.scrollTop = wrap.scrollHeight;
 }
 
+// ログイン中ユーザーの氏名・役職から署名を生成
+function buildSenderSignature() {
+  const user = getSessionUser();
+  if (!user) return '';
+  const roleKeys = Array.isArray(user.roles) ? user.roles : [user.role].filter(Boolean);
+  const roleLabels = roleKeys
+    .map(r => (typeof ROLE_DEFINITIONS !== 'undefined' ? ROLE_DEFINITIONS.find(d => d.value === r)?.label : null) ?? r)
+    .filter(Boolean);
+  const roleStr = roleLabels.length ? `（${roleLabels.join('・')}）` : '';
+  return `\n\n──\n東大阪吹奏楽団　${user.name ?? ''}${roleStr}`;
+}
+
 async function sendChatMessage() {
   if (!currentDetail) return;
   const textarea = document.getElementById('chat-compose-body');
-  const body = textarea.value.trim();
-  if (!body) { showToast('本文を入力してください', 'error'); return; }
+  const rawBody = textarea.value.trim();
+  if (!rawBody) { showToast('本文を入力してください', 'error'); return; }
+  const body = rawBody + buildSenderSignature();
 
   if (!isVisitorGasOk()) {
     showToast('送信用GASのURLが未設定です（visitors.htmlのVISITOR_SEND_GAS_URL）', 'error');
