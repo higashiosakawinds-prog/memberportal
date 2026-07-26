@@ -35,7 +35,7 @@ const MAINTENANCE_CONFIG = {
   settings:           false,  // 設定
   schedule:           false,   //スケジュール
   activities:         false,   //活動記録
-  visitors:           true,    //見学者連絡
+  visitors:           false,    //見学者連絡
 };
 
 // メンテナンス中ページの閲覧を許可するロール
