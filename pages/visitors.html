@@ -212,7 +212,7 @@ const PART_LABELS = {
 };
 
 // 見学者対応の担当になれるロール（common.js の ROLE_PERMISSIONS に合わせてここでも判定に使用）
-const VISITOR_MANAGER_ROLES = ['gm','leader','subleader'];
+const VISITOR_MANAGER_ROLES = ['gm','leader','subleader','safety'];
 
 // メール送信用 Apps Script Webアプリ URL（visitor-gmail-sync.gs をデプロイして取得したURLに置き換える）
 const VISITOR_SEND_GAS_URL = 'https://script.google.com/macros/s/AKfycbxyXiBQQ-Fg_lkVZiPYzb5DoKDLdIHO_R7e2-0tGQQDTUWfdADyF2ithP0lx0Pp6dkCLA/exec';
@@ -415,6 +415,7 @@ function openDetail(id) {
     <p class="vr-detail-section-label">希望日程・コメント</p>
     <div style="margin-bottom:var(--space-2);">${dateChips}</div>
     ${r.date_request_note ? `<p style="font-size:var(--text-sm);color:var(--gray-700);white-space:pre-wrap;background:var(--gray-100);padding:var(--space-3);border-radius:var(--radius-md);">${escHtml(r.date_request_note)}</p>` : ''}
+    ${r.comment ? `<p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:var(--space-2);">申込時コメント：${escHtml(r.comment)}</p>` : ''}
 
     <div class="vr-quick-actions">
       ${r.phone ? `<a class="btn btn-sm btn-outline" href="tel:${escHtml(r.phone)}">📞 電話する</a>` : ''}
@@ -429,6 +430,12 @@ function openDetail(id) {
       <div class="vr-chat-empty">読み込み中…</div>
     </div>
     <div class="vr-compose">
+      <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-2);">
+        <button type="button" class="btn btn-sm btn-outline" onclick="insertUpcomingPractices()">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="13" height="13"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5"/></svg>
+          今後3回の練習日を挿入
+        </button>
+      </div>
       <textarea id="chat-compose-body" class="form-control" placeholder="返信内容を入力…"></textarea>
       <p style="font-size:10px;color:var(--gray-400);margin:0;">※送信者名・役職の署名は自動的に本文末尾へ追加されます。</p>
       <div class="vr-compose-row">
@@ -547,6 +554,50 @@ function renderChat() {
   if (wasNearBottom) {
     wrap.scrollTop = wrap.scrollHeight;
   }
+}
+
+// 今後3回の「練習」日程を取得し、返信本文のカーソル位置へ挿入する
+async function insertUpcomingPractices() {
+  if (!_sb) { showToast('Supabase未接続です', 'error'); return; }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await _sb
+    .from('activities')
+    .select('activity_date, start_time, end_time, location')
+    .eq('activity_type', 'practice')
+    .eq('is_cancelled', false)
+    .gte('activity_date', today)
+    .order('activity_date', { ascending: true })
+    .limit(3);
+
+  if (error) { showToast('練習日程の取得に失敗しました: ' + error.message, 'error'); return; }
+  if (!data || !data.length) { showToast('今後の練習予定が登録されていません', 'error'); return; }
+
+  const WD = ['日','月','火','水','木','金','土'];
+  const lines = data.map(a => {
+    const d = new Date(a.activity_date + 'T00:00:00');
+    const timeStr = a.start_time ? ` ${a.start_time.slice(0,5)}〜${a.end_time ? a.end_time.slice(0,5) : ''}` : '';
+    return `・${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）${timeStr}${a.location ? '　' + a.location : ''}`;
+  });
+  const block = `【今後の練習予定】\n${lines.join('\n')}`;
+
+  insertAtCursor(document.getElementById('chat-compose-body'), block);
+}
+
+// テキストエリアのカーソル位置（未フォーカス時は末尾）にテキストを挿入する
+function insertAtCursor(textarea, text) {
+  const hasSelection = document.activeElement === textarea;
+  const start = hasSelection ? textarea.selectionStart : textarea.value.length;
+  const end   = hasSelection ? textarea.selectionEnd   : textarea.value.length;
+  const before = textarea.value.slice(0, start);
+  const after  = textarea.value.slice(end);
+  const needsLeadingBreak = before.length > 0 && !before.endsWith('\n');
+  const insertText = (needsLeadingBreak ? '\n' : '') + text + '\n';
+
+  textarea.value = before + insertText + after;
+  const newPos = (before + insertText).length;
+  textarea.focus();
+  textarea.setSelectionRange(newPos, newPos);
 }
 
 // ログイン中ユーザーの氏名・役職から署名を生成
