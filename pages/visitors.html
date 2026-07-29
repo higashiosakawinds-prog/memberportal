@@ -23,6 +23,16 @@
     .vr-toolbar { display:flex; gap:var(--space-3); flex-wrap:wrap; margin-bottom:var(--space-5); align-items:center; }
     .vr-toolbar input { flex:1; min-width:200px; }
 
+    /* ── 表示切替タブ（対応中 / アーカイブ） ── */
+    .vr-viewmode-tabs { display:flex; gap:0; border-bottom:2px solid var(--gray-200); margin-bottom:var(--space-5); }
+    .vr-viewmode-tab {
+      padding:var(--space-2) var(--space-5); font-size:var(--text-sm); font-weight:500;
+      color:var(--gray-500); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px;
+      transition:all var(--transition-fast); background:none; border-top:none; border-left:none; border-right:none;
+    }
+    .vr-viewmode-tab:hover { color:var(--navy-700); }
+    .vr-viewmode-tab.active { color:var(--navy-800); border-bottom-color:var(--gold-500); font-weight:700; }
+
     /* ── 一覧（メール風リスト） ── */
     .vr-list { display:flex; flex-direction:column; background:var(--white); border-radius:var(--radius-lg); border:1px solid var(--gray-200); overflow:hidden; }
     .vr-row {
@@ -97,14 +107,8 @@
     }
     .vr-bubble-row.outbound .vr-bubble { background:var(--navy-800); color:var(--white); border-bottom-right-radius:4px; }
     .vr-bubble-row.inbound  .vr-bubble { background:var(--white); color:var(--gray-800); border:1px solid var(--gray-200); border-bottom-left-radius:4px; }
-    .vr-bubble-meta { font-size:10px; color:var(--gray-400); margin-top:3px; padding:0 4px; display:flex; align-items:center; gap:6px; }
+    .vr-bubble-meta { font-size:10px; color:var(--gray-400); margin-top:3px; padding:0 4px; }
     .vr-bubble-subject { font-size:10px; color:var(--gray-400); margin-bottom:2px; padding:0 4px; }
-    .vr-bubble-row.archived { opacity:.45; }
-    .vr-archive-btn {
-      font-size:10px; color:var(--gray-400); background:none; border:none; cursor:pointer;
-      text-decoration:underline; text-underline-offset:2px; padding:0;
-    }
-    .vr-archive-btn:hover { color:var(--navy-600); }
 
     .vr-compose { margin-top:var(--space-3); display:flex; flex-direction:column; gap:var(--space-2); }
     .vr-compose textarea { resize:vertical; min-height:70px; }
@@ -145,6 +149,9 @@
 
     <div id="vr-app" style="display:none;">
 
+      <!-- 表示切替（対応中 / アーカイブ） -->
+      <div class="vr-viewmode-tabs fade-in fade-in-1" id="vr-viewmode-tabs"></div>
+
       <!-- 集計カード（フィルタ兼用） -->
       <div class="vr-stats fade-in fade-in-1" id="vr-stats"></div>
 
@@ -179,8 +186,11 @@
       </button>
     </div>
     <div class="modal__body" id="detail-body">読み込み中…</div>
-    <div class="modal__footer" style="justify-content:space-between;">
-      <span id="detail-updated-hint" style="font-size:var(--text-xs);color:var(--gray-400);"></span>
+    <div class="modal__footer" style="justify-content:space-between;flex-wrap:wrap;gap:var(--space-2);">
+      <div style="display:flex;align-items:center;gap:var(--space-3);">
+        <span id="detail-updated-hint" style="font-size:var(--text-xs);color:var(--gray-400);"></span>
+        <button class="btn btn-sm btn-outline" id="btn-toggle-archive" onclick="toggleArchiveVisitor()"></button>
+      </div>
       <div style="display:flex;gap:var(--space-3);">
         <button class="btn btn-outline" onclick="closeVisitorDetailModal()">閉じる</button>
         <button class="btn btn-gold" id="btn-save-detail">
@@ -231,10 +241,10 @@ let allRequests   = [];
 let activitiesMap = {};   // { activityId: activityRow }
 let staffMembers  = [];   // 担当者候補
 let activeFilter  = 'all';
+let viewMode      = 'active'; // 'active' = 対応中（アーカイブ以外） / 'archived' = アーカイブのみ
 let currentDetail = null; // 編集中のレコード（ローカルコピー）
 let currentMessages = [];  // 開いている見学者のチャット履歴
 let chatPollTimer = null;  // モーダルを開いている間の自動更新タイマー
-let showArchivedMessages = false; // チャット内のアーカイブ済みメッセージを表示するか
 
 // ══════════════════════════════════════
 //  ユーティリティ
@@ -296,16 +306,36 @@ async function loadAll() {
     return roles.some(r => VISITOR_MANAGER_ROLES.includes(r));
   });
 
+  renderViewModeTabs();
   renderStats();
   renderList();
 }
 
 // ══════════════════════════════════════
-//  集計カード
+//  表示切替タブ（対応中 / アーカイブ）
 // ══════════════════════════════════════
+function renderViewModeTabs() {
+  const archivedCount = allRequests.filter(r => r.archived).length;
+  const tabs = [
+    { key:'active',   label:'対応中' },
+    { key:'archived', label:`アーカイブ${archivedCount ? `（${archivedCount}）` : ''}` },
+  ];
+  document.getElementById('vr-viewmode-tabs').innerHTML = tabs.map(t => `
+    <button class="vr-viewmode-tab ${viewMode === t.key ? 'active' : ''}" onclick="setViewMode('${t.key}')">${escHtml(t.label)}</button>`).join('');
+}
+
+function setViewMode(mode) {
+  viewMode = mode;
+  activeFilter = 'all';
+  renderViewModeTabs();
+  renderStats();
+  renderList();
+}
+
 function renderStats() {
-  const counts = { all: allRequests.length };
-  STATUS_DEFS.forEach(s => { counts[s.key] = allRequests.filter(r => r.status === s.key).length; });
+  const scoped = allRequests.filter(r => !!r.archived === (viewMode === 'archived'));
+  const counts = { all: scoped.length };
+  STATUS_DEFS.forEach(s => { counts[s.key] = scoped.filter(r => r.status === s.key).length; });
 
   const cards = [
     { key:'all', label:'すべて' },
@@ -336,6 +366,7 @@ function renderList() {
   const kw = document.getElementById('search-input').value.trim().toLowerCase();
 
   const filtered = allRequests.filter(r => {
+    if (!!r.archived !== (viewMode === 'archived')) return false;
     if (activeFilter !== 'all' && r.status !== activeFilter) return false;
     if (kw) {
       const text = `${r.name}${r.yomi ?? ''}${r.email}${r.phone ?? ''}`.toLowerCase();
@@ -346,7 +377,7 @@ function renderList() {
 
   const listEl = document.getElementById('vr-list');
   if (!filtered.length) {
-    listEl.innerHTML = `<div style="text-align:center;padding:var(--space-10);color:var(--gray-500);">該当する見学申込はありません。</div>`;
+    listEl.innerHTML = `<div style="text-align:center;padding:var(--space-10);color:var(--gray-500);">${viewMode === 'archived' ? 'アーカイブ済みの見学申込はありません。' : '該当する見学申込はありません。'}</div>`;
     return;
   }
 
@@ -387,11 +418,11 @@ function openDetail(id) {
   const r = allRequests.find(x => x.id === id);
   if (!r) return;
   currentDetail = { ...r }; // ローカル編集用コピー
-  showArchivedMessages = false;
 
   document.getElementById('detail-title').textContent = `${r.name} さんの見学申込`;
   document.getElementById('detail-updated-hint').textContent =
     `申込：${fmtDateTime(r.created_at)}　更新：${fmtDateTime(r.updated_at)}`;
+  updateArchiveButton();
 
   const dateIds = r.date_request_activity_ids ?? [];
   const dateChips = dateIds.map(id => activitiesMap[id])
@@ -436,12 +467,6 @@ function openDetail(id) {
     <div id="vr-unread-banner" style="${r.has_unread_reply ? 'display:flex;' : 'display:none;'}align-items:center;justify-content:space-between;gap:var(--space-3);background:rgba(41,128,185,.08);border:1px solid rgba(41,128,185,.25);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);margin-bottom:var(--space-2);">
       <span style="font-size:var(--text-xs);color:#1a5276;font-weight:600;">🔵 新着の返信があります</span>
       <button type="button" class="btn btn-sm btn-outline" onclick="confirmReadReply()">確認した</button>
-    </div>
-    <div style="display:flex;justify-content:flex-end;margin-bottom:4px;">
-      <label style="font-size:10px;color:var(--gray-400);display:flex;align-items:center;gap:4px;cursor:pointer;">
-        <input type="checkbox" id="chk-show-archived" onchange="toggleShowArchived()" style="width:12px;height:12px;">
-        <span id="archived-count-label">アーカイブ済みも表示</span>
-      </label>
     </div>
     <div class="vr-chat-wrap" id="vr-chat-wrap">
       <div class="vr-chat-empty">読み込み中…</div>
@@ -554,33 +579,18 @@ function renderChat() {
   // 上の方をスクロールして読んでいる最中は、自動更新でスクロール位置が動かないようにする。
   const wasNearBottom = (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight) < 60;
 
-  const visible = currentMessages.filter(m => showArchivedMessages || !m.archived);
-  const archivedCount = currentMessages.length - currentMessages.filter(m => !m.archived).length;
-
-  const archivedCountLabel = document.getElementById('archived-count-label');
-  if (archivedCountLabel) {
-    archivedCountLabel.textContent = archivedCount > 0
-      ? `アーカイブ済みも表示（${archivedCount}件）`
-      : 'アーカイブ済みも表示';
-  }
-
-  if (!visible.length) {
-    wrap.innerHTML = currentMessages.length
-      ? `<div class="vr-chat-empty">アーカイブ済みのメッセージのみです。上のチェックを入れると表示されます。</div>`
-      : `<div class="vr-chat-empty">まだメールのやりとりはありません。下から最初のメッセージを送信できます。</div>`;
+  if (!currentMessages.length) {
+    wrap.innerHTML = `<div class="vr-chat-empty">まだメールのやりとりはありません。下から最初のメッセージを送信できます。</div>`;
     return;
   }
 
   const fmt = iso => new Date(iso).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
 
-  wrap.innerHTML = visible.map(m => `
-    <div class="vr-bubble-row ${m.direction}${m.archived ? ' archived' : ''}">
+  wrap.innerHTML = currentMessages.map(m => `
+    <div class="vr-bubble-row ${m.direction}">
       <div class="vr-bubble-subject">${escHtml(m.subject ?? '')}</div>
       <div class="vr-bubble">${escHtml(m.body ?? '')}</div>
-      <div class="vr-bubble-meta">
-        ${m.direction === 'outbound' ? '自団' : '相手'}・${escHtml(fmt(m.sent_at))}
-        ${m.id ? `<button type="button" class="vr-archive-btn" onclick="toggleArchiveMessage('${m.id}', ${!m.archived})">${m.archived ? '復元' : 'アーカイブ'}</button>` : ''}
-      </div>
+      <div class="vr-bubble-meta">${m.direction === 'outbound' ? '自団' : '相手'}・${escHtml(fmt(m.sent_at))}</div>
     </div>`).join('');
 
   if (wasNearBottom) {
@@ -588,18 +598,36 @@ function renderChat() {
   }
 }
 
-function toggleShowArchived() {
-  showArchivedMessages = document.getElementById('chk-show-archived').checked;
-  renderChat();
+function updateArchiveButton() {
+  const btn = document.getElementById('btn-toggle-archive');
+  if (!btn || !currentDetail) return;
+  btn.innerHTML = currentDetail.archived
+    ? '📤 アーカイブから戻す'
+    : '📦 アーカイブする';
 }
 
-async function toggleArchiveMessage(messageId, archive) {
-  const { error } = await _sb.from('visit_messages').update({ archived: archive }).eq('id', messageId);
+async function toggleArchiveVisitor() {
+  if (!currentDetail) return;
+  const nextArchived = !currentDetail.archived;
+  const msg = nextArchived
+    ? `「${currentDetail.name}」さんをアーカイブに移動しますか？\n一覧の「対応中」タブには表示されなくなります。`
+    : `「${currentDetail.name}」さんをアーカイブから戻しますか？`;
+  if (!confirm(msg)) return;
+
+  const { error } = await _sb.from('visit_requests').update({ archived: nextArchived }).eq('id', currentDetail.id);
   if (error) { showToast('操作に失敗しました: ' + error.message, 'error'); return; }
-  const msg = currentMessages.find(m => m.id === messageId);
-  if (msg) msg.archived = archive;
-  renderChat();
-  showToast(archive ? 'アーカイブしました' : 'アーカイブから戻しました', 'success');
+
+  currentDetail.archived = nextArchived;
+  const idx = allRequests.findIndex(x => x.id === currentDetail.id);
+  if (idx !== -1) allRequests[idx].archived = nextArchived;
+
+  updateArchiveButton();
+  showToast(nextArchived ? 'アーカイブに移動しました' : 'アーカイブから戻しました', 'success');
+
+  closeVisitorDetailModal();
+  renderViewModeTabs();
+  renderStats();
+  renderList();
 }
 
 async function confirmReadReply() {
