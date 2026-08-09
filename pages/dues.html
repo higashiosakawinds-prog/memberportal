@@ -81,12 +81,9 @@
     }
 
     .history-wrap {
-      border-radius: var(--radius-lg);
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
+      border-radius: var(--radius-lg); overflow: hidden;
       border: 1px solid var(--gray-200);
     }
-    .history-wrap .table { min-width: 320px; }
     .dot {
       display: inline-block; width: 9px; height: 9px;
       border-radius: 50%; margin-right: 5px; vertical-align: middle;
@@ -95,11 +92,40 @@
     .dot.unpaid { background: var(--gray-300); }
 
     @media(max-width:600px){
-      .dues-info-grid { grid-template-columns: 1fr; }
-      .action-card { padding: var(--space-4); }
-      /* 支払いボタンを全幅に */
-      .action-card .btn { width: 100%; justify-content: center; }
+      .dues-info-grid { grid-template-columns: 1fr 1fr; }
     }
+
+    /* ── 特例措置バナー ── */
+    .sm-active-banner {
+      background: linear-gradient(135deg, #f39c12, #e67e22);
+      border-radius: var(--radius-lg);
+      padding: var(--space-5) var(--space-6);
+      margin-bottom: var(--space-6);
+      color: white;
+      display: flex; align-items: center; gap: var(--space-4);
+    }
+    .sm-active-banner__icon { font-size: 36px; flex-shrink: 0; }
+    .sm-active-banner__title { font-size: var(--text-xl); font-weight: 800; margin-bottom: 4px; }
+    .sm-active-banner__sub  { font-size: var(--text-sm); opacity: .9; }
+
+    /* ── 特例措置申請セクション ── */
+    .sm-apply-section {
+      border-top: 1px solid var(--gray-200);
+      padding-top: var(--space-8);
+      margin-top: var(--space-4);
+      text-align: center;
+    }
+
+    /* ── 規約スクロールボックス ── */
+    .terms-scroll-box {
+      max-height: 320px; overflow-y: auto;
+      border: 1px solid var(--gray-200); border-radius: var(--radius-md);
+      padding: var(--space-5); margin-bottom: var(--space-4);
+      background: #f9fafb;
+    }
+    .terms-section { margin-bottom: var(--space-5); }
+    .terms-section__heading { font-size: var(--text-sm); font-weight: 700; color: var(--navy-800); margin-bottom: var(--space-2); }
+    .terms-section__body    { font-size: var(--text-sm); color: var(--gray-600); line-height: 1.8; }
   </style>
 </head>
 <body>
@@ -108,6 +134,16 @@
 <div class="app-layout">
   <nav class="sidebar" id="sidebar"></nav>
   <main class="main-content">
+
+
+    <!-- 特例措置アクティブバナー -->
+    <div id="sm-banner" style="display:none;" class="sm-active-banner fade-in">
+      <div class="sm-active-banner__icon">🛡️</div>
+      <div>
+        <div class="sm-active-banner__title">特例措置 適用中</div>
+        <div class="sm-active-banner__sub" id="sm-banner-sub"></div>
+      </div>
+    </div>
 
     <div class="page-header fade-in">
       <div>
@@ -165,6 +201,21 @@
       </div>
     </div>
 
+
+    <!-- ④ 特例措置 -->
+    <div class="sm-apply-section fade-in fade-in-4" id="sm-apply-section">
+      <p class="page-header__eyebrow">SPECIAL MEASURES</p>
+      <h2 style="font-size:var(--text-xl);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-2);">特例措置</h2>
+      <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-5);">
+        団費の全額支払いが一時的に困難な場合、特例措置を申請することができます。
+      </p>
+      <div id="sm-current-status"></div>
+      <button class="btn btn-outline" id="btn-sm-apply" onclick="openTermsModal()" style="display:none;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        特例措置の申請をする
+      </button>
+    </div>
+
   </main>
 </div>
 
@@ -191,6 +242,72 @@
   </div>
 </div>
 
+
+<!-- 特例措置 規約モーダル -->
+<div class="modal-overlay" id="modal-sm-terms">
+  <div class="modal" style="max-width:580px;">
+    <div class="modal__header">
+      <h2 class="modal__title" id="sm-terms-title">団費特例措置 申請規約</h2>
+      <button class="modal__close" onclick="closeModal('modal-sm-terms')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div class="terms-scroll-box" id="sm-terms-content"></div>
+      <div style="padding:var(--space-4);background:#f0f4f8;border-radius:var(--radius-md);">
+        <p style="font-size:var(--text-sm);color:var(--navy-800);font-weight:500;" id="sm-terms-agreement"></p>
+      </div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-sm-terms')">閉じる</button>
+      <button class="btn btn-gold" onclick="onAgreeTerms()">同意する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 特例措置 申請フォームモーダル -->
+<div class="modal-overlay" id="modal-sm-apply">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal__header">
+      <h2 class="modal__title">特例措置の申請</h2>
+      <button class="modal__close" onclick="closeModal('modal-sm-apply')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div class="form-group">
+        <label class="form-label">申請者氏名</label>
+        <input type="text" id="sm-name" class="form-control" readonly style="background:var(--gray-100);">
+      </div>
+      <div class="form-group">
+        <label class="form-label">申請理由 <span style="color:var(--danger);">*</span></label>
+        <textarea id="sm-reason" class="form-control" rows="4" placeholder="申請理由を記入してください（内容は幹部のみ閲覧できます）" style="resize:vertical;line-height:1.7;"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">開始希望月 <span style="color:var(--danger);">*</span></label>
+        <select id="sm-start-month" class="form-control" style="max-width:200px;" onchange="onStartMonthChange()"></select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-3);">
+        <div>
+          <p style="font-size:var(--text-xs);color:var(--gray-500);margin-bottom:4px;">基本終了月（6か月後）</p>
+          <p style="font-weight:700;color:var(--navy-800);" id="sm-end-month"></p>
+        </div>
+        <div>
+          <p style="font-size:var(--text-xs);color:var(--gray-500);margin-bottom:4px;">延長終了月（再申請・12か月後）</p>
+          <p style="font-weight:700;color:var(--gray-500);" id="sm-ext-end-month"></p>
+        </div>
+      </div>
+      <p style="font-size:var(--text-xs);color:var(--gray-400);">
+        ※ 延長は再申請により可能です（最大12か月）。承認後に幹部が開始月を調整する場合があります。
+      </p>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-sm-apply')">キャンセル</button>
+      <button class="btn btn-gold" id="btn-submit-apply" onclick="submitApplication()">申請する</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 <script src="../js/supabase.js"></script>
 <script src="../js/common.js"></script>
@@ -211,6 +328,181 @@ const CAT_LABELS = {
 // ══════════════════════════════════════
 //  状態
 // ══════════════════════════════════════
+
+// ── 特例措置の状態 ──
+let mySpecialMeasure = null;
+
+// ── 月計算ユーティリティ ──
+function addMonths(yyyyMM, n) {
+  const [y, m] = yyyyMM.split('-').map(Number);
+  const d = new Date(y, m - 1 + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+function getCurrentMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+function isSmActive(sm, month) {
+  if (!sm || sm.status !== 'approved') return false;
+  const m = month ?? getCurrentMonth();
+  return sm.actual_start_month <= m && m <= sm.actual_end_month;
+}
+
+// ── 特例措置の読み込み ──
+async function loadMySpecialMeasure() {
+  if (!_sb || !getSessionUser()) return null;
+  const { data, error } = await _sb
+    .from('special_measures')
+    .select('*')
+    .eq('member_id', getSessionUser().id)
+    .order('applied_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) { console.warn('特例措置取得失敗', error.message); return null; }
+  return data;
+}
+
+// ── バナー描画 ──
+function renderSpecialMeasureBanner() {
+  const banner = document.getElementById('sm-banner');
+  const sub    = document.getElementById('sm-banner-sub');
+  if (!banner) return;
+  if (isSmActive(mySpecialMeasure, getCurrentMonth())) {
+    sub.textContent = `${fmtMonth(mySpecialMeasure.actual_start_month)} 〜 ${fmtMonth(mySpecialMeasure.actual_end_month)} ／ 団費は通常額の50%（半額）が適用されています`;
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ── 申請セクション現状表示 ──
+function renderSmCurrentStatus() {
+  const area = document.getElementById('sm-current-status');
+  const btn  = document.getElementById('btn-sm-apply');
+  if (!area) return;
+  const sm  = mySpecialMeasure;
+  const now = getCurrentMonth();
+
+  if (!sm) {
+    area.innerHTML = '';
+    if (btn) btn.style.display = 'inline-flex';
+    return;
+  }
+  if (sm.status === 'pending') {
+    area.innerHTML = `
+      <div class="alert alert-info mb-4" style="justify-content:flex-start;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+        <span>申請中 — 幹部による承認をお待ちください（申請日：${new Date(sm.applied_at).toLocaleDateString('ja-JP')}）</span>
+      </div>`;
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  if (sm.status === 'approved' && isSmActive(sm, now)) {
+    area.innerHTML = `
+      <div class="alert mb-4" style="background:rgba(39,174,96,.1);border:1px solid rgba(39,174,96,.3);justify-content:flex-start;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--success)" stroke-width="2" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span style="color:var(--success);font-weight:600;">特例措置 適用中（〜${escHtml(fmtMonth(sm.actual_end_month))}）</span>
+      </div>`;
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  if (sm.status === 'rejected') {
+    area.innerHTML = `
+      <div class="alert alert-warning mb-4" style="justify-content:flex-start;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+        <span>前回の申請は否認されました。再度申請することができます。</span>
+      </div>`;
+    if (btn) btn.style.display = 'inline-flex';
+    return;
+  }
+  // 期間終了
+  area.innerHTML = `
+    <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-4);">
+      前回の特例措置（〜${escHtml(fmtMonth(sm.actual_end_month ?? sm.end_month))}）は終了しました。再申請することができます。
+    </p>`;
+  if (btn) btn.style.display = 'inline-flex';
+}
+
+// ── 規約モーダルを開く ──
+function openTermsModal() {
+  const titleEl   = document.getElementById('sm-terms-title');
+  const contentEl = document.getElementById('sm-terms-content');
+  const agreeEl   = document.getElementById('sm-terms-agreement');
+  if (titleEl)   titleEl.textContent = SPECIAL_MEASURES_TERMS.title;
+  if (agreeEl)   agreeEl.textContent = SPECIAL_MEASURES_TERMS.agreement_text;
+  if (contentEl) {
+    contentEl.innerHTML =
+      (SPECIAL_MEASURES_TERMS.lastUpdated
+        ? `<p style="font-size:var(--text-xs);color:var(--gray-400);margin-bottom:var(--space-4);">最終更新：${escHtml(SPECIAL_MEASURES_TERMS.lastUpdated)}</p>`
+        : '') +
+      SPECIAL_MEASURES_TERMS.sections.map(s => `
+        <div class="terms-section">
+          <p class="terms-section__heading">${escHtml(s.heading)}</p>
+          <p class="terms-section__body">${escHtml(s.body)}</p>
+        </div>`).join('');
+  }
+  openModal('modal-sm-terms');
+}
+
+// ── 規約に同意して申請フォームへ ──
+function onAgreeTerms() {
+  closeModal('modal-sm-terms');
+  const user = getSessionUser();
+  const name = myProfile
+    ? `${myProfile.last_name} ${myProfile.first_name}`
+    : (user?.name ?? '');
+  document.getElementById('sm-name').value   = name;
+  document.getElementById('sm-reason').value = '';
+
+  const sel = document.getElementById('sm-start-month');
+  const now = new Date();
+  sel.innerHTML = Array.from({ length: 3 }, (_, i) => {
+    const d  = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return `<option value="${ym}">${fmtMonth(ym)}</option>`;
+  }).join('');
+  onStartMonthChange();
+  openModal('modal-sm-apply');
+}
+
+// ── 開始月変更で終了月を自動更新 ──
+function onStartMonthChange() {
+  const start = document.getElementById('sm-start-month').value;
+  document.getElementById('sm-end-month').textContent     = fmtMonth(addMonths(start, 6));
+  document.getElementById('sm-ext-end-month').textContent = fmtMonth(addMonths(start, 12));
+}
+
+// ── 申請を送信 ──
+async function submitApplication() {
+  const user   = getSessionUser();
+  const reason = document.getElementById('sm-reason').value.trim();
+  const start  = document.getElementById('sm-start-month').value;
+  if (!reason) { showToast('申請理由を入力してください', 'error'); return; }
+  if (!_sb)    { showToast('Supabase未接続です', 'error'); return; }
+
+  const btn = document.getElementById('btn-submit-apply');
+  btn.disabled = true; btn.textContent = '申請中…';
+
+  const { error } = await _sb.from('special_measures').insert({
+    member_id:             user.id,
+    reason,
+    requested_start_month: start,
+    end_month:             addMonths(start, 6),
+    extended_end_month:    addMonths(start, 12),
+    status:                'pending',
+  });
+
+  btn.disabled = false; btn.textContent = '申請する';
+  if (error) { showToast('申請に失敗しました: ' + error.message, 'error'); return; }
+
+  closeModal('modal-sm-apply');
+  showToast('特例措置の申請が完了しました。幹部の承認をお待ちください。', 'success');
+
+  mySpecialMeasure = await loadMySpecialMeasure();
+  renderSpecialMeasureBanner();
+  renderSmCurrentStatus();
+}
+
 let myProfile       = null;
 let duesFees        = {};
 let paymentRecords  = {};
@@ -220,6 +512,45 @@ let availableMonths = [];
 // ══════════════════════════════════════
 //  ユーティリティ
 // ══════════════════════════════════════
+// ══════════════════════════════════════
+//  特例措置規約（この定数を編集して文面を変更できます）
+// ══════════════════════════════════════
+const SPECIAL_MEASURES_TERMS = {
+  title: '団費特例措置 申請規約',
+  lastUpdated: '2025年6月1日',  // ← 更新日を変更できます
+  sections: [
+    {
+      heading: '第1条（目的）',
+      body: 'この規約は、東大阪吹奏楽団（以下「本団」という）において、団費の全額支払いが一時的に困難な団員に対し、支払いを支援する特例措置（以下「特例措置」という）について定めるものです。',
+    },
+    {
+      heading: '第2条（対象者）',
+      body: '特例措置は、本団の正規の団員区分（正団員・正団員（学生）・準団員・スタッフ）に属するすべての団員が申請できます。',
+    },
+    {
+      heading: '第3条（措置内容）',
+      body: '特例措置が承認された期間中、団費の支払い額は通常額の50%（半額）となります。差額については本団が一時的に支援します。',
+    },
+    {
+      heading: '第4条（適用期間）',
+      body: '特例措置の基本適用期間は、幹部が承認した開始月から起算して6か月間とします。期間終了後もやむを得ない事情が継続する場合は、再申請により最大12か月まで延長することができます。',
+    },
+    {
+      heading: '第5条（申請方法）',
+      body: 'この申請フォームより必要事項を記入のうえ申請してください。申請後、幹部が内容を確認し、承認または不承認を通知します。承認された場合は、本システム上で特例期間が反映されます。',
+    },
+    {
+      heading: '第6条（守秘義務）',
+      body: '申請内容（申請理由を含む）は幹部のみが閲覧できます。他の団員に対して開示されることは一切ありません。',
+    },
+    {
+      heading: '第7条（誠実申告）',
+      body: '申請者は、申請理由を誠実に申告する義務を負います。虚偽の申告が判明した場合は、特例措置を取り消すことがあります。',
+    },
+  ],
+  agreement_text: '上記の規約をすべて読み、内容を理解した上で申請することに同意します。',
+};
+
 const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -287,6 +618,10 @@ function renderInfoGrid() {
     return;
   }
 
+  // 特例措置アクティブ判定
+  const smNow    = getCurrentMonth();
+  const smOn     = isSmActive(mySpecialMeasure, smNow);
+
   // 休団中はフラットに表示
   if (myCat === 'rest') {
     grid.innerHTML = `
@@ -309,7 +644,11 @@ function renderInfoGrid() {
       <span class="badge badge-gold" style="font-size:10px;margin-bottom:var(--space-2);display:inline-block;">あなたの区分</span>
       <p class="dues-info-card__cat">${escHtml(CAT_LABELS[myCat] ?? myCat)}</p>
       <p class="dues-info-card__amount">
-        ${myFee ? `¥${Number(myFee).toLocaleString()}<small style="font-size:var(--text-sm);font-weight:400;color:var(--gray-500);">/月</small>` : '<span style="font-size:var(--text-base);color:var(--gray-400);">未設定</span>'}
+        ${myFee
+          ? smOn
+            ? `<span style="text-decoration:line-through;color:var(--gray-400);font-size:var(--text-base);">¥${Number(myFee).toLocaleString()}</span>&#8201;<span style="color:#e67e22;font-size:var(--text-2xl);font-weight:800;">¥${Number(Math.floor(myFee/2)).toLocaleString()}</span><small style="font-size:var(--text-sm);font-weight:400;color:var(--gray-500);">/月（特例50%）</small>`
+            : `¥${Number(myFee).toLocaleString()}<small style="font-size:var(--text-sm);font-weight:400;color:var(--gray-500);">/月</small>`
+          : '<span style="font-size:var(--text-base);color:var(--gray-400);">未設定</span>'}
       </p>
       <p class="dues-info-card__method">支払い方法<br>${methodHtml}</p>
     </div>`;
@@ -337,11 +676,19 @@ function selectMonth(m) { selectedMonth = m; renderMonthTabs(); renderActionArea
 //  描画：支払いアクションエリア
 // ══════════════════════════════════════
 function renderActionArea() {
-  const area  = document.getElementById('payment-action-area');
-  const pm    = myProfile?.payment_method;
-  const rec   = paymentRecords[selectedMonth];
-  const paid  = rec?.paid ?? false;
-  const label = fmtMonth(selectedMonth);
+  const area   = document.getElementById('payment-action-area');
+  const pm     = myProfile?.payment_method;
+  const rec    = paymentRecords[selectedMonth];
+  const paid   = rec?.paid ?? false;
+  const label  = fmtMonth(selectedMonth);
+
+  // 特例措置の有効判定とその月の実際の金額を算出
+  const smOn   = isSmActive(mySpecialMeasure, selectedMonth);
+  const baseFee = duesFees[myProfile?.category] ?? 0;
+  const myFeeForMonth = (smOn && baseFee > 0) ? Math.floor(baseFee / 2) : baseFee;
+  const smNote = smOn
+    ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:var(--text-xs);color:#e67e22;font-weight:700;margin-top:var(--space-2);">🛡️ 特例措置適用中 — 今月の団費は¥${myFeeForMonth.toLocaleString()}（半額）です</span>`
+    : '';
 
   if (!myProfile) {
     area.innerHTML = `<div class="alert alert-info"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg><span>ログインが必要です。</span></div>`;
@@ -363,6 +710,7 @@ function renderActionArea() {
           <div>
             <p style="font-weight:700;color:var(--success);font-size:var(--text-lg);">${escHtml(label)}の団費は支払い済みです</p>
             ${dt ? `<p style="font-size:var(--text-xs);color:var(--gray-500);">確認日：${escHtml(dt)}</p>` : ''}
+            ${smNote}
           </div>
         </div>
       </div>`;
@@ -373,6 +721,7 @@ function renderActionArea() {
     area.innerHTML = `
       <div class="action-card credit">
         <p style="font-weight:600;color:var(--navy-800);font-size:var(--text-base);">${escHtml(label)}の団費を支払ったことを確認した。</p>
+        ${smNote}
         <div class="check-row">
           <input type="checkbox" class="big-cb" id="credit-cb" onchange="onCreditCheck(this)">
           <label for="credit-cb" style="font-size:var(--text-sm);color:var(--gray-700);cursor:pointer;">
@@ -384,6 +733,7 @@ function renderActionArea() {
     area.innerHTML = `
       <div class="action-card cash">
         <p style="font-weight:600;color:var(--navy-800);font-size:var(--text-base);">${escHtml(label)}の団費を支払う。</p>
+        ${smNote}
         <p style="font-size:var(--text-sm);color:var(--gray-500);margin-top:var(--space-2);">ボタンを押してQRコードを表示し、会計担当者に読み取ってもらってください。</p>
         <div style="margin-top:var(--space-4);">
           <button class="btn btn-gold" onclick="showQR()">
