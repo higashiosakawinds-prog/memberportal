@@ -147,22 +147,8 @@
 
     @media(max-width:768px){
       .da-tab { padding:var(--space-2) var(--space-3);font-size:var(--text-xs); }
-      /* 支払い状況テーブル：スマホではパート・区分列を非表示にしてスクロール不要に */
-      .st-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
-      .st-wrap .table { min-width:unset; width:100%; }
-      .st-col-part, .st-col-cat { display:none !important; }
-      /* 督促メールフォームのボタンを縦積みに */
-      #panel-mail .card__body > div:last-child { flex-direction:column; gap:var(--space-2); }
-      #panel-mail .card__body > div:last-child .btn { width:100%; justify-content:center; }
-      /* 団費設定グリッドを1列に */
-      .fee-grid { grid-template-columns:1fr 1fr; }
+      .fee-rate-grid { grid-template-columns:1fr; }
     }
-    @media(max-width:480px){
-      .fee-grid { grid-template-columns:1fr; }
-    }
-    /* 数値フォント */
-    .fee-card__amount-val,
-    .dues-num { font-family:var(--font-numeric); font-weight:700; letter-spacing:-0.02em; }
   </style>
 </head>
 <body>
@@ -223,8 +209,8 @@
           <thead>
             <tr>
               <th>氏名</th>
-              <th class="st-col-part">パート</th>
-              <th class="st-col-cat">区分</th>
+              <th>パート</th>
+              <th>区分</th>
               <th>支払い方法</th>
               <th id="mh0" style="text-align:center;">—</th>
               <th id="mh1" style="text-align:center;">—</th>
@@ -460,17 +446,33 @@ const PART_LABELS = {
 };
 
 // ── 状態 ──
-let allMembers   = [];
-let allPayments  = {};
-let duesFees     = {};
-let months3      = [];  // 直近3ヶ月 ['YYYY-MM', ...]
-let pendingQr    = null;
-let scanStream   = null;
-let scanTimer    = null;
+let allMembers      = [];
+let allPayments     = {};
+let duesFees        = {};
+let specialMeasures = {};  // { memberId: { status, actual_start_month, actual_end_month } }
+let months3         = [];  // 直近3ヶ月 ['YYYY-MM', ...]
+let pendingQr       = null;
+let scanStream      = null;
+let scanTimer       = null;
 
 // ══════════════════════════════════════
 //  ユーティリティ
 // ══════════════════════════════════════
+function addMonths(yyyyMM, n) {
+  const [y, m] = yyyyMM.split('-').map(Number);
+  const d = new Date(y, m - 1 + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+function getCurrentMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+function isSmActive(sm, month) {
+  if (!sm || sm.status !== 'approved') return false;
+  const m = month ?? getCurrentMonth();
+  return sm.actual_start_month <= m && m <= sm.actual_end_month;
+}
+
 const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const isGasOk = () => DUES_GAS_URL && !DUES_GAS_URL.includes('YOUR_DUES_SCRIPT_ID');
@@ -530,6 +532,26 @@ async function loadAllPayments() {
 // ══════════════════════════════════════
 //  ① 支払い状況テーブル
 // ══════════════════════════════════════
+// ══════════════════════════════════════
+//  特例措置の読み込み（Supabase）
+// ══════════════════════════════════════
+async function loadSpecialMeasures() {
+  if (!_sb) return {};
+  try {
+    const { data, error } = await _sb
+      .from('special_measures')
+      .select('member_id, status, actual_start_month, actual_end_month')
+      .eq('status', 'approved');
+    if (error) throw new Error(error.message);
+    const map = {};
+    (data ?? []).forEach(sm => { map[sm.member_id] = sm; });
+    return map;
+  } catch (e) {
+    console.warn('[HighasuiDX] 特例措置取得失敗:', e.message);
+    return {};
+  }
+}
+
 function renderStatusTable() {
   months3.forEach((m,i) => {
     const el = document.getElementById(`mh${i}`);
@@ -565,11 +587,17 @@ function renderStatusTable() {
       </td>`;
     }).join('');
 
+    // 特例措置のアクティブ判定（表示する最初の月を基準に確認）
+    const smForMember  = specialMeasures[m.id];
+    const smBadgeHtml  = months3.some(mo => isSmActive(smForMember, mo))
+      ? '<span class="badge badge-gold" title="特例措置適用中" style="font-size:9px;margin-left:4px;">特例</span>'
+      : '';
+
     return `
       <tr class="${rowCls}">
-        <td style="font-weight:600;color:var(--navy-800);">${escHtml(m.last_name)} ${escHtml(m.first_name)}</td>
-        <td class="st-col-part" style="font-size:var(--text-sm);">${escHtml(PART_LABELS[m.part]??'—')}</td>
-        <td class="st-col-cat"><span class="badge badge-navy" style="font-size:10px;">${escHtml(CAT_LABELS[m.category]??'—')}</span></td>
+        <td style="font-weight:600;color:var(--navy-800);">${escHtml(m.last_name)} ${escHtml(m.first_name)}${smBadgeHtml}</td>
+        <td style="font-size:var(--text-sm);">${escHtml(PART_LABELS[m.part]??'—')}</td>
+        <td><span class="badge badge-navy" style="font-size:10px;">${escHtml(CAT_LABELS[m.category]??'—')}</span></td>
         <td>${pmBadge}</td>
         ${cells}
       </tr>`;
@@ -661,10 +689,11 @@ function onDetected(raw) {
 
   if (raw.startsWith('DP:')) {
     const parts = raw.split(':');
-    // parts: ['DP', shortId, 'YYYY-MM'] ← YYYY-MM はコロンを含まないため分割されない
-    if (parts.length >= 3) {
+    // parts: ['DP', shortId, 'YYYY', 'MM'] ← YYYY-MM は split(':') で分割される
+    // → 'YYYY-MM' は index 2〜3 を再結合
+    if (parts.length >= 4) {
       const shortId  = parts[1];
-      const yyyyMM   = parts[2];
+      const yyyyMM   = `${parts[2]}-${parts[3]}`;
 
       // allMembersからショートIDで逆引き（先頭12文字照合）
       const found = allMembers.find(m => {
@@ -808,7 +837,9 @@ async function openRegisterModal() {
   }
 
   // ── GASから支払いデータを再取得 ──
-  allPayments = await loadAllPayments();
+  allPayments     = await loadAllPayments();
+  // ── Supabaseから特例措置を再取得 ──
+  specialMeasures = await loadSpecialMeasures();
 
   btn.disabled = false;
   btn.textContent = '今月の支払いを登録';
@@ -860,28 +891,35 @@ function recalculate() {
   // 休団中を除外した全団員
   const targets = allMembers.filter(m => m.category !== 'rest');
 
-  // カテゴリ × 支払い方法ごとに人数をカウント
+  // カテゴリ × 支払い方法 × 特例有無ごとに人数をカウント
   // 支払い済み判定: allPayments[memberId][month].paid === true
   const counts = {
     regular_cash: 0, regular_credit: 0, regular_none: 0,
+    regular_sm_cash: 0, regular_sm_credit: 0, regular_sm_none: 0,  // 特例適用者
     student_cash: 0, student_credit: 0, student_none: 0,
+    student_sm_cash: 0, student_sm_credit: 0, student_sm_none: 0,
     trainee_cash: 0, trainee_credit: 0, trainee_none: 0,
+    trainee_sm_cash: 0, trainee_sm_credit: 0, trainee_sm_none: 0,
     support_cash: 0, support_credit: 0, support_none: 0,
+    support_sm_cash: 0, support_sm_credit: 0, support_sm_none: 0,
   };
 
   targets.forEach(m => {
-    // GASの支払いデータと突き合わせ（paid フラグ確認）
     const payRec = allPayments[m.id]?.[month];
     const paid   = payRec?.paid === true || payRec?.paid === 'paid';
-    if (!paid) return;  // 未払いはスキップ
+    if (!paid) return;
 
-    const pm  = m.payment_method ?? 'none';  // 'cash' | 'credit' | null/undefined
-    const cat = m.category ?? '';
+    const pm     = m.payment_method ?? 'none';
+    const cat    = m.category ?? '';
+    const pmKey  = pm === 'cash' ? 'cash' : pm === 'credit' ? 'credit' : 'none';
+    // 特例措置がこの月に有効かチェック
+    const smOn   = isSmActive(specialMeasures[m.id], month);
+    const prefix = smOn ? `${cat.replace('regular_student','student')}_sm_` : `${cat.replace('regular_student','student')}_`;
 
-    if      (cat === 'regular')         counts[`regular_${pm === 'cash' ? 'cash' : pm === 'credit' ? 'credit' : 'none'}`]++;
-    else if (cat === 'regular_student') counts[`student_${pm === 'cash' ? 'cash' : pm === 'credit' ? 'credit' : 'none'}`]++;
-    else if (cat === 'trainee')         counts[`trainee_${pm === 'cash' ? 'cash' : pm === 'credit' ? 'credit' : 'none'}`]++;
-    else if (cat === 'support')         counts[`support_${pm === 'cash' ? 'cash' : pm === 'credit' ? 'credit' : 'none'}`]++;
+    if      (cat === 'regular')         counts[`regular_${smOn?'sm_':''}${pmKey}`]++;
+    else if (cat === 'regular_student') counts[`student_${smOn?'sm_':''}${pmKey}`]++;
+    else if (cat === 'trainee')         counts[`trainee_${smOn?'sm_':''}${pmKey}`]++;
+    else if (cat === 'support')         counts[`support_${smOn?'sm_':''}${pmKey}`]++;
   });
 
   // 内訳行を構築
@@ -904,15 +942,39 @@ function recalculate() {
     });
   }
   if (counts.regular_none > 0) {
-    // 支払い方法未設定は現金扱いで計上（注記付き）
     rows.push({
       label:   '正団員（支払方法未設定）',
       formula: `${counts.regular_none}名 × ¥${regularFee.toLocaleString()} ※支払方法未設定のため現金扱い`,
       amount:  counts.regular_none * regularFee,
     });
   }
+  // 特例措置適用者（半額）
+  const regularHalf = Math.floor(regularFee / 2);
+  if (counts.regular_sm_cash > 0) {
+    rows.push({
+      label:   '正団員（現金）🛡️特例',
+      formula: `${counts.regular_sm_cash}名 × ¥${regularHalf.toLocaleString()}（¥${regularFee.toLocaleString()}の50%）`,
+      amount:  counts.regular_sm_cash * regularHalf,
+    });
+  }
+  if (counts.regular_sm_credit > 0) {
+    const netHalf = regularHalf - ccReg;
+    rows.push({
+      label:   '正団員（クレジット）🛡️特例',
+      formula: `${counts.regular_sm_credit}名 × (¥${regularHalf.toLocaleString()} − ¥${ccReg.toLocaleString()} 手数料) = ¥${netHalf.toLocaleString()}/人`,
+      amount:  counts.regular_sm_credit * netHalf,
+    });
+  }
+  if (counts.regular_sm_none > 0) {
+    rows.push({
+      label:   '正団員（支払方法未設定）🛡️特例',
+      formula: `${counts.regular_sm_none}名 × ¥${regularHalf.toLocaleString()} ※支払方法未設定のため現金扱い`,
+      amount:  counts.regular_sm_none * regularHalf,
+    });
+  }
 
   // ── 正団員（学生）──
+  const studentHalf = Math.floor(studentFee / 2);
   if (counts.student_cash > 0) {
     rows.push({
       label:   '正団員・学生（現金）',
@@ -935,9 +997,34 @@ function recalculate() {
       amount:  counts.student_none * studentFee,
     });
   }
+  // 特例措置適用者（半額）
+  if (counts.student_sm_cash > 0) {
+    rows.push({
+      label:   '正団員・学生（現金）🛡️特例',
+      formula: `${counts.student_sm_cash}名 × ¥${studentHalf.toLocaleString()}（¥${studentFee.toLocaleString()}の50%）`,
+      amount:  counts.student_sm_cash * studentHalf,
+    });
+  }
+  if (counts.student_sm_credit > 0) {
+    const netHalf = studentHalf - ccStu;
+    rows.push({
+      label:   '正団員・学生（クレジット）🛡️特例',
+      formula: `${counts.student_sm_credit}名 × (¥${studentHalf.toLocaleString()} − ¥${ccStu.toLocaleString()} 手数料) = ¥${netHalf.toLocaleString()}/人`,
+      amount:  counts.student_sm_credit * netHalf,
+    });
+  }
+  if (counts.student_sm_none > 0) {
+    rows.push({
+      label:   '正団員・学生（支払方法未設定）🛡️特例',
+      formula: `${counts.student_sm_none}名 × ¥${studentHalf.toLocaleString()} ※支払方法未設定のため現金扱い`,
+      amount:  counts.student_sm_none * studentHalf,
+    });
+  }
 
-  // ── 準団員（クレカ手数料対象外）──
+  // ── 準団員 ──
+  const traineeHalf  = Math.floor(traineeFee / 2);
   const traineeTotal = counts.trainee_cash + counts.trainee_credit + counts.trainee_none;
+  const traineeTotalSm = counts.trainee_sm_cash + counts.trainee_sm_credit + counts.trainee_sm_none;
   if (traineeTotal > 0) {
     rows.push({
       label:   '準団員',
@@ -945,9 +1032,18 @@ function recalculate() {
       amount:  traineeTotal * traineeFee,
     });
   }
+  if (traineeTotalSm > 0) {
+    rows.push({
+      label:   '準団員 🛡️特例',
+      formula: `${traineeTotalSm}名 × ¥${traineeHalf.toLocaleString()}（¥${traineeFee.toLocaleString()}の50%）`,
+      amount:  traineeTotalSm * traineeHalf,
+    });
+  }
 
-  // ── スタッフ（クレカ手数料対象外）──
+  // ── スタッフ ──
+  const supportHalf  = Math.floor(supportFee / 2);
   const supportTotal = counts.support_cash + counts.support_credit + counts.support_none;
+  const supportTotalSm = counts.support_sm_cash + counts.support_sm_credit + counts.support_sm_none;
   if (supportTotal > 0) {
     rows.push({
       label:   'スタッフ',
@@ -955,21 +1051,30 @@ function recalculate() {
       amount:  supportTotal * supportFee,
     });
   }
+  if (supportTotalSm > 0) {
+    rows.push({
+      label:   'スタッフ 🛡️特例',
+      formula: `${supportTotalSm}名 × ¥${supportHalf.toLocaleString()}（¥${supportFee.toLocaleString()}の50%）`,
+      amount:  supportTotalSm * supportHalf,
+    });
+  }
 
   const grandTotal = rows.reduce((s, r) => s + r.amount, 0);
 
   // ── 人数サマリー（デバッグ用・ユーザー確認用）──
-  const paidAll   = targets.filter(m => {
+  const paidAll    = targets.filter(m => {
     const r = allPayments[m.id]?.[month];
     return r?.paid === true || r?.paid === 'paid';
   });
+  const smPaidCount = paidAll.filter(m => isSmActive(specialMeasures[m.id], month)).length;
   const summaryHtml = `
     <div style="background:var(--gray-100);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-4);font-size:var(--text-xs);color:var(--gray-600);">
-      <span style="font-weight:700;color:var(--navy-800);">${fmtMonth(month)} 支払い済み団員：${paidAll.length}名</span>
-      （正団員 ${counts.regular_cash + counts.regular_credit + counts.regular_none}名、
-        学生 ${counts.student_cash + counts.student_credit + counts.student_none}名、
-        準団員 ${traineeTotal}名、
-        スタッフ ${supportTotal}名）
+      <span style="font-weight:700;color:var(--navy-800);">${fmtMonth(month)} 支払い済み：${paidAll.length}名</span>
+      （正団員 ${counts.regular_cash + counts.regular_credit + counts.regular_none + counts.regular_sm_cash + counts.regular_sm_credit + counts.regular_sm_none}名、
+        学生 ${counts.student_cash + counts.student_credit + counts.student_none + counts.student_sm_cash + counts.student_sm_credit + counts.student_sm_none}名、
+        準団員 ${traineeTotal + traineeTotalSm}名、
+        スタッフ ${supportTotal + supportTotalSm}名）
+      ${smPaidCount > 0 ? `<br><span style="color:#e67e22;font-weight:700;">🛡️ うち特例措置適用：${smPaidCount}名（半額計算）</span>` : ''}
     </div>`;
 
   // ── 内訳をレンダリング ──
@@ -1033,7 +1138,9 @@ async function confirmRegister() {
   btn.disabled    = true;
   btn.textContent = '登録中…';
 
-  // ledger.html の postToGS と同一の形式で POST
+  // 出納帳GAS（ledger.html と同一スプレッドシート）に追記する
+  // 既存GASのdoPostは action==='delete' 以外は無条件で行追加するため、
+  // ledger.html の postToGS と同じ形式（date/type/category/amount/description/vendor）で送信する
   try {
     const res = await fetch(LEDGER_GAS_URL, {
       method:  'POST',
@@ -1126,9 +1233,8 @@ async function updatePm(sel) {
   const id  = sel.dataset.id;
   const val = sel.value;
   if (!_sb){ showToast('Supabase未接続','error'); return; }
-　const { data: updated, error } = await _sb.from('profiles').update({ payment_method: val||null }).eq('id',id).select('id');
-　if (error) { showToast('更新失敗: '+error.message,'error'); return; }
-　if (!updated || updated.length === 0) { showToast('権限がないため更新できませんでした','error'); return; }
+  const { error } = await _sb.from('profiles').update({ payment_method: val||null }).eq('id',id);
+  if (error) { showToast('更新失敗: '+error.message,'error'); return; }
   const m = allMembers.find(x => x.id === id);
   if (m) m.payment_method = val || null;
   showToast('支払い方法を更新しました','success');
@@ -1152,9 +1258,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   months3 = build3Months();
 
   // データ読み込み
-  allMembers  = await loadMembers();
-  duesFees    = await loadFees();
-  allPayments = await loadAllPayments();
+  allMembers      = await loadMembers();
+  duesFees        = await loadFees();
+  allPayments     = await loadAllPayments();
+  specialMeasures = await loadSpecialMeasures();
 
   // 描画
   renderStatusTable();
@@ -1207,8 +1314,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       .filter(m => m.category !== 'rest' && !(allPayments[m.id]?.[month]?.paid ?? false))
       .map(m => m.email).filter(Boolean);
     if (!emails.length) { showToast('未払いの団員がいません','success'); return; }
-    const _mailtoHref = `mailto:?bcc=${encodeURIComponent(emails.join(','))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    showMailPicker(_mailtoHref);
+    window.location.href =
+      `mailto:?bcc=${encodeURIComponent(emails.join(','))}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    showToast('メールアプリを開きました','success');
   });
 });
 </script>
