@@ -862,10 +862,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   duesFees       = await loadFees();
   paymentRecords = user ? await loadMyPayments(user.id) : {};
 
+  // 特例措置の状態を読み込んでから描画
+  mySpecialMeasure = await loadMySpecialMeasure();
+
   renderInfoGrid();
   renderMonthTabs();
   renderActionArea();
   renderHistory();
+
+  // 特例措置バナー・申請ボタンを描画（データ取得後に実行）
+  renderSpecialMeasureBanner();
+  renderSmCurrentStatus();
 });
 </script>
 </body>
