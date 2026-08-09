@@ -92,6 +92,7 @@ const ROLE_PERMISSIONS = {
   dues_payment_approve:   ['all'],      // QR承認・手動支払い変更
   dues_fee_edit:          ['all'],      // 金額変更
   dues_method_edit:       ['all'],      // 支払い方法変更
+  special_measures_admin: ['gm', 'leader''subleader'],   // 特例措置の承認・管理（幹部のみ）
 
   instruments_edit:       ['all'],
   lending_edit:           ['all'],
