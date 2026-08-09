@@ -6,17 +6,72 @@
   <title>団員申請 — 東大阪吹奏楽団</title>
   <link rel="stylesheet" href="../css/variables.css">
   <link rel="stylesheet" href="../css/common.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* ── タブ ── */
+    .req-tabs { display:flex;gap:0;border-bottom:2px solid var(--gray-200);margin-bottom:var(--space-6);flex-wrap:wrap; }
+    .req-tab {
+      padding:var(--space-3) var(--space-5);font-size:var(--text-sm);font-weight:500;
+      color:var(--gray-500);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;
+      transition:all var(--transition-fast);background:none;
+      border-top:none;border-left:none;border-right:none;white-space:nowrap;
+    }
+    .req-tab:hover { color:var(--navy-700); }
+    .req-tab.active { color:var(--navy-800);border-bottom-color:var(--gold-500);font-weight:700; }
+    .req-panel { display:none; }
+    .req-panel.active { display:block; }
+
+    /* ── 申請カード ── */
+    .sm-card {
+      background:var(--white);border:1px solid var(--gray-200);
+      border-radius:var(--radius-lg);padding:var(--space-5);margin-bottom:var(--space-4);
+      transition:box-shadow var(--transition-base);
+    }
+    .sm-card:hover { box-shadow:var(--shadow-sm); }
+    .sm-card__header { display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap; }
+    .sm-card__name { font-size:var(--text-lg);font-weight:700;color:var(--navy-800); }
+    .sm-card__meta { font-size:var(--text-xs);color:var(--gray-500);margin-top:4px; }
+    .sm-card__reason {
+      margin-top:var(--space-3);padding:var(--space-3) var(--space-4);
+      background:var(--gray-100);border-radius:var(--radius-md);
+      font-size:var(--text-sm);color:var(--gray-700);line-height:1.7;
+    }
+    .sm-card__months {
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+      gap:var(--space-3);margin-top:var(--space-4);
+    }
+    .sm-month-item { font-size:var(--text-xs); }
+    .sm-month-item__label { color:var(--gray-500);margin-bottom:2px; }
+    .sm-month-item__value { font-weight:700;color:var(--navy-800);font-size:var(--text-sm); }
+    .sm-card__actions { display:flex;gap:var(--space-3);margin-top:var(--space-4);flex-wrap:wrap; }
+
+    .status-badge {
+      display:inline-flex;align-items:center;gap:4px;
+      padding:2px 10px;border-radius:var(--radius-full);
+      font-size:var(--text-xs);font-weight:700;
+    }
+    .status-pending  { background:rgba(230,126,34,.12);color:#ca6f1e; }
+    .status-approved { background:rgba(39,174,96,.12);color:var(--success); }
+    .status-rejected { background:rgba(192,57,43,.12);color:var(--danger); }
+    .status-expired  { background:var(--gray-200);color:var(--gray-500); }
+
+    .empty-state {
+      text-align:center;padding:var(--space-16);color:var(--gray-400);
+    }
+    .empty-state svg { margin:0 auto var(--space-4); }
+
+    @media(max-width:640px){
+      .req-tab { padding:var(--space-2) var(--space-3);font-size:var(--text-xs); }
+    }
+  </style>
 </head>
 <body>
-
 <header class="site-header" id="site-header"></header>
 <div class="sidebar-overlay" id="sidebar-overlay"></div>
-
 <div class="app-layout">
   <nav class="sidebar" id="sidebar"></nav>
-
   <main class="main-content">
+
     <div class="page-header fade-in">
       <div>
         <p class="page-header__eyebrow">REQUESTS</p>
@@ -24,21 +79,464 @@
       </div>
     </div>
 
-    <div class="card fade-in fade-in-1">
-      <div class="card__body" style="text-align:center;padding:var(--space-16);color:var(--gray-500);">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"
-             width="48" height="48" style="margin:0 auto var(--space-4);opacity:0.3;">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/>
-        </svg>
-        <p style="font-size:var(--text-lg);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-2);">団員申請</p>
-        <p style="font-size:var(--text-sm);">このページは現在開発中です。</p>
+    <!-- 権限なし表示 -->
+    <div id="no-permission" style="display:none;">
+      <div class="card">
+        <div class="card__body" style="text-align:center;padding:var(--space-16);color:var(--gray-500);">
+          <p style="font-size:var(--text-lg);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-2);">閲覧権限がありません</p>
+          <p style="font-size:var(--text-sm);">このページは幹部のみが閲覧できます。</p>
+        </div>
       </div>
     </div>
+
+    <!-- 特例措置管理セクション（幹部のみ） -->
+    <div id="sm-section" style="display:none;">
+
+      <div class="req-tabs fade-in fade-in-1">
+        <button class="req-tab active" data-tab="pending">
+          未対応
+          <span class="sidebar-badge" id="pending-count-badge" style="display:none;margin-left:6px;"></span>
+        </button>
+        <button class="req-tab" data-tab="approved">承認済み</button>
+        <button class="req-tab" data-tab="rejected">否認済み</button>
+        <button class="req-tab" data-tab="all">すべて</button>
+      </div>
+
+      <!-- 未対応 -->
+      <div class="req-panel active" id="panel-pending">
+        <div id="list-pending">
+          <div style="text-align:center;padding:var(--space-10);"><div class="loading-spinner" style="margin:0 auto;"></div></div>
+        </div>
+      </div>
+
+      <!-- 承認済み -->
+      <div class="req-panel" id="panel-approved">
+        <div id="list-approved">
+          <div style="text-align:center;padding:var(--space-10);"><div class="loading-spinner" style="margin:0 auto;"></div></div>
+        </div>
+      </div>
+
+      <!-- 否認済み -->
+      <div class="req-panel" id="panel-rejected">
+        <div id="list-rejected">
+          <div style="text-align:center;padding:var(--space-10);"><div class="loading-spinner" style="margin:0 auto;"></div></div>
+        </div>
+      </div>
+
+      <!-- すべて -->
+      <div class="req-panel" id="panel-all">
+        <div id="list-all">
+          <div style="text-align:center;padding:var(--space-10);"><div class="loading-spinner" style="margin:0 auto;"></div></div>
+        </div>
+      </div>
+
+    </div><!-- /sm-section -->
+
   </main>
 </div>
 
+<!-- 承認モーダル -->
+<div class="modal-overlay" id="modal-approve">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal__header">
+      <h2 class="modal__title">特例措置を承認する</h2>
+      <button class="modal__close" onclick="closeModal('modal-approve')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div class="alert alert-info mb-5">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+        <span>承認すると、団費が半額（50%）になります。開始月は必要に応じて変更できます。</span>
+      </div>
+
+      <div style="background:var(--gray-100);border-radius:var(--radius-md);padding:var(--space-4);margin-bottom:var(--space-5);">
+        <p style="font-size:var(--text-xs);color:var(--gray-500);margin-bottom:2px;">申請者</p>
+        <p style="font-weight:700;color:var(--navy-800);" id="approve-name"></p>
+        <p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:var(--space-2);">申請理由</p>
+        <p style="font-size:var(--text-sm);color:var(--gray-700);margin-top:2px;" id="approve-reason"></p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">
+          特例開始月
+          <span style="font-size:var(--text-xs);font-weight:400;color:var(--gray-400);">（申請希望月から変更可能）</span>
+        </label>
+        <select id="approve-start-month" class="form-control" style="max-width:200px;" onchange="onApproveStartMonthChange()"></select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-5);">
+        <div>
+          <p style="font-size:var(--text-xs);color:var(--gray-500);margin-bottom:4px;">終了月（6か月後）</p>
+          <p style="font-weight:700;color:var(--navy-800);" id="approve-end-month"></p>
+        </div>
+        <div>
+          <p style="font-size:var(--text-xs);color:var(--gray-500);margin-bottom:4px;">再申請延長終了月（12か月後）</p>
+          <p style="font-weight:700;color:var(--gray-500);" id="approve-ext-end-month"></p>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">備考（任意）</label>
+        <textarea id="approve-notes" class="form-control" rows="3" placeholder="団員への伝達事項など（任意）"></textarea>
+      </div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-danger" id="btn-reject-from-approve" onclick="rejectApplication()">否認する</button>
+      <button class="btn btn-outline" onclick="closeModal('modal-approve')">キャンセル</button>
+      <button class="btn btn-gold" onclick="approveApplication()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+        承認する
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
-<script src="../js/supabase.js"><\/script>
-<script src="../js/common.js"><\/script>
+<script src="../js/supabase.js"></script>
+<script src="../js/common.js"></script>
+<script>
+// ══════════════════════════════════════
+//  状態
+// ══════════════════════════════════════
+let allApplications = [];   // special_measures rows + joined profile
+let pendingTarget   = null; // 現在処理中の申請（承認モーダル用）
+let memberMap       = {};   // { id: {last_name, first_name, ...} }
+
+// ══════════════════════════════════════
+//  ユーティリティ
+// ══════════════════════════════════════
+const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function fmtMonth(ym) {
+  if (!ym) return '—';
+  const [y, m] = ym.split('-');
+  return `${y}年${parseInt(m)}月`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('ja-JP', { year:'numeric', month:'short', day:'numeric' });
+}
+
+function addMonths(yyyyMM, n) {
+  const [y, m] = yyyyMM.split('-').map(Number);
+  const d = new Date(y, m - 1 + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getCurrentMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function statusBadge(status) {
+  const map = {
+    pending:  ['status-pending',  '審査中'],
+    approved: ['status-approved', '承認済み'],
+    rejected: ['status-rejected', '否認'],
+    expired:  ['status-expired',  '期間終了'],
+  };
+  const [cls, label] = map[status] ?? ['status-expired', status];
+  return `<span class="status-badge ${cls}">${label}</span>`;
+}
+
+function memberName(memberId) {
+  const m = memberMap[memberId];
+  return m ? `${m.last_name} ${m.first_name}` : '（不明）';
+}
+
+// ══════════════════════════════════════
+//  データ読み込み
+// ══════════════════════════════════════
+async function loadData() {
+  if (!_sb) return;
+
+  // profiles をまず取得
+  const { data: profiles } = await _sb
+    .from('profiles')
+    .select('id, last_name, first_name, category, part');
+  (profiles ?? []).forEach(p => { memberMap[p.id] = p; });
+
+  // special_measures を全件取得（幹部のみがこのページを見る）
+  const { data, error } = await _sb
+    .from('special_measures')
+    .select('*')
+    .order('applied_at', { ascending: false });
+
+  if (error) {
+    console.warn('特例措置取得失敗:', error.message);
+    return;
+  }
+  allApplications = data ?? [];
+}
+
+// ══════════════════════════════════════
+//  リスト描画
+// ══════════════════════════════════════
+const CAT_LABELS = {
+  regular:'正団員', regular_student:'正団員（学生）',
+  trainee:'準団員', support:'スタッフ', rest:'休団中',
+};
+
+function renderCard(sm) {
+  const name   = escHtml(memberName(sm.member_id));
+  const cat    = escHtml(CAT_LABELS[memberMap[sm.member_id]?.category] ?? '—');
+  const now    = getCurrentMonth();
+  const active = sm.status === 'approved'
+    && sm.actual_start_month <= now && now <= sm.actual_end_month;
+
+  return `
+    <div class="sm-card">
+      <div class="sm-card__header">
+        <div>
+          <div class="sm-card__name">
+            ${name}
+            ${active ? '<span class="badge badge-gold" style="font-size:10px;margin-left:6px;">特例中</span>' : ''}
+          </div>
+          <div class="sm-card__meta">
+            ${cat}　／　申請日：${fmtDate(sm.applied_at)}
+          </div>
+        </div>
+        ${statusBadge(sm.status)}
+      </div>
+
+      <div class="sm-card__reason">
+        <span style="font-size:var(--text-xs);color:var(--gray-400);display:block;margin-bottom:4px;">申請理由</span>
+        ${escHtml(sm.reason || '（理由未記入）')}
+      </div>
+
+      <div class="sm-card__months">
+        <div class="sm-month-item">
+          <div class="sm-month-item__label">申請希望開始月</div>
+          <div class="sm-month-item__value">${fmtMonth(sm.requested_start_month)}</div>
+        </div>
+        <div class="sm-month-item">
+          <div class="sm-month-item__label">基本終了月（6か月後）</div>
+          <div class="sm-month-item__value">${fmtMonth(sm.end_month)}</div>
+        </div>
+        <div class="sm-month-item">
+          <div class="sm-month-item__label">延長終了月（12か月後）</div>
+          <div class="sm-month-item__value" style="color:var(--gray-500);">${fmtMonth(sm.extended_end_month)}</div>
+        </div>
+        ${sm.status === 'approved' ? `
+          <div class="sm-month-item">
+            <div class="sm-month-item__label">確定開始月</div>
+            <div class="sm-month-item__value" style="color:var(--success);">${fmtMonth(sm.actual_start_month)}</div>
+          </div>
+          <div class="sm-month-item">
+            <div class="sm-month-item__label">確定終了月</div>
+            <div class="sm-month-item__value" style="color:var(--success);">${fmtMonth(sm.actual_end_month)}</div>
+          </div>` : ''}
+      </div>
+
+      ${sm.notes ? `
+        <div style="margin-top:var(--space-3);font-size:var(--text-xs);color:var(--gray-500);">
+          備考：${escHtml(sm.notes)}
+        </div>` : ''}
+
+      ${sm.status === 'pending' ? `
+        <div class="sm-card__actions">
+          <button class="btn btn-gold" onclick="openApproveModal('${sm.id}')">審査する</button>
+        </div>` : ''}
+
+      ${sm.status === 'approved' ? `
+        <div class="sm-card__actions">
+          <button class="btn btn-sm btn-outline" onclick="openApproveModal('${sm.id}')">内容を変更</button>
+          <button class="btn btn-sm btn-danger" onclick="revokeApproval('${sm.id}')">取り消す</button>
+        </div>` : ''}
+    </div>`;
+}
+
+function renderList(targetId, items) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  if (items.length === 0) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1" width="48" height="48" style="opacity:.3;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z"/>
+        </svg>
+        <p style="font-size:var(--text-sm);">申請はありません</p>
+      </div>`;
+    return;
+  }
+  el.innerHTML = items.map(renderCard).join('');
+}
+
+function renderAllLists() {
+  const pending  = allApplications.filter(s => s.status === 'pending');
+  const approved = allApplications.filter(s => s.status === 'approved');
+  const rejected = allApplications.filter(s => s.status === 'rejected');
+
+  renderList('list-pending',  pending);
+  renderList('list-approved', approved);
+  renderList('list-rejected', rejected);
+  renderList('list-all',      allApplications);
+
+  // バッジ
+  const badge = document.getElementById('pending-count-badge');
+  if (pending.length > 0) {
+    badge.textContent = pending.length;
+    badge.style.display = 'inline-flex';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════
+//  承認モーダル
+// ══════════════════════════════════════
+function openApproveModal(id) {
+  pendingTarget = allApplications.find(s => s.id === id);
+  if (!pendingTarget) return;
+
+  const name = memberName(pendingTarget.member_id);
+  document.getElementById('approve-name').textContent   = name;
+  document.getElementById('approve-reason').textContent = pendingTarget.reason || '（理由未記入）';
+  document.getElementById('approve-notes').value        = pendingTarget.notes ?? '';
+
+  // 開始月の選択肢：申請希望月 ± 3か月
+  const base = pendingTarget.requested_start_month;
+  const sel  = document.getElementById('approve-start-month');
+  sel.innerHTML = Array.from({ length: 7 }, (_, i) => {
+    const ym = addMonths(base, i - 3);
+    const selected = (ym === (pendingTarget.actual_start_month ?? base)) ? 'selected' : '';
+    return `<option value="${ym}" ${selected}>${fmtMonth(ym)}${ym === base ? '（申請希望）' : ''}</option>`;
+  }).join('');
+
+  onApproveStartMonthChange();
+  openModal('modal-approve');
+}
+
+function onApproveStartMonthChange() {
+  const start = document.getElementById('approve-start-month').value;
+  document.getElementById('approve-end-month').textContent     = fmtMonth(addMonths(start, 6));
+  document.getElementById('approve-ext-end-month').textContent = fmtMonth(addMonths(start, 12));
+}
+
+async function approveApplication() {
+  if (!pendingTarget || !_sb) return;
+
+  const startMonth = document.getElementById('approve-start-month').value;
+  const endMonth   = addMonths(startMonth, 6);
+  const notes      = document.getElementById('approve-notes').value.trim();
+  const user       = getSessionUser();
+
+  const btn = document.querySelector('#modal-approve .btn-gold');
+  btn.disabled = true; btn.textContent = '処理中…';
+
+  const { error } = await _sb.from('special_measures').update({
+    status:             'approved',
+    actual_start_month: startMonth,
+    actual_end_month:   endMonth,
+    approved_at:        new Date().toISOString(),
+    approved_by:        user?.id ?? null,
+    notes,
+    // 否認情報をクリア（再承認ケース）
+    rejected_at:        null,
+    rejected_by:        null,
+  }).eq('id', pendingTarget.id);
+
+  btn.disabled = false; btn.textContent = '承認する';
+
+  if (error) {
+    showToast('承認処理に失敗しました: ' + error.message, 'error');
+    return;
+  }
+
+  showToast(`${memberName(pendingTarget.member_id)} さんの特例措置を承認しました`, 'success');
+  closeModal('modal-approve');
+  pendingTarget = null;
+  await loadData();
+  renderAllLists();
+}
+
+async function rejectApplication() {
+  if (!pendingTarget || !_sb) return;
+
+  const user = getSessionUser();
+  if (!confirm(`${memberName(pendingTarget.member_id)} さんの申請を否認しますか？`)) return;
+
+  const notes = document.getElementById('approve-notes').value.trim();
+
+  const { error } = await _sb.from('special_measures').update({
+    status:      'rejected',
+    rejected_at: new Date().toISOString(),
+    rejected_by: user?.id ?? null,
+    notes,
+    // 承認情報をクリア
+    actual_start_month: null,
+    actual_end_month:   null,
+    approved_at:        null,
+    approved_by:        null,
+  }).eq('id', pendingTarget.id);
+
+  if (error) {
+    showToast('否認処理に失敗しました: ' + error.message, 'error');
+    return;
+  }
+
+  showToast(`${memberName(pendingTarget.member_id)} さんの申請を否認しました`, 'success');
+  closeModal('modal-approve');
+  pendingTarget = null;
+  await loadData();
+  renderAllLists();
+}
+
+async function revokeApproval(id) {
+  if (!_sb) return;
+  const sm = allApplications.find(s => s.id === id);
+  if (!sm) return;
+  if (!confirm(`${memberName(sm.member_id)} さんの特例措置承認を取り消しますか？`)) return;
+
+  const { error } = await _sb.from('special_measures').update({
+    status:             'rejected',
+    actual_start_month: null,
+    actual_end_month:   null,
+    approved_at:        null,
+    approved_by:        null,
+    rejected_at:        new Date().toISOString(),
+    rejected_by:        getSessionUser()?.id ?? null,
+  }).eq('id', id);
+
+  if (error) {
+    showToast('取り消しに失敗しました: ' + error.message, 'error');
+    return;
+  }
+
+  showToast('特例措置を取り消しました', 'success');
+  await loadData();
+  renderAllLists();
+}
+
+// ══════════════════════════════════════
+//  初期化
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  // 権限チェック
+  if (!canDo('special_measures_admin')) {
+    document.getElementById('no-permission').style.display = 'block';
+    return;
+  }
+
+  document.getElementById('sm-section').style.display = 'block';
+
+  // データ読み込み & 描画
+  await loadData();
+  renderAllLists();
+
+  // タブ切り替え
+  document.querySelectorAll('.req-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.req-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.req-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
+    });
+  });
+});
+</script>
 </body>
 </html>
