@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>各種申請 — 東大阪吹奏楽団</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/common.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* ── タブ ── */
+    .app-tabs {
+      display: flex; gap: 0; border-bottom: 2px solid var(--gray-200);
+      margin-bottom: var(--space-8); flex-wrap: wrap;
+    }
+    .app-tab {
+      padding: var(--space-3) var(--space-5); font-size: var(--text-sm); font-weight: 500;
+      color: var(--gray-500); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;
+      transition: all var(--transition-fast); background: none;
+      border-top: none; border-left: none; border-right: none; white-space: nowrap;
+    }
+    .app-tab:hover { color: var(--navy-700); }
+    .app-tab.active { color: var(--navy-800); border-bottom-color: var(--gold-500); font-weight: 700; }
+    .app-panel { display: none; }
+    .app-panel.active { display: block; }
+
+    /* ── 特例制度バナー ── */
+    .sm-active-banner {
+      background: linear-gradient(135deg, #f39c12, #e67e22);
+      border-radius: var(--radius-lg);
+      padding: var(--space-5) var(--space-6);
+      margin-bottom: var(--space-6);
+      color: white;
+      display: flex; align-items: center; gap: var(--space-4);
+    }
+    .sm-active-banner__icon { font-size: 36px; flex-shrink: 0; }
+    .sm-active-banner__title { font-size: var(--text-xl); font-weight: 800; margin-bottom: 4px; }
+    .sm-active-banner__sub  { font-size: var(--text-sm); opacity: .9; }
+
+    /* ── 規約スクロールボックス ── */
+    .terms-scroll-box {
+      max-height: 320px; overflow-y: auto;
+      border: 1px solid var(--gray-200); border-radius: var(--radius-md);
+      padding: var(--space-5); margin-bottom: var(--space-4);
+      background: #f9fafb;
+    }
+    .terms-section { margin-bottom: var(--space-5); }
+    .terms-section:last-child { margin-bottom: 0; }
+    .terms-section__heading { font-size: var(--text-sm); font-weight: 700; color: var(--navy-800); margin-bottom: var(--space-2); }
+    .terms-section__body    { font-size: var(--text-sm); color: var(--gray-600); line-height: 1.8; white-space: pre-wrap; }
+
+    /* ── 申請状況カード ── */
+    .req-status-card {
+      padding: var(--space-4); border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md); margin-bottom: var(--space-5);
+      background: var(--gray-100);
+    }
+
+    .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+    @media(max-width: 640px) {
+      .form-grid-2 { grid-template-columns: 1fr; }
+      .app-tab { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+    }
+  </style>
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main-content">
+
+    <div class="page-header fade-in">
+      <div>
+        <p class="page-header__eyebrow">MEMBER</p>
+        <h1 class="page-header__title">各種申請</h1>
+      </div>
+    </div>
+
+    <!-- タブ -->
+    <div class="app-tabs fade-in fade-in-1">
+      <button class="app-tab active" data-tab="special">団費納付特例制度</button>
+      <button class="app-tab" data-tab="rest">休団申請</button>
+      <button class="app-tab" data-tab="withdraw">退団申請</button>
+    </div>
+
+    <!-- ① 団費納付特例制度 -->
+    <div class="app-panel active fade-in fade-in-2" id="panel-special">
+
+      <div id="sm-banner" style="display:none;" class="sm-active-banner">
+        <div class="sm-active-banner__icon">🛡️</div>
+        <div>
+          <div class="sm-active-banner__title">特例制度 適用中</div>
+          <div class="sm-active-banner__sub" id="sm-banner-sub"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card__header"><span class="card__title">団費納付特例制度</span></div>
+        <div class="card__body">
+          <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-5);">
+            やむを得ない事情により団費の納付が一時的に困難な場合は、団費納付特例制度を申請できます。承認されると、適用期間中は団費が通常額の半額になります（残額は納付猶予）。
+          </p>
+          <div id="sm-current-status"></div>
+          <button class="btn btn-outline" id="btn-sm-apply" onclick="openTermsModal()">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            特例制度の申請をする
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② 休団申請 -->
+    <div class="app-panel fade-in fade-in-2" id="panel-rest">
+      <div class="card">
+        <div class="card__header"><span class="card__title">休団申請</span></div>
+        <div class="card__body">
+          <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-5);">
+            諸事情により一時的に活動を休止する場合は、こちらから申請してください。内容を幹部が確認のうえ対応します。
+          </p>
+          <div id="rest-current-status"></div>
+          <div id="rest-form-wrap">
+            <div class="form-group">
+              <label class="form-label">休団理由 <span class="required">*</span></label>
+              <textarea id="rest-reason" class="form-control" rows="3" placeholder="休団を希望する理由を記入してください" style="resize:vertical;line-height:1.7;"></textarea>
+            </div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">休団開始希望日 <span class="required">*</span></label>
+                <input type="date" id="rest-start-date" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label">復帰予定日（任意）</label>
+                <input type="date" id="rest-return-date" class="form-control">
+              </div>
+            </div>
+            <button class="btn btn-gold" id="btn-rest-submit">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
+              休団を申請する
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ 退団申請 -->
+    <div class="app-panel fade-in fade-in-2" id="panel-withdraw">
+      <div class="card">
+        <div class="card__header"><span class="card__title">退団申請</span></div>
+        <div class="card__body">
+          <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-5);">
+            退団を希望する場合は、こちらから申請してください。内容を幹部が確認のうえご連絡します。
+          </p>
+          <div id="withdraw-current-status"></div>
+          <div id="withdraw-form-wrap">
+            <div class="form-group">
+              <label class="form-label">退団理由 <span class="required">*</span></label>
+              <textarea id="withdraw-reason" class="form-control" rows="3" placeholder="退団を希望する理由を記入してください" style="resize:vertical;line-height:1.7;"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">退団希望日 <span class="required">*</span></label>
+              <input type="date" id="withdraw-date" class="form-control" style="max-width:220px;">
+            </div>
+            <button class="btn btn-danger" id="btn-withdraw-submit">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
+              退団を申請する
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- 団費納付特例制度 規約モーダル -->
+<div class="modal-overlay" id="modal-sm-terms">
+  <div class="modal" style="max-width:580px;">
+    <div class="modal__header">
+      <h2 class="modal__title" id="sm-terms-title">団費納付特例制度</h2>
+      <button class="modal__close" onclick="closeModal('modal-sm-terms')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div class="terms-scroll-box" id="sm-terms-content"></div>
+      <div style="padding:var(--space-4);background:#f0f4f8;border-radius:var(--radius-md);">
+        <p style="font-size:var(--text-sm);color:var(--navy-800);font-weight:500;" id="sm-terms-agreement"></p>
+      </div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-sm-terms')">閉じる</button>
+      <button class="btn btn-gold" onclick="onAgreeTerms()">同意する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 団費納付特例制度 申請フォームモーダル -->
+<div class="modal-overlay" id="modal-sm-apply">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal__header">
+      <h2 class="modal__title">特例制度の申請</h2>
+      <button class="modal__close" onclick="closeModal('modal-sm-apply')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div class="form-group">
+        <label class="form-label">申請者氏名</label>
+        <input type="text" id="sm-name" class="form-control" readonly style="background:var(--gray-100);">
+      </div>
+      <div class="form-group">
+        <label class="form-label">申請理由 <span style="color:var(--danger);">*</span></label>
+        <textarea id="sm-reason" class="form-control" rows="4" placeholder="申請理由を記入してください（内容は幹部のみ閲覧できます）" style="resize:vertical;line-height:1.7;"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">開始希望月 <span style="color:var(--danger);">*</span></label>
+        <select id="sm-start-month" class="form-control" style="max-width:200px;" onchange="onStartMonthChange()"></select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-3);">
+        <div>
+          <p style="font-size:var(--text-xs);color:var(--gray-500);margin-bottom:4px;">基本終了月（6か月後）</p>
+          <p style="font-weight:700;color:var(--navy-800);" id="sm-end-month"></p>
+        </div>
+        <div>
+          <p style="font-size:var(--text-xs);color:var(--gray-500);margin-bottom:4px;">延長終了月（再申請・12か月後）</p>
+          <p style="font-weight:700;color:var(--gray-500);" id="sm-ext-end-month"></p>
+        </div>
+      </div>
+      <p style="font-size:var(--text-xs);color:var(--gray-400);">
+        ※ 延長は再申請により可能です（最大12か月）。承認後に幹部が開始月を調整する場合があります。
+      </p>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-sm-apply')">キャンセル</button>
+      <button class="btn btn-gold" id="btn-submit-apply" onclick="submitApplication()">申請する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<script src="../js/supabase.js"></script>
+<script src="../js/common.js"></script>
+<script>
+// ══════════════════════════════════════
+//  団費納付特例制度 規約（この定数を編集して文面を変更できます）
+// ══════════════════════════════════════
+const SPECIAL_MEASURES_TERMS = {
+  title: '団費納付特例制度',
+  lastUpdated: '2026年8月10日',
+  sections: [
+    {
+      heading: '第1条（目的）',
+      body: '本制度は、東大阪吹奏楽団（以下「本団」という）において、やむを得ない事情により一時的に団費の納付が困難となった団員に対し、団の健全な運営と団員間の公平性を維持しながら、継続して活動できる環境を整えることを目的とする、支払いを支援する特例制度について定めるものである。',
+    },
+    {
+      heading: '第2条（対象者）',
+      body: '次のすべてに該当する者を対象とする。\n・一時的な経済的事情等により団費の納付が困難であること。\n・事前に団へ相談・申請を行っていること。\n・保護者または支援機関等の第三者による事情確認を受けられること（必要に応じて証明書類の提出を求める場合がある。）。\n・幹部会が特例適用を承認した者。',
+    },
+    {
+      heading: '第3条（特例内容）',
+      body: '特例期間中は、団費の半額を毎月納付するものとする。\n残額については免除ではなく納付猶予とし、特例終了後に計画的に納付するものとする。',
+    },
+    {
+      heading: '第4条（適用期間）',
+      body: '特例の適用期間は幹部が承認した開始月から起算して6か月以内とする。\n必要がある場合は、再申請により1回に限り更新できるものとし、最長12か月とする。',
+    },
+    {
+      heading: '第5条（特例終了後）',
+      body: '特例終了後は、通常団費へ復帰するとともに、猶予された団費について団と協議のうえ、計画的に納付するものとする。',
+    },
+    {
+      heading: '第6条（除籍）',
+      body: '次のいずれかに該当する場合は、約款に基づき除籍を検討する。\n・無断で団費を滞納した場合\n・特例期間終了後も納付の意思または見込みが認められない場合\n・虚偽の申請が判明した場合',
+    },
+    {
+      heading: '第7条（秘密保持）',
+      body: '本制度の利用者および申請内容は、運営上必要な範囲で幹部会のみが共有し、その他の団員へは開示しない。',
+    },
+    {
+      heading: '第8条（その他）',
+      body: '本制度は団費の免除制度ではなく、一時的な納付猶予制度である。\n制度の適用は個別の事情を総合的に判断し、幹部会の決議をもって決定する。',
+    },
+  ],
+  agreement_text: '上記の規約をすべて読み、内容を理解した上で申請することに同意します。',
+};
+
+// ══════════════════════════════════════
+//  ユーティリティ
+// ══════════════════════════════════════
+const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function addMonths(yyyyMM, n) {
+  const [y, m] = yyyyMM.split('-').map(Number);
+  const d = new Date(y, m - 1 + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+function getCurrentMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+function isSmActive(sm, month) {
+  if (!sm || sm.status !== 'approved') return false;
+  const m = month ?? getCurrentMonth();
+  return sm.actual_start_month <= m && m <= sm.actual_end_month;
+}
+function fmtMonth(ym) {
+  if (!ym) return '—';
+  const [y, m] = ym.split('-');
+  return `${y}年${parseInt(m)}月`;
+}
+
+let myProfile        = null;
+let mySpecialMeasure = null;
+
+// ══════════════════════════════════════
+//  ① 団費納付特例制度
+// ══════════════════════════════════════
+async function loadMySpecialMeasure() {
+  if (!_sb || !getSessionUser()) return null;
+  const { data, error } = await _sb
+    .from('special_measures')
+    .select('*')
+    .eq('member_id', getSessionUser().id)
+    .order('applied_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) { console.warn('特例制度取得失敗', error.message); return null; }
+  return data;
+}
+
+function renderSpecialMeasureBanner() {
+  const banner = document.getElementById('sm-banner');
+  const sub    = document.getElementById('sm-banner-sub');
+  if (!banner) return;
+  if (isSmActive(mySpecialMeasure, getCurrentMonth())) {
+    sub.textContent = `${fmtMonth(mySpecialMeasure.actual_start_month)} 〜 ${fmtMonth(mySpecialMeasure.actual_end_month)} ／ 団費は通常額の50%（半額）が適用されています`;
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+function renderSmCurrentStatus() {
+  const area = document.getElementById('sm-current-status');
+  const btn  = document.getElementById('btn-sm-apply');
+  if (!area) return;
+  const sm  = mySpecialMeasure;
+  const now = getCurrentMonth();
+
+  if (!sm) {
+    area.innerHTML = '';
+    if (btn) btn.style.display = 'inline-flex';
+    return;
+  }
+  if (sm.status === 'pending') {
+    area.innerHTML = `
+      <div class="alert alert-info mb-4" style="justify-content:flex-start;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+        <span>申請中 — 幹部による承認をお待ちください（申請日：${new Date(sm.applied_at).toLocaleDateString('ja-JP')}）</span>
+      </div>`;
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  if (sm.status === 'approved' && isSmActive(sm, now)) {
+    area.innerHTML = `
+      <div class="alert mb-4" style="background:rgba(39,174,96,.1);border:1px solid rgba(39,174,96,.3);justify-content:flex-start;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="var(--success)" stroke-width="2" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span style="color:var(--success);font-weight:600;">特例制度 適用中（〜${escHtml(fmtMonth(sm.actual_end_month))}）</span>
+      </div>`;
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  if (sm.status === 'rejected') {
+    area.innerHTML = `
+      <div class="alert alert-warning mb-4" style="justify-content:flex-start;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+        <span>前回の申請は否認されました。再度申請することができます。</span>
+      </div>`;
+    if (btn) btn.style.display = 'inline-flex';
+    return;
+  }
+  // 期間終了
+  area.innerHTML = `
+    <p style="font-size:var(--text-sm);color:var(--gray-500);margin-bottom:var(--space-4);">
+      前回の特例制度（〜${escHtml(fmtMonth(sm.actual_end_month ?? sm.end_month))}）は終了しました。再申請することができます。
+    </p>`;
+  if (btn) btn.style.display = 'inline-flex';
+}
+
+function openTermsModal() {
+  const titleEl   = document.getElementById('sm-terms-title');
+  const contentEl = document.getElementById('sm-terms-content');
+  const agreeEl   = document.getElementById('sm-terms-agreement');
+  if (titleEl)   titleEl.textContent = SPECIAL_MEASURES_TERMS.title;
+  if (agreeEl)   agreeEl.textContent = SPECIAL_MEASURES_TERMS.agreement_text;
+  if (contentEl) {
+    contentEl.innerHTML =
+      (SPECIAL_MEASURES_TERMS.lastUpdated
+        ? `<p style="font-size:var(--text-xs);color:var(--gray-400);margin-bottom:var(--space-4);">最終更新：${escHtml(SPECIAL_MEASURES_TERMS.lastUpdated)}</p>`
+        : '') +
+      SPECIAL_MEASURES_TERMS.sections.map(s => `
+        <div class="terms-section">
+          <p class="terms-section__heading">${escHtml(s.heading)}</p>
+          <p class="terms-section__body">${escHtml(s.body)}</p>
+        </div>`).join('');
+  }
+  openModal('modal-sm-terms');
+}
+
+function onAgreeTerms() {
+  closeModal('modal-sm-terms');
+  const user = getSessionUser();
+  const name = myProfile
+    ? `${myProfile.last_name} ${myProfile.first_name}`
+    : (user?.name ?? '');
+  document.getElementById('sm-name').value   = name;
+  document.getElementById('sm-reason').value = '';
+
+  const sel = document.getElementById('sm-start-month');
+  const now = new Date();
+  sel.innerHTML = Array.from({ length: 3 }, (_, i) => {
+    const d  = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return `<option value="${ym}">${fmtMonth(ym)}</option>`;
+  }).join('');
+  onStartMonthChange();
+  openModal('modal-sm-apply');
+}
+
+function onStartMonthChange() {
+  const start = document.getElementById('sm-start-month').value;
+  document.getElementById('sm-end-month').textContent     = fmtMonth(addMonths(start, 6));
+  document.getElementById('sm-ext-end-month').textContent = fmtMonth(addMonths(start, 12));
+}
+
+async function submitApplication() {
+  const user   = getSessionUser();
+  const reason = document.getElementById('sm-reason').value.trim();
+  const start  = document.getElementById('sm-start-month').value;
+  if (!reason) { showToast('申請理由を入力してください', 'error'); return; }
+  if (!_sb || !user) { showToast('ログインが必要です', 'error'); return; }
+
+  const btn = document.getElementById('btn-submit-apply');
+  btn.disabled = true; btn.textContent = '申請中…';
+
+  const { error } = await _sb.from('special_measures').insert({
+    member_id:             user.id,
+    reason,
+    requested_start_month: start,
+    end_month:             addMonths(start, 6),
+    extended_end_month:    addMonths(start, 12),
+    status:                'pending',
+  });
+
+  btn.disabled = false; btn.textContent = '申請する';
+  if (error) { showToast('申請に失敗しました: ' + error.message, 'error'); return; }
+
+  closeModal('modal-sm-apply');
+  showToast('特例制度の申請が完了しました。幹部の承認をお待ちください。', 'success');
+
+  mySpecialMeasure = await loadMySpecialMeasure();
+  renderSpecialMeasureBanner();
+  renderSmCurrentStatus();
+}
+
+// ══════════════════════════════════════
+//  ② 休団申請 ／ ③ 退団申請（共通ロジック）
+// ══════════════════════════════════════
+const STATUS_LABEL = { pending: '審査中', approved: '承認済み', rejected: '否認' };
+const STATUS_BADGE  = { pending: 'badge-warning', approved: 'badge-success', rejected: 'badge-danger' };
+const TYPE_LABEL    = { rest: '休団', withdraw: '退団' };
+
+async function loadMyStatusRequest(type) {
+  const user = getSessionUser();
+  if (!_sb || !user) return null;
+  const { data, error } = await _sb
+    .from('member_status_requests')
+    .select('*')
+    .eq('member_id', user.id)
+    .eq('request_type', type)
+    .order('applied_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) { console.warn('[HighasuiDX] 申請状況取得失敗:', error.message); return null; }
+  return data;
+}
+
+function renderStatusRequestCard(type, req) {
+  const containerId = type === 'rest' ? 'rest-current-status' : 'withdraw-current-status';
+  const formWrapId  = type === 'rest' ? 'rest-form-wrap'      : 'withdraw-form-wrap';
+  const box      = document.getElementById(containerId);
+  const formWrap = document.getElementById(formWrapId);
+  if (!box) return;
+
+  if (!req) {
+    box.innerHTML = '';
+    if (formWrap) formWrap.style.display = 'block';
+    return;
+  }
+
+  const dateLine = type === 'rest'
+    ? `休団開始希望日：${escHtml(req.desired_date ?? '—')}${req.return_date ? `　復帰予定日：${escHtml(req.return_date)}` : ''}`
+    : `退団希望日：${escHtml(req.desired_date ?? '—')}`;
+
+  box.innerHTML = `
+    <div class="req-status-card">
+      <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2);flex-wrap:wrap;">
+        <span class="badge ${STATUS_BADGE[req.status] ?? 'badge-navy'}">${escHtml(STATUS_LABEL[req.status] ?? req.status)}</span>
+        <span style="font-size:var(--text-xs);color:var(--gray-500);">申請日：${new Date(req.applied_at).toLocaleDateString('ja-JP')}</span>
+      </div>
+      <p style="font-size:var(--text-xs);color:var(--gray-500);margin-bottom:var(--space-2);">${dateLine}</p>
+      <p style="font-size:var(--text-sm);color:var(--gray-700);white-space:pre-wrap;">${escHtml(req.reason ?? '')}</p>
+      ${req.notes ? `<p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:var(--space-2);border-top:1px solid var(--gray-200);padding-top:var(--space-2);">幹部からの備考：${escHtml(req.notes)}</p>` : ''}
+    </div>`;
+
+  // 審査中・承認済みの間はフォームを隠す（否認された場合や過去記録のみの場合は再申請可能）
+  if (formWrap) {
+    formWrap.style.display = (req.status === 'pending' || req.status === 'approved') ? 'none' : 'block';
+  }
+}
+
+async function submitStatusRequest(type) {
+  const user = getSessionUser();
+  const prefix = type === 'rest' ? 'rest' : 'withdraw';
+  const reason = document.getElementById(`${prefix}-reason`).value.trim();
+  const desiredDate = type === 'rest'
+    ? document.getElementById('rest-start-date').value
+    : document.getElementById('withdraw-date').value;
+  const returnDate = type === 'rest'
+    ? (document.getElementById('rest-return-date').value || null)
+    : null;
+
+  if (!reason)      { showToast(`${TYPE_LABEL[type]}理由を入力してください`, 'error'); return; }
+  if (!desiredDate) { showToast(`${type === 'rest' ? '休団開始希望日' : '退団希望日'}を入力してください`, 'error'); return; }
+  if (!_sb || !user) { showToast('ログインが必要です', 'error'); return; }
+
+  const btn = document.getElementById(`btn-${prefix}-submit`);
+  btn.disabled = true; btn.textContent = '送信中…';
+
+  const { error } = await _sb.from('member_status_requests').insert({
+    member_id:     user.id,
+    request_type:  type,
+    reason,
+    desired_date:  desiredDate,
+    return_date:   returnDate,
+    status:        'pending',
+  });
+
+  btn.disabled = false;
+  btn.innerHTML = type === 'rest'
+    ? '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg> 休団を申請する'
+    : '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg> 退団を申請する';
+
+  if (error) { showToast('申請に失敗しました: ' + error.message, 'error'); return; }
+
+  showToast(`${TYPE_LABEL[type]}申請を送信しました。幹部の確認をお待ちください。`, 'success');
+  document.getElementById(`${prefix}-reason`).value = '';
+  if (type === 'rest') {
+    document.getElementById('rest-start-date').value = '';
+    document.getElementById('rest-return-date').value = '';
+  } else {
+    document.getElementById('withdraw-date').value = '';
+  }
+
+  const req = await loadMyStatusRequest(type);
+  renderStatusRequestCard(type, req);
+}
+
+// ══════════════════════════════════════
+//  タブ切り替え
+// ══════════════════════════════════════
+function initTabs() {
+  document.querySelectorAll('.app-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.app-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.app-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
+    });
+  });
+}
+
+// ══════════════════════════════════════
+//  初期化
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  initTabs();
+
+  const user = getSessionUser();
+  if (_sb && user) {
+    const { data } = await _sb
+      .from('profiles')
+      .select('id,last_name,first_name,category')
+      .eq('id', user.id)
+      .single();
+    myProfile = data;
+  }
+
+  // ① 団費納付特例制度
+  mySpecialMeasure = await loadMySpecialMeasure();
+  renderSpecialMeasureBanner();
+  renderSmCurrentStatus();
+
+  // ② 休団申請 ／ ③ 退団申請
+  const restReq = await loadMyStatusRequest('rest');
+  renderStatusRequestCard('rest', restReq);
+  const withdrawReq = await loadMyStatusRequest('withdraw');
+  renderStatusRequestCard('withdraw', withdrawReq);
+
+  document.getElementById('btn-rest-submit').addEventListener('click', () => submitStatusRequest('rest'));
+  document.getElementById('btn-withdraw-submit').addEventListener('click', () => submitStatusRequest('withdraw'));
+});
+</script>
+</body>
+</html>
