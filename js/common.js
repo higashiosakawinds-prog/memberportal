@@ -36,6 +36,7 @@ const MAINTENANCE_CONFIG = {
   schedule:           false,   //スケジュール
   activities:         false,   //活動記録
   visitors:           false,    //見学者連絡
+  applications:       false,   // 各種申請
 };
 
 // メンテナンス中ページの閲覧を許可するロール
@@ -300,6 +301,7 @@ function getPageLabel(pageId) {
     contact:              '連絡網',
     requests:             '団員申請',
     settings:             '設定',
+    applications:         '各種申請',
   };
   return labels[pageId] ?? pageId;
 }
@@ -679,9 +681,17 @@ function renderSidebar() {
     `;
   });
 
-  // ── サイドバー下部：設定ボタン（全員に表示） ──
+  // ── サイドバー下部：各種申請・設定ボタン（全員に表示） ──
   html += `
     <div class="sidebar-section" style="margin-top:auto;padding-top:var(--space-4);border-top:1px solid rgba(201,168,76,0.15);">
+      <a href="${rootPrefix}pages/applications.html"
+         class="sidebar-item ${currentPageId === 'applications' ? 'active' : ''}"
+         data-page="applications">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"/>
+        </svg>
+        <span>各種申請</span>
+      </a>
       <a href="${rootPrefix}pages/settings.html"
          class="sidebar-item ${currentPageId === 'settings' ? 'active' : ''}"
          data-page="settings">
