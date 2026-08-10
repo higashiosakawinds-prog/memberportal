@@ -533,7 +533,7 @@ async function loadAllPayments() {
 //  ① 支払い状況テーブル
 // ══════════════════════════════════════
 // ══════════════════════════════════════
-//  特例措置の読み込み（Supabase）
+//  特例制度の読み込み（Supabase）
 // ══════════════════════════════════════
 async function loadSpecialMeasures() {
   if (!_sb) return {};
@@ -547,7 +547,7 @@ async function loadSpecialMeasures() {
     (data ?? []).forEach(sm => { map[sm.member_id] = sm; });
     return map;
   } catch (e) {
-    console.warn('[HighasuiDX] 特例措置取得失敗:', e.message);
+    console.warn('[HighasuiDX] 特例制度取得失敗:', e.message);
     return {};
   }
 }
@@ -587,10 +587,10 @@ function renderStatusTable() {
       </td>`;
     }).join('');
 
-    // 特例措置のアクティブ判定（表示する最初の月を基準に確認）
+    // 特例制度のアクティブ判定（表示する最初の月を基準に確認）
     const smForMember  = specialMeasures[m.id];
     const smBadgeHtml  = months3.some(mo => isSmActive(smForMember, mo))
-      ? '<span class="badge badge-gold" title="特例措置適用中" style="font-size:9px;margin-left:4px;">特例</span>'
+      ? '<span class="badge badge-gold" title="特例制度適用中" style="font-size:9px;margin-left:4px;">特例</span>'
       : '';
 
     return `
@@ -838,7 +838,7 @@ async function openRegisterModal() {
 
   // ── GASから支払いデータを再取得 ──
   allPayments     = await loadAllPayments();
-  // ── Supabaseから特例措置を再取得 ──
+  // ── Supabaseから特例制度を再取得 ──
   specialMeasures = await loadSpecialMeasures();
 
   btn.disabled = false;
@@ -912,7 +912,7 @@ function recalculate() {
     const pm     = m.payment_method ?? 'none';
     const cat    = m.category ?? '';
     const pmKey  = pm === 'cash' ? 'cash' : pm === 'credit' ? 'credit' : 'none';
-    // 特例措置がこの月に有効かチェック
+    // 特例制度がこの月に有効かチェック
     const smOn   = isSmActive(specialMeasures[m.id], month);
     const prefix = smOn ? `${cat.replace('regular_student','student')}_sm_` : `${cat.replace('regular_student','student')}_`;
 
@@ -948,7 +948,7 @@ function recalculate() {
       amount:  counts.regular_none * regularFee,
     });
   }
-  // 特例措置適用者（半額）
+  // 特例制度適用者（半額）
   const regularHalf = Math.floor(regularFee / 2);
   if (counts.regular_sm_cash > 0) {
     rows.push({
@@ -997,7 +997,7 @@ function recalculate() {
       amount:  counts.student_none * studentFee,
     });
   }
-  // 特例措置適用者（半額）
+  // 特例制度適用者（半額）
   if (counts.student_sm_cash > 0) {
     rows.push({
       label:   '正団員・学生（現金）🛡️特例',
@@ -1074,7 +1074,7 @@ function recalculate() {
         学生 ${counts.student_cash + counts.student_credit + counts.student_none + counts.student_sm_cash + counts.student_sm_credit + counts.student_sm_none}名、
         準団員 ${traineeTotal + traineeTotalSm}名、
         スタッフ ${supportTotal + supportTotalSm}名）
-      ${smPaidCount > 0 ? `<br><span style="color:#e67e22;font-weight:700;">🛡️ うち特例措置適用：${smPaidCount}名（半額計算）</span>` : ''}
+      ${smPaidCount > 0 ? `<br><span style="color:#e67e22;font-weight:700;">🛡️ うち特例制度適用：${smPaidCount}名（半額計算）</span>` : ''}
     </div>`;
 
   // ── 内訳をレンダリング ──
