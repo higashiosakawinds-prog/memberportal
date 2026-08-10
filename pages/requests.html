@@ -89,7 +89,7 @@
       </div>
     </div>
 
-    <!-- 特例措置管理セクション（幹部のみ） -->
+    <!-- 特例制度管理セクション（幹部のみ） -->
     <div id="sm-section" style="display:none;">
 
       <div class="req-tabs fade-in fade-in-1">
@@ -139,7 +139,7 @@
 <div class="modal-overlay" id="modal-approve">
   <div class="modal" style="max-width:520px;">
     <div class="modal__header">
-      <h2 class="modal__title">特例措置を承認する</h2>
+      <h2 class="modal__title">特例制度を承認する</h2>
       <button class="modal__close" onclick="closeModal('modal-approve')">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
@@ -266,7 +266,7 @@ async function loadData() {
     .order('applied_at', { ascending: false });
 
   if (error) {
-    console.warn('特例措置取得失敗:', error.message);
+    console.warn('特例制度取得失敗:', error.message);
     return;
   }
   allApplications = data ?? [];
@@ -446,7 +446,7 @@ async function approveApplication() {
     return;
   }
 
-  showToast(`${memberName(pendingTarget.member_id)} さんの特例措置を承認しました`, 'success');
+  showToast(`${memberName(pendingTarget.member_id)} さんの特例制度を承認しました`, 'success');
   closeModal('modal-approve');
   pendingTarget = null;
   await loadData();
@@ -489,7 +489,7 @@ async function revokeApproval(id) {
   if (!_sb) return;
   const sm = allApplications.find(s => s.id === id);
   if (!sm) return;
-  if (!confirm(`${memberName(sm.member_id)} さんの特例措置承認を取り消しますか？`)) return;
+  if (!confirm(`${memberName(sm.member_id)} さんの特例制度承認を取り消しますか？`)) return;
 
   const { error } = await _sb.from('special_measures').update({
     status:             'rejected',
@@ -506,7 +506,7 @@ async function revokeApproval(id) {
     return;
   }
 
-  showToast('特例措置を取り消しました', 'success');
+  showToast('特例制度を取り消しました', 'success');
   await loadData();
   renderAllLists();
 }
