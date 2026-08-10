@@ -192,6 +192,39 @@
   </div>
 </div>
 
+<!-- 休団・退団申請 審査モーダル -->
+<div class="modal-overlay" id="modal-status-review">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal__header">
+      <h2 class="modal__title" id="status-review-title">申請を確認する</h2>
+      <button class="modal__close" onclick="closeModal('modal-status-review')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div style="background:var(--gray-100);border-radius:var(--radius-md);padding:var(--space-4);margin-bottom:var(--space-5);">
+        <p style="font-size:var(--text-xs);color:var(--gray-500);margin-bottom:2px;">申請者</p>
+        <p style="font-weight:700;color:var(--navy-800);" id="status-review-name"></p>
+        <p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:var(--space-3);" id="status-review-date-label"></p>
+        <p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:var(--space-3);">申請理由</p>
+        <p style="font-size:var(--text-sm);color:var(--gray-700);margin-top:2px;white-space:pre-wrap;" id="status-review-reason"></p>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">備考（任意・申請者にも表示されます）</label>
+        <textarea id="status-review-notes" class="form-control" rows="3" placeholder="団員への伝達事項など（任意）"></textarea>
+      </div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-danger" onclick="rejectStatusRequest()">否認する</button>
+      <button class="btn btn-outline" onclick="closeModal('modal-status-review')">キャンセル</button>
+      <button class="btn btn-gold" onclick="approveStatusRequest()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+        承認する
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 <script src="../js/supabase.js"></script>
 <script src="../js/common.js"></script>
@@ -199,9 +232,18 @@
 // ══════════════════════════════════════
 //  状態
 // ══════════════════════════════════════
-let allApplications = [];   // special_measures rows + joined profile
-let pendingTarget   = null; // 現在処理中の申請（承認モーダル用）
-let memberMap       = {};   // { id: {last_name, first_name, ...} }
+let allApplications   = [];   // special_measures rows
+let allStatusRequests = [];   // member_status_requests rows（休団・退団）
+let allUnified         = [];  // 上記2つをマージし種別タグを付けた一覧
+let pendingTarget      = null; // 特例制度：承認モーダル用
+let pendingStatusTarget = null; // 休団・退団：審査モーダル用
+let memberMap          = {};   // { id: {last_name, first_name, ...} }
+
+const TYPE_META = {
+  special:  { label: '特例制度', badge: 'badge-gold' },
+  rest:     { label: '休団申請', badge: 'badge-warning' },
+  withdraw: { label: '退団申請', badge: 'badge-danger' },
+};
 
 // ══════════════════════════════════════
 //  ユーティリティ
@@ -218,6 +260,14 @@ function fmtMonth(ym) {
 function fmtDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('ja-JP', { year:'numeric', month:'short', day:'numeric' });
+}
+
+// YYYY-MM-DD 形式の date 型カラム用（休団・退団申請の希望日など）
+function fmtDateOnly(d) {
+  if (!d) return '—';
+  const dt = new Date(d + 'T00:00:00');
+  if (isNaN(dt.getTime())) return escHtml(d);
+  return dt.toLocaleDateString('ja-JP', { year:'numeric', month:'short', day:'numeric' });
 }
 
 function addMonths(yyyyMM, n) {
@@ -259,17 +309,44 @@ async function loadData() {
     .select('id, last_name, first_name, category, part');
   (profiles ?? []).forEach(p => { memberMap[p.id] = p; });
 
-  // special_measures を全件取得（幹部のみがこのページを見る）
-  const { data, error } = await _sb
-    .from('special_measures')
-    .select('*')
-    .order('applied_at', { ascending: false });
+  // 特例制度（special_measures）と休団・退団申請（member_status_requests）を並行取得
+  const [smRes, statusRes] = await Promise.all([
+    _sb.from('special_measures').select('*').order('applied_at', { ascending: false }),
+    _sb.from('member_status_requests').select('*').order('applied_at', { ascending: false }),
+  ]);
 
-  if (error) {
-    console.warn('特例制度取得失敗:', error.message);
-    return;
-  }
-  allApplications = data ?? [];
+  if (smRes.error)     console.warn('特例制度取得失敗:', smRes.error.message);
+  if (statusRes.error) console.warn('休団・退団申請取得失敗:', statusRes.error.message);
+
+  allApplications   = smRes.data ?? [];
+  allStatusRequests = statusRes.data ?? [];
+  allUnified        = buildUnifiedList();
+}
+
+// 特例制度・休団申請・退団申請を種別タグ付きで1つの配列にまとめる
+function buildUnifiedList() {
+  const special = allApplications.map(sm => ({
+    uid:       `special_${sm.id}`,
+    type:      'special',
+    id:        sm.id,
+    member_id: sm.member_id,
+    status:    sm.status,
+    applied_at: sm.applied_at,
+    raw:       sm,
+  }));
+
+  const statusReqs = allStatusRequests.map(r => ({
+    uid:       `${r.request_type}_${r.id}`,
+    type:      r.request_type, // 'rest' | 'withdraw'
+    id:        r.id,
+    member_id: r.member_id,
+    status:    r.status,
+    applied_at: r.applied_at,
+    raw:       r,
+  }));
+
+  return [...special, ...statusReqs].sort((a, b) =>
+    new Date(b.applied_at ?? 0) - new Date(a.applied_at ?? 0));
 }
 
 // ══════════════════════════════════════
@@ -280,12 +357,13 @@ const CAT_LABELS = {
   trainee:'準団員', support:'スタッフ', rest:'休団中',
 };
 
-function renderCard(sm) {
+function renderSpecialCard(sm) {
   const name   = escHtml(memberName(sm.member_id));
   const cat    = escHtml(CAT_LABELS[memberMap[sm.member_id]?.category] ?? '—');
   const now    = getCurrentMonth();
   const active = sm.status === 'approved'
     && sm.actual_start_month <= now && now <= sm.actual_end_month;
+  const meta   = TYPE_META.special;
 
   return `
     <div class="sm-card">
@@ -293,7 +371,8 @@ function renderCard(sm) {
         <div>
           <div class="sm-card__name">
             ${name}
-            ${active ? '<span class="badge badge-gold" style="font-size:10px;margin-left:6px;">特例中</span>' : ''}
+            <span class="badge ${meta.badge}" style="font-size:10px;margin-left:6px;">${meta.label}</span>
+            ${active ? '<span class="badge badge-gold" style="font-size:10px;margin-left:4px;">特例中</span>' : ''}
           </div>
           <div class="sm-card__meta">
             ${cat}　／　申請日：${fmtDate(sm.applied_at)}
@@ -349,6 +428,61 @@ function renderCard(sm) {
     </div>`;
 }
 
+// 休団申請・退団申請カード
+function renderStatusCard(item) {
+  const r    = item.raw;
+  const meta = TYPE_META[item.type];
+  const name = escHtml(memberName(r.member_id));
+  const cat  = escHtml(CAT_LABELS[memberMap[r.member_id]?.category] ?? '—');
+
+  const dateLine = item.type === 'rest'
+    ? `休団開始希望日：${fmtDateOnly(r.desired_date)}${r.return_date ? `　／　復帰予定日：${fmtDateOnly(r.return_date)}` : ''}`
+    : `退団希望日：${fmtDateOnly(r.desired_date)}`;
+
+  return `
+    <div class="sm-card">
+      <div class="sm-card__header">
+        <div>
+          <div class="sm-card__name">
+            ${name}
+            <span class="badge ${meta.badge}" style="font-size:10px;margin-left:6px;">${meta.label}</span>
+          </div>
+          <div class="sm-card__meta">
+            ${cat}　／　申請日：${fmtDate(r.applied_at)}
+          </div>
+        </div>
+        ${statusBadge(r.status)}
+      </div>
+
+      <p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:var(--space-3);">${escHtml(dateLine)}</p>
+
+      <div class="sm-card__reason">
+        <span style="font-size:var(--text-xs);color:var(--gray-400);display:block;margin-bottom:4px;">申請理由</span>
+        ${escHtml(r.reason || '（理由未記入）')}
+      </div>
+
+      ${r.notes ? `
+        <div style="margin-top:var(--space-3);font-size:var(--text-xs);color:var(--gray-500);">
+          備考：${escHtml(r.notes)}
+        </div>` : ''}
+
+      ${r.status === 'pending' ? `
+        <div class="sm-card__actions">
+          <button class="btn btn-gold" onclick="openStatusReviewModal('${item.uid}')">審査する</button>
+        </div>` : ''}
+
+      ${(r.status === 'approved' || r.status === 'rejected') ? `
+        <div class="sm-card__actions">
+          <button class="btn btn-sm btn-outline" onclick="openStatusReviewModal('${item.uid}')">内容を確認・変更</button>
+        </div>` : ''}
+    </div>`;
+}
+
+// 種別に応じて描画を振り分ける
+function renderUnifiedCard(item) {
+  return item.type === 'special' ? renderSpecialCard(item.raw) : renderStatusCard(item);
+}
+
 function renderList(targetId, items) {
   const el = document.getElementById(targetId);
   if (!el) return;
@@ -362,18 +496,18 @@ function renderList(targetId, items) {
       </div>`;
     return;
   }
-  el.innerHTML = items.map(renderCard).join('');
+  el.innerHTML = items.map(renderUnifiedCard).join('');
 }
 
 function renderAllLists() {
-  const pending  = allApplications.filter(s => s.status === 'pending');
-  const approved = allApplications.filter(s => s.status === 'approved');
-  const rejected = allApplications.filter(s => s.status === 'rejected');
+  const pending  = allUnified.filter(i => i.status === 'pending');
+  const approved = allUnified.filter(i => i.status === 'approved');
+  const rejected = allUnified.filter(i => i.status === 'rejected');
 
   renderList('list-pending',  pending);
   renderList('list-approved', approved);
   renderList('list-rejected', rejected);
-  renderList('list-all',      allApplications);
+  renderList('list-all',      allUnified);
 
   // バッジ
   const badge = document.getElementById('pending-count-badge');
@@ -507,6 +641,88 @@ async function revokeApproval(id) {
   }
 
   showToast('特例制度を取り消しました', 'success');
+  await loadData();
+  renderAllLists();
+}
+
+// ══════════════════════════════════════
+//  休団・退団申請 審査モーダル
+// ══════════════════════════════════════
+function openStatusReviewModal(uid) {
+  const item = allUnified.find(x => x.uid === uid);
+  if (!item || item.type === 'special') return;
+  pendingStatusTarget = item;
+
+  const r    = item.raw;
+  const meta = TYPE_META[item.type];
+
+  document.getElementById('status-review-title').textContent = `${meta.label}を確認する`;
+  document.getElementById('status-review-name').textContent  = memberName(r.member_id);
+
+  const dateLabel = item.type === 'rest'
+    ? `休団開始希望日：${fmtDateOnly(r.desired_date)}${r.return_date ? `　／　復帰予定日：${fmtDateOnly(r.return_date)}` : ''}`
+    : `退団希望日：${fmtDateOnly(r.desired_date)}`;
+  document.getElementById('status-review-date-label').textContent = dateLabel;
+  document.getElementById('status-review-reason').textContent     = r.reason || '（理由未記入）';
+  document.getElementById('status-review-notes').value            = r.notes ?? '';
+
+  openModal('modal-status-review');
+}
+
+async function approveStatusRequest() {
+  if (!pendingStatusTarget || !_sb) return;
+
+  const notes = document.getElementById('status-review-notes').value.trim();
+  const user  = getSessionUser();
+
+  const btn = document.querySelector('#modal-status-review .btn-gold');
+  btn.disabled = true; btn.textContent = '処理中…';
+
+  const { error } = await _sb.from('member_status_requests').update({
+    status:      'approved',
+    notes,
+    reviewed_at: new Date().toISOString(),
+    reviewed_by: user?.id ?? null,
+  }).eq('id', pendingStatusTarget.id);
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg> 承認する';
+
+  if (error) {
+    showToast('承認処理に失敗しました: ' + error.message, 'error');
+    return;
+  }
+
+  showToast(`${memberName(pendingStatusTarget.member_id)} さんの${TYPE_META[pendingStatusTarget.type].label}を承認しました`, 'success');
+  closeModal('modal-status-review');
+  pendingStatusTarget = null;
+  await loadData();
+  renderAllLists();
+}
+
+async function rejectStatusRequest() {
+  if (!pendingStatusTarget || !_sb) return;
+
+  const user = getSessionUser();
+  if (!confirm(`${memberName(pendingStatusTarget.member_id)} さんの申請を否認しますか？`)) return;
+
+  const notes = document.getElementById('status-review-notes').value.trim();
+
+  const { error } = await _sb.from('member_status_requests').update({
+    status:      'rejected',
+    notes,
+    reviewed_at: new Date().toISOString(),
+    reviewed_by: user?.id ?? null,
+  }).eq('id', pendingStatusTarget.id);
+
+  if (error) {
+    showToast('否認処理に失敗しました: ' + error.message, 'error');
+    return;
+  }
+
+  showToast(`${memberName(pendingStatusTarget.member_id)} さんの申請を否認しました`, 'success');
+  closeModal('modal-status-review');
+  pendingStatusTarget = null;
   await loadData();
   renderAllLists();
 }
