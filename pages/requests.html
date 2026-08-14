@@ -100,6 +100,10 @@
         <button class="req-tab" data-tab="approved">承認済み</button>
         <button class="req-tab" data-tab="rejected">否認済み</button>
         <button class="req-tab" data-tab="all">すべて</button>
+        <button class="req-tab" data-tab="opinions">
+          意見箱
+          <span class="sidebar-badge" id="opinion-count-badge" style="display:none;margin-left:6px;"></span>
+        </button>
       </div>
 
       <!-- 未対応 -->
@@ -126,6 +130,13 @@
       <!-- すべて -->
       <div class="req-panel" id="panel-all">
         <div id="list-all">
+          <div style="text-align:center;padding:var(--space-10);"><div class="loading-spinner" style="margin:0 auto;"></div></div>
+        </div>
+      </div>
+
+      <!-- 意見箱 -->
+      <div class="req-panel" id="panel-opinions">
+        <div id="list-opinions">
           <div style="text-align:center;padding:var(--space-10);"><div class="loading-spinner" style="margin:0 auto;"></div></div>
         </div>
       </div>
@@ -225,6 +236,34 @@
   </div>
 </div>
 
+
+<!-- 団員とのやり取りモーダル（申請チャット） -->
+<div class="modal-overlay" id="modal-request-chat">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal__header">
+      <h2 class="modal__title" id="rc-title">団員とのやり取り</h2>
+      <button class="modal__close" onclick="closeRequestChat()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div id="rc-chat-wrap" style="max-height:360px;overflow-y:auto;background:var(--gray-100);border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-3);">
+        <div style="text-align:center;color:var(--gray-400);font-size:var(--text-sm);">読み込み中…</div>
+      </div>
+      <div style="margin-top:var(--space-3);">
+        <textarea id="rc-compose" class="form-control" rows="3" placeholder="メッセージを入力…" style="resize:vertical;"></textarea>
+      </div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeRequestChat()">閉じる</button>
+      <button class="btn btn-gold" id="rc-send-btn" onclick="sendRequestChatMessage()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
+        送信
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 <script src="../js/supabase.js"></script>
 <script src="../js/common.js"></script>
@@ -238,6 +277,12 @@ let allUnified         = [];  // 上記2つをマージし種別タグを付け�
 let pendingTarget      = null; // 特例制度：承認モーダル用
 let pendingStatusTarget = null; // 休団・退団：審査モーダル用
 let memberMap          = {};   // { id: {last_name, first_name, ...} }
+let allOpinions         = [];  // opinions テーブル一覧
+
+// 団員とのやり取り（申請チャット）用の状態
+let rcCurrent   = null; // { requestType, requestId, isLeaderView }
+let rcMessages  = [];
+let rcPollTimer = null;
 
 const TYPE_META = {
   special:  { label: '特例制度', badge: 'badge-gold' },
@@ -415,6 +460,13 @@ function renderSpecialCard(sm) {
           備考：${escHtml(sm.notes)}
         </div>` : ''}
 
+      <div class="sm-card__actions">
+        <button class="btn btn-sm btn-outline" onclick="openRequestChat('special','${sm.id}','${name} さんとのやり取り',true)">
+          💬 やり取りする
+          <span id="chatbadge-special-${sm.id}" class="badge badge-danger" style="display:none;margin-left:4px;"></span>
+        </button>
+      </div>
+
       ${sm.status === 'pending' ? `
         <div class="sm-card__actions">
           <button class="btn btn-gold" onclick="openApproveModal('${sm.id}')">審査する</button>
@@ -465,6 +517,13 @@ function renderStatusCard(item) {
         <div style="margin-top:var(--space-3);font-size:var(--text-xs);color:var(--gray-500);">
           備考：${escHtml(r.notes)}
         </div>` : ''}
+
+      <div class="sm-card__actions">
+        <button class="btn btn-sm btn-outline" onclick="openRequestChat('${item.type}','${r.id}','${name} さんとのやり取り',true)">
+          💬 やり取りする
+          <span id="chatbadge-${item.type}-${r.id}" class="badge badge-danger" style="display:none;margin-left:4px;"></span>
+        </button>
+      </div>
 
       ${r.status === 'pending' ? `
         <div class="sm-card__actions">
@@ -517,6 +576,8 @@ function renderAllLists() {
   } else {
     badge.style.display = 'none';
   }
+
+  updateAllChatBadges();
 }
 
 // ══════════════════════════════════════
@@ -728,6 +789,194 @@ async function rejectStatusRequest() {
 }
 
 // ══════════════════════════════════════
+//  団員とのやり取り（申請チャット・共通）
+//  Supabaseの request_messages テーブルにのみ保存し、
+//  Gmail連携は行いません。
+// ══════════════════════════════════════
+async function updateAllChatBadges() {
+  if (!_sb) return;
+  const { data, error } = await _sb.from('request_messages')
+    .select('request_type, request_id')
+    .eq('is_leader', false).eq('read_by_leader', false);
+  if (error) return;
+  const counts = {};
+  (data ?? []).forEach(m => {
+    const key = `${m.request_type}-${m.request_id}`;
+    counts[key] = (counts[key] ?? 0) + 1;
+  });
+  Object.entries(counts).forEach(([key, cnt]) => {
+    const badge = document.getElementById(`chatbadge-${key}`);
+    if (badge) { badge.textContent = cnt; badge.style.display = 'inline-flex'; }
+  });
+}
+
+async function openRequestChat(requestType, requestId, title, isLeaderView) {
+  if (!_sb) { showToast('Supabase未接続です', 'error'); return; }
+  rcCurrent = { requestType, requestId, isLeaderView };
+  document.getElementById('rc-title').textContent = title || '団員とのやり取り';
+  document.getElementById('rc-compose').value = '';
+  openModal('modal-request-chat');
+  await loadRequestChat();
+
+  clearInterval(rcPollTimer);
+  rcPollTimer = setInterval(loadRequestChat, 20000);
+
+  // 相手からのメッセージを既読にする
+  const readField = isLeaderView ? 'read_by_leader' : 'read_by_member';
+  await _sb.from('request_messages')
+    .update({ [readField]: true })
+    .eq('request_type', requestType)
+    .eq('request_id', requestId)
+    .eq('is_leader', !isLeaderView);
+
+  updateAllChatBadges();
+}
+
+function closeRequestChat() {
+  clearInterval(rcPollTimer);
+  rcPollTimer = null;
+  closeModal('modal-request-chat');
+  rcCurrent = null;
+}
+
+async function loadRequestChat() {
+  if (!rcCurrent || !_sb) return;
+  const { requestType, requestId } = rcCurrent;
+  const { data, error } = await _sb.from('request_messages')
+    .select('*')
+    .eq('request_type', requestType)
+    .eq('request_id', requestId)
+    .order('created_at', { ascending: true });
+  if (error) { console.warn('[HighasuiDX] チャット取得失敗:', error.message); return; }
+  rcMessages = data ?? [];
+  renderRequestChat();
+}
+
+function renderRequestChat() {
+  const wrap = document.getElementById('rc-chat-wrap');
+  if (!wrap || !rcCurrent) return;
+  if (!rcMessages.length) {
+    wrap.innerHTML = `<div style="text-align:center;color:var(--gray-400);font-size:var(--text-sm);">まだやり取りはありません。</div>`;
+    return;
+  }
+  const fmt = iso => new Date(iso).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  wrap.innerHTML = rcMessages.map(m => {
+    const mine = rcCurrent.isLeaderView ? m.is_leader : !m.is_leader;
+    return `
+      <div style="align-self:${mine ? 'flex-end' : 'flex-start'};max-width:82%;display:flex;flex-direction:column;align-items:${mine ? 'flex-end' : 'flex-start'};">
+        <div style="font-size:10px;color:var(--gray-400);margin-bottom:2px;padding:0 4px;">${escHtml(m.sender_name)}${m.is_leader ? '（幹部）' : ''}</div>
+        <div style="padding:var(--space-3) var(--space-4);border-radius:var(--radius-lg);font-size:var(--text-sm);line-height:1.7;white-space:pre-wrap;word-break:break-word;
+          ${mine ? 'background:var(--navy-800);color:var(--white);border-bottom-right-radius:4px;' : 'background:var(--white);color:var(--gray-800);border:1px solid var(--gray-200);border-bottom-left-radius:4px;'}">${escHtml(m.body)}</div>
+        <div style="font-size:10px;color:var(--gray-400);margin-top:2px;padding:0 4px;">${escHtml(fmt(m.created_at))}</div>
+      </div>`;
+  }).join('');
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+async function sendRequestChatMessage() {
+  if (!rcCurrent || !_sb) return;
+  const textarea = document.getElementById('rc-compose');
+  const body = textarea.value.trim();
+  if (!body) { showToast('メッセージを入力してください', 'error'); return; }
+  const user = getSessionUser();
+  if (!user) { showToast('ログインが必要です', 'error'); return; }
+
+  const btn = document.getElementById('rc-send-btn');
+  btn.disabled = true;
+
+  const { error } = await _sb.from('request_messages').insert({
+    request_type: rcCurrent.requestType,
+    request_id:   rcCurrent.requestId,
+    sender_id:    user.id,
+    sender_name:  user.name ?? '—',
+    is_leader:    rcCurrent.isLeaderView,
+    body,
+  });
+
+  btn.disabled = false;
+  if (error) { showToast('送信に失敗しました: ' + error.message, 'error'); return; }
+
+  textarea.value = '';
+  await loadRequestChat();
+}
+
+// ══════════════════════════════════════
+//  意見箱（幹部側）
+// ══════════════════════════════════════
+async function loadOpinions() {
+  if (!_sb) return;
+  const { data, error } = await _sb.from('opinions').select('*').order('created_at', { ascending: false });
+  if (error) { console.warn('[HighasuiDX] 意見取得失敗:', error.message); return; }
+  allOpinions = data ?? [];
+}
+
+function renderOpinionsList() {
+  const el = document.getElementById('list-opinions');
+  if (!el) return;
+
+  if (!allOpinions.length) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1" width="48" height="48" style="opacity:.3;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"/>
+        </svg>
+        <p style="font-size:var(--text-sm);">意見はまだありません</p>
+      </div>`;
+    updateOpinionBadge();
+    return;
+  }
+
+  el.innerHTML = allOpinions.map(o => `
+    <div class="sm-card">
+      <div class="sm-card__header">
+        <div>
+          <div class="sm-card__name">
+            ${o.is_anonymous ? '匿名団員' : escHtml(o.member_name)}
+            ${o.status === 'unread'
+              ? '<span class="badge badge-danger" style="font-size:10px;margin-left:6px;">未確認</span>'
+              : '<span class="badge badge-success" style="font-size:10px;margin-left:6px;">確認済み</span>'}
+          </div>
+          <div class="sm-card__meta">送信日：${fmtDate(o.created_at)}</div>
+        </div>
+      </div>
+      <div class="sm-card__reason">${escHtml(o.body)}</div>
+      <div class="form-group" style="margin-top:var(--space-4);margin-bottom:0;">
+        <label class="form-label" style="font-size:var(--text-xs);">幹部からの返信・メモ（任意）</label>
+        <textarea class="form-control opinion-note-input" data-id="${o.id}" rows="2" style="resize:vertical;">${escHtml(o.admin_note ?? '')}</textarea>
+      </div>
+      <div class="sm-card__actions">
+        <button class="btn btn-sm btn-gold" onclick="saveOpinionNote('${o.id}')">保存して確認済みにする</button>
+      </div>
+    </div>`).join('');
+
+  updateOpinionBadge();
+}
+
+function updateOpinionBadge() {
+  const unread = allOpinions.filter(o => o.status === 'unread').length;
+  const badge = document.getElementById('opinion-count-badge');
+  if (!badge) return;
+  if (unread > 0) { badge.textContent = unread; badge.style.display = 'inline-flex'; }
+  else badge.style.display = 'none';
+}
+
+async function saveOpinionNote(id) {
+  if (!_sb) return;
+  const input = document.querySelector(`.opinion-note-input[data-id="${id}"]`);
+  const note  = input?.value.trim() ?? '';
+
+  const { error } = await _sb.from('opinions')
+    .update({ admin_note: note || null, status: 'read' })
+    .eq('id', id);
+
+  if (error) { showToast('保存に失敗しました: ' + error.message, 'error'); return; }
+
+  showToast('保存しました', 'success');
+  await loadOpinions();
+  renderOpinionsList();
+}
+
+// ══════════════════════════════════════
 //  初期化
 // ══════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
@@ -742,6 +991,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // データ読み込み & 描画
   await loadData();
   renderAllLists();
+
+  await loadOpinions();
+  renderOpinionsList();
 
   // タブ切り替え
   document.querySelectorAll('.req-tab').forEach(tab => {
