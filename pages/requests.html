@@ -862,9 +862,10 @@ function renderRequestChat() {
   const fmt = iso => new Date(iso).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
   wrap.innerHTML = rcMessages.map(m => {
     const mine = rcCurrent.isLeaderView ? m.is_leader : !m.is_leader;
+    const displayName = m.is_leader ? '幹部' : m.sender_name;
     return `
       <div style="align-self:${mine ? 'flex-end' : 'flex-start'};max-width:82%;display:flex;flex-direction:column;align-items:${mine ? 'flex-end' : 'flex-start'};">
-        <div style="font-size:10px;color:var(--gray-400);margin-bottom:2px;padding:0 4px;">${escHtml(m.sender_name)}${m.is_leader ? '（幹部）' : ''}</div>
+        <div style="font-size:10px;color:var(--gray-400);margin-bottom:2px;padding:0 4px;">${escHtml(displayName)}</div>
         <div style="padding:var(--space-3) var(--space-4);border-radius:var(--radius-lg);font-size:var(--text-sm);line-height:1.7;white-space:pre-wrap;word-break:break-word;
           ${mine ? 'background:var(--navy-800);color:var(--white);border-bottom-right-radius:4px;' : 'background:var(--white);color:var(--gray-800);border:1px solid var(--gray-200);border-bottom-left-radius:4px;'}">${escHtml(m.body)}</div>
         <div style="font-size:10px;color:var(--gray-400);margin-top:2px;padding:0 4px;">${escHtml(fmt(m.created_at))}</div>
@@ -888,7 +889,7 @@ async function sendRequestChatMessage() {
     request_type: rcCurrent.requestType,
     request_id:   rcCurrent.requestId,
     sender_id:    user.id,
-    sender_name:  user.name ?? '—',
+    sender_name:  rcCurrent.isLeaderView ? '幹部' : (user.name ?? '—'),
     is_leader:    rcCurrent.isLeaderView,
     body,
   });
@@ -931,7 +932,7 @@ function renderOpinionsList() {
       <div class="sm-card__header">
         <div>
           <div class="sm-card__name">
-            ${o.is_anonymous ? '匿名団員' : escHtml(o.member_name)}
+            ${escHtml(o.member_name)}
             ${o.status === 'unread'
               ? '<span class="badge badge-danger" style="font-size:10px;margin-left:6px;">未確認</span>'
               : '<span class="badge badge-success" style="font-size:10px;margin-left:6px;">確認済み</span>'}
