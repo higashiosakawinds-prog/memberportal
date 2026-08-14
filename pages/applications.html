@@ -186,10 +186,6 @@
             <label class="form-label">内容 <span class="required">*</span></label>
             <textarea id="opinion-body" class="form-control" rows="5" placeholder="ご意見・ご要望を入力してください" style="resize:vertical;line-height:1.7;"></textarea>
           </div>
-          <div class="form-group" style="display:flex;align-items:center;gap:var(--space-2);">
-            <input type="checkbox" id="opinion-anonymous" style="width:16px;height:16px;accent-color:var(--navy-600);cursor:pointer;">
-            <label for="opinion-anonymous" style="font-size:var(--text-sm);color:var(--gray-700);cursor:pointer;">匿名で送信する（氏名を幹部に開示しません）</label>
-          </div>
           <button class="btn btn-gold" id="btn-opinion-submit">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
             送信する
@@ -455,9 +451,10 @@ function renderRequestChat() {
   const fmt = iso => new Date(iso).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
   wrap.innerHTML = rcMessages.map(m => {
     const mine = rcCurrent.isLeaderView ? m.is_leader : !m.is_leader;
+    const displayName = m.is_leader ? '幹部' : m.sender_name;
     return `
       <div style="align-self:${mine ? 'flex-end' : 'flex-start'};max-width:82%;display:flex;flex-direction:column;align-items:${mine ? 'flex-end' : 'flex-start'};">
-        <div style="font-size:10px;color:var(--gray-400);margin-bottom:2px;padding:0 4px;">${escHtml(m.sender_name)}${m.is_leader ? '（幹部）' : ''}</div>
+        <div style="font-size:10px;color:var(--gray-400);margin-bottom:2px;padding:0 4px;">${escHtml(displayName)}</div>
         <div style="padding:var(--space-3) var(--space-4);border-radius:var(--radius-lg);font-size:var(--text-sm);line-height:1.7;white-space:pre-wrap;word-break:break-word;
           ${mine ? 'background:var(--navy-800);color:var(--white);border-bottom-right-radius:4px;' : 'background:var(--white);color:var(--gray-800);border:1px solid var(--gray-200);border-bottom-left-radius:4px;'}">${escHtml(m.body)}</div>
         <div style="font-size:10px;color:var(--gray-400);margin-top:2px;padding:0 4px;">${escHtml(fmt(m.created_at))}</div>
@@ -517,10 +514,7 @@ function renderOpinionHistory(list) {
     <div style="border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:var(--space-4);margin-bottom:var(--space-3);background:var(--white);">
       <div style="display:flex;justify-content:space-between;gap:var(--space-2);align-items:center;margin-bottom:var(--space-2);flex-wrap:wrap;">
         <span style="font-size:var(--text-xs);color:var(--gray-500);">${escHtml(new Date(o.created_at).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}))}</span>
-        <div style="display:flex;gap:6px;">
-          ${o.is_anonymous ? '<span class="badge badge-navy" style="font-size:10px;">匿名送信</span>' : ''}
-          <span class="badge ${o.status === 'read' ? 'badge-success' : 'badge-warning'}" style="font-size:10px;">${o.status === 'read' ? '確認済み' : '未確認'}</span>
-        </div>
+        <span class="badge ${o.status === 'read' ? 'badge-success' : 'badge-warning'}" style="font-size:10px;">${o.status === 'read' ? '確認済み' : '未確認'}</span>
       </div>
       <p style="font-size:var(--text-sm);color:var(--gray-700);white-space:pre-wrap;">${escHtml(o.body)}</p>
       ${o.admin_note ? `<div style="margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--gray-200);"><p style="font-size:var(--text-xs);color:var(--gray-500);margin-bottom:4px;">幹部からの返信</p><p style="font-size:var(--text-sm);color:var(--navy-800);white-space:pre-wrap;">${escHtml(o.admin_note)}</p></div>` : ''}
@@ -529,7 +523,6 @@ function renderOpinionHistory(list) {
 
 async function submitOpinion() {
   const body = document.getElementById('opinion-body').value.trim();
-  const anon = document.getElementById('opinion-anonymous').checked;
   if (!body) { showToast('内容を入力してください', 'error'); return; }
   const user = getSessionUser();
   if (!_sb || !user) { showToast('ログインが必要です', 'error'); return; }
@@ -538,11 +531,10 @@ async function submitOpinion() {
   btn.disabled = true; btn.textContent = '送信中…';
 
   const { error } = await _sb.from('opinions').insert({
-    member_id:    user.id,
-    member_name:  user.name ?? '—',
-    is_anonymous: anon,
+    member_id:   user.id,
+    member_name: user.name ?? '—',
     body,
-    status:       'unread',
+    status:      'unread',
   });
 
   btn.disabled = false;
@@ -551,7 +543,6 @@ async function submitOpinion() {
   if (error) { showToast('送信に失敗しました: ' + error.message, 'error'); return; }
 
   document.getElementById('opinion-body').value = '';
-  document.getElementById('opinion-anonymous').checked = false;
   showToast('意見を送信しました。ありがとうございます。', 'success');
   renderOpinionHistory(await loadMyOpinions());
 }
