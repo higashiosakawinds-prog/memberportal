@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>東大阪吹奏楽団 DXシステム</title>
+  <title>東大阪吹奏楽団 ひがすいポータル</title>
   <link rel="stylesheet" href="css/variables.css">
   <link rel="stylesheet" href="css/common.css">
   <!-- アイコン -->
@@ -59,7 +59,7 @@
     </div>
 
     <!-- 統計カード -->
-    <div class="grid grid-3 mb-8">
+    <div class="grid grid-2 mb-8">
       <div class="stat-card fade-in fade-in-1">
         <p class="stat-card__number" id="stat-members">—</p>
         <p class="stat-card__label">登録団員数</p>
@@ -67,10 +67,6 @@
       <div class="stat-card fade-in fade-in-2">
         <p class="stat-card__number" id="stat-scores">—</p>
         <p class="stat-card__label">登録楽譜数</p>
-      </div>
-      <div class="stat-card fade-in fade-in-3">
-        <p class="stat-card__number" id="stat-requests">—</p>
-        <p class="stat-card__label">未処理申請数</p>
       </div>
     </div>
 
@@ -316,14 +312,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ─── 統計カード ───
   if (_sb) {
-    const [{ count: mc }, { count: sc }, { count: rc }] = await Promise.all([
+    const [{ count: mc }, { count: sc }] = await Promise.all([
       _sb.from('profiles').select('*', { count:'exact', head:true }),
       _sb.from('scores2').select('*', { count:'exact', head:true }),
-      _sb.from('requests').select('*', { count:'exact', head:true }).eq('status', 'pending'),
     ]);
     document.getElementById('stat-members').textContent  = mc ?? '—';
     document.getElementById('stat-scores').textContent   = sc ?? '—';
-    document.getElementById('stat-requests').textContent = rc ?? '—';
   }
 
   // ─── 公開中の楽譜を一覧表示 ───
