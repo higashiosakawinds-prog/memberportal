@@ -31,12 +31,12 @@ const MAINTENANCE_CONFIG = {
   'instrument-lending': false, // 楽器貸出管理
   qrcode:             true,  // QRコード印刷
   contact:            false,  // 連絡網
-  requests:           true,  // 団員申請
+  requests:           false,  // 団員申請
   settings:           false,  // 設定
   schedule:           false,   //スケジュール
   activities:         false,   //活動記録
   visitors:           false,    //見学者連絡
-  applications:       true,   // 各種申請
+  applications:       false,   // 各種申請
 };
 
 // メンテナンス中ページの閲覧を許可するロール
