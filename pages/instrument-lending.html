@@ -131,6 +131,33 @@
     .status-修理中   { background: rgba(192,57,43,.12);  color: var(--danger); }
     .status-廃棄     { background: var(--gray-300);      color: var(--gray-700); }
 
+    /* ── 管理・貸出登録タブ：モーダル起動カード ── */
+    .manage-launch-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5);
+    }
+    .manage-launch-card {
+      display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2);
+      text-align: left; background: var(--white);
+      border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
+      padding: var(--space-6); cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+    .manage-launch-card:hover {
+      border-color: var(--navy-500); box-shadow: var(--shadow-md); transform: translateY(-2px);
+    }
+    .manage-launch-card__icon {
+      font-size: 1.8rem; line-height: 1;
+      width: 52px; height: 52px; border-radius: var(--radius-md);
+      background: var(--navy-900); display: flex; align-items: center; justify-content: center;
+      margin-bottom: var(--space-2);
+    }
+    .manage-launch-card__title { font-size: var(--text-lg); font-weight: 700; color: var(--navy-800); }
+    .manage-launch-card__desc { font-size: var(--text-sm); color: var(--gray-500); line-height: 1.6; }
+
+    @media(max-width: 640px) {
+      .manage-launch-grid { grid-template-columns: 1fr; }
+    }
+
     /* ─── ステータス選択ボタン・種別選択ボタン共通の「選択済み」スタイル ─── */
     .choice-btn {
       display: inline-flex; align-items: center; gap: var(--space-2);
@@ -248,8 +275,7 @@
     <!-- タブ -->
     <div class="il-tabs fade-in fade-in-1">
       <button class="il-tab active" data-tab="recent">直近の記録</button>
-      <button class="il-tab" data-tab="status">管理状態変更</button>
-      <button class="il-tab" data-tab="lend">貸出・借用登録</button>
+      <button class="il-tab" data-tab="manage">管理・貸出登録</button>
       <button class="il-tab" data-tab="return">返却処理</button>
     </div>
 
@@ -300,8 +326,34 @@
       </div>
     </div>
 
-    <!-- ② 管理状態変更 -->
-    <div class="il-panel" id="panel-status">
+    <!-- ② 管理・貸出登録（状態変更・貸出借用登録をモーダルで行う） -->
+    <div class="il-panel" id="panel-manage">
+      <div class="manage-launch-grid fade-in fade-in-1">
+        <button type="button" class="manage-launch-card" id="btn-open-status-modal">
+          <span class="manage-launch-card__icon">🔧</span>
+          <span class="manage-launch-card__title">管理状態を変更する</span>
+          <span class="manage-launch-card__desc">保管・修理中・廃棄などのステータスを更新します</span>
+        </button>
+        <button type="button" class="manage-launch-card" id="btn-open-lend-modal">
+          <span class="manage-launch-card__icon">📤</span>
+          <span class="manage-launch-card__title">貸出・借用を登録する</span>
+          <span class="manage-launch-card__desc">団内貸出・外部貸出・借用の記録を新規登録します</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         管理状態変更モーダル
+         ══════════════════════════════════ -->
+    <div class="modal-overlay" id="modal-status">
+      <div class="modal" style="max-width:640px;">
+        <div class="modal__header">
+          <h2 class="modal__title">管理状態変更</h2>
+          <button class="modal__close" onclick="closeModal('modal-status')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="modal__body">
 
       <div class="select-area fade-in fade-in-1">
         <div class="select-area__head">STEP 1 ― 対象備品を選択</div>
@@ -397,10 +449,23 @@
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- ③ 貸出・借用登録 -->
-    <div class="il-panel" id="panel-lend">
+        </div><!-- /modal__body -->
+      </div><!-- /modal -->
+    </div><!-- /modal-overlay: modal-status -->
+
+    <!-- ══════════════════════════════════
+         貸出・借用登録モーダル
+         ══════════════════════════════════ -->
+    <div class="modal-overlay" id="modal-lend">
+      <div class="modal" style="max-width:640px;">
+        <div class="modal__header">
+          <h2 class="modal__title">貸出・借用登録</h2>
+          <button class="modal__close" onclick="closeModal('modal-lend')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="modal__body">
 
       <div class="select-area fade-in fade-in-1">
         <div class="select-area__head">STEP 1 ― 対象備品を選択</div>
@@ -498,7 +563,10 @@
           </div>
         </div>
       </div>
-    </div>
+
+        </div><!-- /modal__body -->
+      </div><!-- /modal -->
+    </div><!-- /modal-overlay: modal-lend -->
 
     <!-- ④ 返却処理 -->
     <div class="il-panel" id="panel-return">
@@ -898,6 +966,36 @@ async function saveStatus() {
   renderItemList('status');
   loadRecentRecords();
   updateSummaryStats();
+  closeModal('modal-status');
+}
+
+// ── 管理状態変更モーダルを開く（毎回選択状態をリセット） ──
+function openStatusModal() {
+  document.getElementById('status-search').value = '';
+  selectedItem.status = null;
+  document.getElementById('status-preview').classList.remove('show');
+  document.getElementById('status-form-area').style.display = 'none';
+  resetChoiceGroup('status-btn-group', 'status-new-val', 'status-selected-hint');
+  document.getElementById('status-repair').value = '';
+  clearStatusImg();
+  renderItemList('status');
+  openModal('modal-status');
+}
+
+// ── 貸出・借用登録モーダルを開く（毎回選択状態をリセット） ──
+function openLendModal() {
+  document.getElementById('lend-search').value = '';
+  selectedItem.lend = null;
+  document.getElementById('lend-preview').classList.remove('show');
+  document.getElementById('lend-form-area').style.display = 'none';
+  resetChoiceGroup('lend-type-btn-group', 'lend-type-val', 'lend-type-hint');
+  document.getElementById('lend-borrower').value = '';
+  document.getElementById('lend-due').value = '';
+  document.getElementById('lend-memo').value = '';
+  const startEl = document.getElementById('lend-start');
+  if (startEl) startEl.valueAsDate = new Date();
+  renderItemList('lend');
+  openModal('modal-lend');
 }
 
 // ══════════════════════════════════════
@@ -975,7 +1073,7 @@ async function saveLending() {
 
   btn.disabled = false; btn.textContent = '登録して貸出コードを発行';
 
-  // モーダル表示
+  // モーダル表示（貸出登録モーダルを閉じてからコード発行モーダルを開く）
   document.getElementById('modal-code-display').textContent = issuedCode;
   document.getElementById('modal-code-summary').innerHTML =
     `<strong>${escHtml(it.name_ja)}</strong>（${escHtml(fmtNum(it))}）<br>
@@ -983,6 +1081,7 @@ async function saveLending() {
      借用者・貸出先：${escHtml(borrower)}<br>
      開始日：${escHtml(fmtDate(startVal))}${dueDate ? `　返却期日：${escHtml(fmtDate(dueDate))}` : ''}`;
 
+  closeModal('modal-lend');
   openModal('modal-lending-code');
 
   // フォームリセット
@@ -1230,6 +1329,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // タブ・選択モード
   initTabs();
   initSelectTabs();
+
+  // 管理・貸出登録タブ：モーダル起動ボタン
+  document.getElementById('btn-open-status-modal')?.addEventListener('click', openStatusModal);
+  document.getElementById('btn-open-lend-modal')?.addEventListener('click', openLendModal);
 
   // choice-btn グループ初期化
   initChoiceGroup('status-btn-group',    'status-new-val',  'status-selected-hint', 'status-selected-label');
