@@ -689,11 +689,11 @@ function onDetected(raw) {
 
   if (raw.startsWith('DP:')) {
     const parts = raw.split(':');
-    // parts: ['DP', shortId, 'YYYY', 'MM'] ← YYYY-MM は split(':') で分割される
-    // → 'YYYY-MM' は index 2〜3 を再結合
-    if (parts.length >= 4) {
-      const shortId  = parts[1];
-      const yyyyMM   = `${parts[2]}-${parts[3]}`;
+    // 'DP:6ba7b8109173:2025-06'.split(':') = ['DP', '6ba7b8109173', '2025-06']
+    // 月部分はハイフン区切りのため、コロンでは分割されず3要素になる
+    if (parts.length >= 3) {
+      const shortId = parts[1];
+      const yyyyMM  = parts[2];
 
       // allMembersからショートIDで逆引き（先頭12文字照合）
       const found = allMembers.find(m => {
