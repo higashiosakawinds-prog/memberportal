@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>アンケート管理 — 東大阪吹奏楽団</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/common.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .sa-tabs { display:flex;gap:0;border-bottom:2px solid var(--gray-200);margin-bottom:var(--space-8);flex-wrap:wrap; }
+    .sa-tab {
+      padding:var(--space-3) var(--space-5);font-size:var(--text-sm);font-weight:500;
+      color:var(--gray-500);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;
+      transition:all var(--transition-fast);background:none;border-top:none;border-left:none;border-right:none;
+    }
+    .sa-tab:hover { color:var(--navy-700); }
+    .sa-tab.active { color:var(--navy-800);border-bottom-color:var(--gold-500);font-weight:700; }
+    .sa-panel { display:none; }
+    .sa-panel.active { display:block; }
+
+    .setup-steps { counter-reset:step; }
+    .setup-step {
+      display:flex; gap:var(--space-3); padding:var(--space-3) 0;
+      border-bottom:1px solid var(--gray-200); font-size:var(--text-sm); color:var(--gray-700); line-height:1.7;
+    }
+    .setup-step:last-child { border-bottom:none; }
+    .setup-step__num {
+      counter-increment:step; flex-shrink:0; width:24px; height:24px; border-radius:50%;
+      background:var(--navy-800); color:var(--gold-300); font-size:var(--text-xs); font-weight:700;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .setup-step__num::before { content:counter(step); }
+    .code-box {
+      background:var(--navy-900); color:#d4e3f5; border-radius:var(--radius-md);
+      padding:var(--space-4); font-family:var(--font-numeric); font-size:var(--text-xs);
+      max-height:260px; overflow:auto; white-space:pre-wrap; word-break:break-all;
+    }
+
+    .survey-card {
+      background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-lg);
+      padding:var(--space-5); margin-bottom:var(--space-4);
+    }
+    .survey-card__head { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-3); flex-wrap:wrap; }
+    .survey-card__title { font-size:var(--text-lg); font-weight:700; color:var(--navy-800); }
+    .survey-card__desc { font-size:var(--text-sm); color:var(--gray-500); margin-top:4px; }
+    .survey-card__meta { font-size:var(--text-xs); color:var(--gray-400); margin-top:6px; }
+    .survey-card__progress-wrap { margin-top:var(--space-4); }
+    .survey-progress-bar {
+      height:8px; border-radius:var(--radius-full); background:var(--gray-200); overflow:hidden;
+    }
+    .survey-progress-bar__fill { height:100%; background:var(--success); border-radius:var(--radius-full); transition:width .3s ease; }
+    .survey-card__actions { display:flex; gap:var(--space-2); flex-wrap:wrap; margin-top:var(--space-4); }
+
+    .status-draft     { background:var(--gray-200); color:var(--gray-600); }
+    .status-published { background:rgba(39,174,96,.12); color:#1e8449; }
+    .status-closed     { background:rgba(192,57,43,.12); color:var(--danger); }
+
+    .cat-check-group { display:flex; flex-wrap:wrap; gap:var(--space-2); }
+    .cat-check-item {
+      display:flex; align-items:center; gap:6px; padding:var(--space-2) var(--space-3);
+      border:1px solid var(--gray-300); border-radius:var(--radius-md); cursor:pointer; font-size:var(--text-sm);
+    }
+    .cat-check-item input { accent-color:var(--navy-600); }
+
+    .resp-list { max-height:320px; overflow-y:auto; }
+    .resp-row {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:var(--space-2) var(--space-3); border-bottom:1px solid var(--gray-100); font-size:var(--text-sm);
+    }
+    .resp-row:last-child { border-bottom:none; }
+
+    @media(max-width:640px){ .sa-tab { padding:var(--space-2) var(--space-3); font-size:var(--text-xs); } }
+  </style>
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main-content">
+
+    <div class="page-header fade-in">
+      <div>
+        <p class="page-header__eyebrow">SURVEYS · ADMIN</p>
+        <h1 class="page-header__title">アンケート管理</h1>
+      </div>
+    </div>
+
+    <!-- 権限なし -->
+    <div id="no-permission" style="display:none;padding:var(--space-16);text-align:center;">
+      <p style="font-size:var(--text-lg);font-weight:700;color:var(--danger);">このページにはアクセス権限がありません。</p>
+      <a href="../index.html" class="btn btn-outline" style="margin-top:var(--space-6);">ダッシュボードに戻る</a>
+    </div>
+
+    <div id="sa-app" style="display:none;">
+
+      <div class="sa-tabs fade-in fade-in-1">
+        <button class="sa-tab active" data-tab="create">作成する</button>
+        <button class="sa-tab" data-tab="manage">管理する</button>
+        <button class="sa-tab" data-tab="setup">セットアップ手順</button>
+      </div>
+
+      <!-- ── 作成タブ ── -->
+      <div class="sa-panel active" id="panel-create">
+        <div class="alert alert-info mb-6">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+          <span>アンケート本体はGoogleフォームで作成してください。先に「セットアップ手順」タブの内容を確認のうえ、フォームのURLと回答者ID用のエントリー番号を用意してからここに入力してください。</span>
+        </div>
+
+        <div class="card">
+          <div class="card__header"><span class="card__title">新しいアンケートを作成</span></div>
+          <div class="card__body">
+
+            <div class="form-group">
+              <label class="form-label">タイトル <span class="required">*</span></label>
+              <input type="text" id="c-title" class="form-control" placeholder="例：定期演奏会の選曲アンケート">
+            </div>
+            <div class="form-group">
+              <label class="form-label">説明（任意・ダッシュボードに表示されます）</label>
+              <textarea id="c-description" class="form-control" rows="2" placeholder="例：11月の定演で演奏したい曲を教えてください"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">GoogleフォームのURL（回答用 / viewform）<span class="required">*</span></label>
+              <input type="url" id="c-form-url" class="form-control" placeholder="https://docs.google.com/forms/d/e/xxxxxxxx/viewform">
+            </div>
+            <div class="form-group">
+              <label class="form-label">回答者ID用エントリー番号 <span class="required">*</span></label>
+              <input type="text" id="c-entry-id" class="form-control" placeholder="例：1234567890" inputmode="numeric">
+              <span class="form-hint">「セットアップ手順」タブの手順3で確認した entry.<strong>この数字部分</strong> を入力してください。</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">対象区分（未選択の場合は全員が対象になります）</label>
+              <div class="cat-check-group" id="c-target-categories">
+                <label class="cat-check-item"><input type="checkbox" value="regular"> 正団員</label>
+                <label class="cat-check-item"><input type="checkbox" value="regular_student"> 正団員（学生）</label>
+                <label class="cat-check-item"><input type="checkbox" value="trainee"> 準団員</label>
+                <label class="cat-check-item"><input type="checkbox" value="support"> スタッフ</label>
+                <label class="cat-check-item"><input type="checkbox" value="rest"> 休団中</label>
+              </div>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;">
+              <button class="btn btn-gold" id="btn-create-survey">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                作成する（下書き）
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 管理タブ ── -->
+      <div class="sa-panel" id="panel-manage">
+        <div id="survey-list">
+          <div style="text-align:center;padding:var(--space-10);"><div class="loading-spinner" style="margin:0 auto;"></div></div>
+        </div>
+      </div>
+
+      <!-- ── セットアップ手順タブ ── -->
+      <div class="sa-panel" id="panel-setup">
+        <div class="card mb-6">
+          <div class="card__header"><span class="card__title">① Googleフォームの準備</span></div>
+          <div class="card__body setup-steps">
+            <div class="setup-step"><span class="setup-step__num"></span><span>
+              <a href="https://forms.google.com" target="_blank" rel="noopener">Googleフォーム</a>で新しいフォームを作成し、通常どおり質問を追加します。
+            </span></div>
+            <div class="setup-step"><span class="setup-step__num"></span><span>
+              記述式（短文）の質問を1つ追加し、タイトルを <strong>「回答者ID（自動入力・変更しないでください）」</strong> にします。説明文に「この項目は自動的に入力されます」と書き、<strong>必須にはしない</strong>でください。
+            </span></div>
+            <div class="setup-step"><span class="setup-step__num"></span><span>
+              もう1つ記述式の質問を追加し、タイトルを <strong>「メールアドレス（任意・回答内容を受け取りたい方はご記入ください）」</strong> にします。こちらも<strong>必須にしない</strong>でください。
+            </span></div>
+            <div class="setup-step"><span class="setup-step__num"></span><span>
+              画面右上の <strong>⋮（その他の操作）→「事前入力したリンクを取得」</strong> を選び、「回答者ID」の欄に適当な値（例：TEST）を入力して「リンクを取得」を押します。表示されたURLの中に <code>entry.1234567890=TEST</code> のような部分があるので、<strong>数字部分（例：1234567890）</strong>をコピーしておきます。これが「作成する」タブで入力する「回答者ID用エントリー番号」です。
+            </span></div>
+            <div class="setup-step"><span class="setup-step__num"></span><span>
+              フォームの「回答」タブで <strong>「メール アドレスを収集する」はOFFのまま</strong>にしてください（団員のGoogleアカウントへのログインを必須にすると、Googleアカウントを持たない団員が回答できなくなります）。
+            </span></div>
+          </div>
+        </div>
+
+        <div class="card mb-6">
+          <div class="card__header"><span class="card__title">② Apps Scriptの設定（回答の記録・メール送信用）</span></div>
+          <div class="card__body setup-steps">
+            <div class="setup-step"><span class="setup-step__num"></span><span>
+              フォーム編集画面の <strong>「⋮」→「Apps Script」</strong>（または上部メニューの拡張機能 → Apps Script）を開きます。
+            </span></div>
+            <div class="setup-step"><span class="setup-step__num"></span><span>
+              エディタの内容をすべて削除し、下のコードを貼り付けて保存します。
+              <div class="code-box" id="gas-code-box"></div>
+              <button class="btn btn-sm btn-outline" style="margin-top:var(--space-2);" onclick="copyGasCode()">コードをコピー</button>
+            </span></div>
+            <div class="setup-step"><span class="setup-step__num"></span><span>
+              左メニューの歯車アイコン「プロジェクトの設定」→「スクリプト プロパティ」で、
+              <strong>SUPABASE_URL</strong>・<strong>SUPABASE_SERVICE_KEY</strong>（Service Roleキー）・<strong>SURVEY_ID</strong>（「作成する」タブで作成後にこの画面で確認できるID）の3つを登録します。
+            </span></div>
+            <div class="setup-step"><span class="setup-step__num"></span><span>
+              左メニューの時計アイコン「トリガー」→「トリガーを追加」で、実行する関数に <code>onFormSubmitTrigger</code>、イベントのソースに「フォームから」、イベントの種類に「フォーム送信時」を選んで保存します（初回は権限の承認が必要です）。
+            </span></div>
+            <div class="setup-step"><span class="setup-step__num"></span><span>
+              テスト回答を1件送信し、Supabaseの <code>survey_responses</code> テーブルに行が追加されること、メールアドレスを入力した場合に確認メールが届くことを確認してください。
+            </span></div>
+          </div>
+        </div>
+
+        <div class="alert alert-warning">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+          <span>Googleフォーム自体には「1人1回answer」を強制する仕組みがないため（団員全員がGoogleアカウントでログインしている前提が使えないため）、この画面の「回答済み」表示は目安としてご利用ください。</span>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- 編集モーダル -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal__header">
+      <h2 class="modal__title">アンケートを編集</h2>
+      <button class="modal__close" onclick="closeModal('modal-edit')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div class="form-group">
+        <label class="form-label">タイトル <span class="required">*</span></label>
+        <input type="text" id="e-title" class="form-control">
+      </div>
+      <div class="form-group">
+        <label class="form-label">説明</label>
+        <textarea id="e-description" class="form-control" rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">対象区分（未選択の場合は全員）</label>
+        <div class="cat-check-group" id="e-target-categories">
+          <label class="cat-check-item"><input type="checkbox" value="regular"> 正団員</label>
+          <label class="cat-check-item"><input type="checkbox" value="regular_student"> 正団員（学生）</label>
+          <label class="cat-check-item"><input type="checkbox" value="trainee"> 準団員</label>
+          <label class="cat-check-item"><input type="checkbox" value="support"> スタッフ</label>
+          <label class="cat-check-item"><input type="checkbox" value="rest"> 休団中</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-edit')">キャンセル</button>
+      <button class="btn btn-gold" id="btn-save-edit">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 回答状況モーダル -->
+<div class="modal-overlay" id="modal-status">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal__header">
+      <h2 class="modal__title" id="status-modal-title">回答状況</h2>
+      <button class="modal__close" onclick="closeModal('modal-status')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body">
+      <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-4);">
+        <button class="btn btn-sm btn-outline status-view-tab active" data-view="answered">回答済み</button>
+        <button class="btn btn-sm btn-outline status-view-tab" data-view="unanswered">未回答</button>
+      </div>
+      <div class="resp-list" id="status-resp-list"></div>
+      <div id="status-reminder-area" style="display:none;margin-top:var(--space-4);border-top:1px solid var(--gray-200);padding-top:var(--space-4);">
+        <div class="form-group">
+          <label class="form-label">件名</label>
+          <input type="text" id="reminder-subject" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">本文</label>
+          <textarea id="reminder-body" class="form-control" rows="6" style="resize:vertical;"></textarea>
+        </div>
+        <button class="btn btn-gold" id="btn-send-reminder">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+          未回答者にメールで督促する
+        </button>
+      </div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-status')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<script src="../js/supabase.js"></script>
+<script src="../js/common.js"></script>
+<script>
+const CAT_LABELS = {
+  regular:'正団員', regular_student:'正団員（学生）',
+  trainee:'準団員', support:'スタッフ', rest:'休団中',
+};
+
+const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+let allSurveys   = [];
+let allMembers   = [];
+let responseCounts = {};      // { surveyId: [{member_id, email}, ...] }
+let currentStatusSurvey = null;
+let currentStatusView   = 'answered';
+
+// ══════════════════════════════════════
+//  Apps Script テンプレート（コピー用）
+// ══════════════════════════════════════
+const GAS_TEMPLATE = `/**
+ * 東大阪吹奏楽団 DXシステム — アンケート回答連携スクリプト
+ * スクリプト プロパティに SUPABASE_URL / SUPABASE_SERVICE_KEY / SURVEY_ID を設定し、
+ * onFormSubmitTrigger をフォーム送信時トリガーに設定してください。
+ */
+function onFormSubmitTrigger(e) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const SUPABASE_URL = props.getProperty('SUPABASE_URL');
+    const SUPABASE_SERVICE_KEY = props.getProperty('SUPABASE_SERVICE_KEY');
+    const SURVEY_ID = props.getProperty('SURVEY_ID');
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !SURVEY_ID) { console.error('スクリプト プロパティ未設定'); return; }
+
+    const itemResponses = e.response.getItemResponses();
+    let memberId = null, email = null;
+    const answers = [];
+    itemResponses.forEach(ir => {
+      const title = ir.getItem().getTitle();
+      const value = ir.getResponse();
+      answers.push({ question: title, answer: value });
+      if (title.indexOf('回答者ID') !== -1) memberId = String(value || '').trim();
+      if (title.indexOf('メールアドレス') !== -1) email = String(value || '').trim();
+    });
+
+    if (memberId) {
+      const payload = { survey_id: SURVEY_ID, member_id: memberId, email: email || null, responded_at: new Date().toISOString() };
+      const res = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/survey_responses?on_conflict=survey_id,member_id', {
+        method: 'post', contentType: 'application/json',
+        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: 'Bearer ' + SUPABASE_SERVICE_KEY, Prefer: 'resolution=merge-duplicates' },
+        payload: JSON.stringify(payload), muteHttpExceptions: true,
+      });
+      if (res.getResponseCode() >= 300) console.error('Supabase書き込み失敗: ' + res.getContentText());
+    }
+
+    if (email) {
+      const bodyLines = answers.filter(a => a.question.indexOf('回答者ID') === -1)
+        .map(a => '■ ' + a.question + '\\n' + (Array.isArray(a.answer) ? a.answer.join('、') : a.answer) + '\\n');
+      MailApp.sendEmail(email, '【東大阪吹奏楽団】アンケート回答受付のお知らせ',
+        'この度はアンケートにご回答いただきありがとうございました。\\n以下の内容で回答を受け付けました。\\n\\n' +
+        bodyLines.join('\\n') + '\\n──\\n東大阪吹奏楽団');
+    }
+  } catch (err) { console.error('onFormSubmitTrigger エラー: ' + err); }
+}`;
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('gas-code-box').textContent = GAS_TEMPLATE;
+});
+
+function copyGasCode() {
+  navigator.clipboard.writeText(GAS_TEMPLATE)
+    .then(() => showToast('コードをコピーしました', 'success'))
+    .catch(() => showToast('コピーに失敗しました', 'error'));
+}
+
+// ══════════════════════════════════════
+//  タブ切り替え
+// ══════════════════════════════════════
+document.querySelectorAll('.sa-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.sa-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.sa-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
+  });
+});
+
+// ══════════════════════════════════════
+//  データ読み込み
+// ══════════════════════════════════════
+async function loadMembers() {
+  if (!_sb) return;
+  const { data } = await _sb.from('profiles').select('id, last_name, first_name, category, email');
+  allMembers = data ?? [];
+}
+
+async function loadSurveys() {
+  if (!_sb) return;
+  const { data, error } = await _sb.from('surveys').select('*').order('created_at', { ascending: false });
+  if (error) { console.warn('[HighasuiDX] surveys取得失敗:', error.message); return; }
+  allSurveys = data ?? [];
+
+  const { data: resp } = await _sb.from('survey_responses').select('survey_id, member_id, email');
+  responseCounts = {};
+  (resp ?? []).forEach(r => {
+    if (!responseCounts[r.survey_id]) responseCounts[r.survey_id] = [];
+    responseCounts[r.survey_id].push(r);
+  });
+}
+
+function targetMembersFor(survey) {
+  const cats = survey.target_categories;
+  if (!cats || cats.length === 0) return allMembers;
+  return allMembers.filter(m => cats.includes(m.category));
+}
+
+// ══════════════════════════════════════
+//  一覧描画
+// ══════════════════════════════════════
+function renderSurveyList() {
+  const el = document.getElementById('survey-list');
+  if (!allSurveys.length) {
+    el.innerHTML = `<div style="text-align:center;padding:var(--space-16);color:var(--gray-400);">まだアンケートがありません。「作成する」タブから作成してください。</div>`;
+    return;
+  }
+
+  const STATUS_LABEL = { draft:'下書き', published:'公開中', closed:'締切' };
+
+  el.innerHTML = allSurveys.map(s => {
+    const targets   = targetMembersFor(s);
+    const responded = responseCounts[s.id]?.length ?? 0;
+    const total     = targets.length;
+    const pct       = total > 0 ? Math.round((responded / total) * 100) : 0;
+
+    const actions = [];
+    if (s.status === 'draft') {
+      actions.push(`<button class="btn btn-sm btn-gold" onclick="publishSurvey('${s.id}')">公開する</button>`);
+      actions.push(`<button class="btn btn-sm btn-outline" onclick="openEditModal('${s.id}')">編集</button>`);
+      actions.push(`<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger);" onclick="deleteSurvey('${s.id}')">削除</button>`);
+    } else if (s.status === 'published') {
+      actions.push(`<button class="btn btn-sm btn-outline" onclick="openStatusModal('${s.id}')">回答状況を見る</button>`);
+      actions.push(`<button class="btn btn-sm btn-outline" onclick="openEditModal('${s.id}')">編集</button>`);
+      actions.push(`<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger);" onclick="closeSurvey('${s.id}')">締め切る</button>`);
+    } else {
+      actions.push(`<button class="btn btn-sm btn-outline" onclick="openStatusModal('${s.id}')">回答状況を見る</button>`);
+      actions.push(`<button class="btn btn-sm btn-outline" onclick="publishSurvey('${s.id}')">再公開する</button>`);
+      actions.push(`<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger);" onclick="deleteSurvey('${s.id}')">削除</button>`);
+    }
+
+    const catLabel = (s.target_categories && s.target_categories.length)
+      ? s.target_categories.map(c => CAT_LABELS[c] ?? c).join('、')
+      : '全員';
+
+    return `
+      <div class="survey-card">
+        <div class="survey-card__head">
+          <div>
+            <span class="badge status-${s.status}" style="font-size:10px;margin-bottom:6px;display:inline-block;">${STATUS_LABEL[s.status]}</span>
+            <p class="survey-card__title">${escHtml(s.title)}</p>
+            ${s.description ? `<p class="survey-card__desc">${escHtml(s.description)}</p>` : ''}
+            <p class="survey-card__meta">対象：${escHtml(catLabel)}　／　ID：<span style="font-family:var(--font-numeric);">${escHtml(s.id)}</span></p>
+          </div>
+        </div>
+        <div class="survey-card__progress-wrap">
+          <div style="display:flex;justify-content:space-between;font-size:var(--text-xs);color:var(--gray-500);margin-bottom:4px;">
+            <span>回答状況</span><span>${responded} / ${total}名（${pct}%）</span>
+          </div>
+          <div class="survey-progress-bar"><div class="survey-progress-bar__fill" style="width:${pct}%;"></div></div>
+        </div>
+        <div class="survey-card__actions">${actions.join('')}</div>
+      </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════
+//  作成
+// ══════════════════════════════════════
+document.getElementById('btn-create-survey').addEventListener('click', async () => {
+  const title       = document.getElementById('c-title').value.trim();
+  const description = document.getElementById('c-description').value.trim();
+  const formUrl     = document.getElementById('c-form-url').value.trim();
+  const entryId     = document.getElementById('c-entry-id').value.trim();
+  const cats        = [...document.querySelectorAll('#c-target-categories input:checked')].map(el => el.value);
+
+  if (!title)   { showToast('タイトルを入力してください', 'error'); return; }
+  if (!formUrl) { showToast('GoogleフォームのURLを入力してください', 'error'); return; }
+  if (!/^\d+$/.test(entryId)) { showToast('回答者ID用エントリー番号は数字で入力してください', 'error'); return; }
+  if (!_sb) { showToast('Supabase未接続のため作成できません', 'error'); return; }
+
+  const sessionUser = getSessionUser();
+  const btn = document.getElementById('btn-create-survey');
+  btn.disabled = true; btn.textContent = '作成中…';
+
+  const { data, error } = await _sb.from('surveys').insert({
+    title, description,
+    form_view_url:   formUrl,
+    member_entry_id: entryId,
+    target_categories: cats.length ? cats : null,
+    status: 'draft',
+    created_by: sessionUser?.id ?? null,
+  }).select().single();
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg> 作成する（下書き）';
+
+  if (error) { showToast('作成に失敗しました: ' + error.message, 'error'); return; }
+
+  showToast(`下書きを作成しました。Apps ScriptのSURVEY_IDに「${data.id}」を設定してください。`, 'success');
+  ['c-title','c-description','c-form-url','c-entry-id'].forEach(id => document.getElementById(id).value = '');
+  document.querySelectorAll('#c-target-categories input').forEach(el => el.checked = false);
+
+  await loadSurveys();
+  renderSurveyList();
+  document.querySelector('.sa-tab[data-tab="manage"]').click();
+});
+
+// ══════════════════════════════════════
+//  公開・締切・削除
+// ══════════════════════════════════════
+async function publishSurvey(id) {
+  if (!_sb) return;
+  const { error } = await _sb.from('surveys').update({ status: 'published', published_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showToast('公開に失敗しました: ' + error.message, 'error'); return; }
+  showToast('アンケートを公開しました。団員のダッシュボードに表示されます。', 'success');
+  await loadSurveys(); renderSurveyList();
+}
+
+async function closeSurvey(id) {
+  if (!_sb) return;
+  if (!confirm('このアンケートを締め切りますか？ダッシュボードから表示されなくなります。')) return;
+  const { error } = await _sb.from('surveys').update({ status: 'closed', closed_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showToast('締切に失敗しました: ' + error.message, 'error'); return; }
+  showToast('アンケートを締め切りました', 'success');
+  await loadSurveys(); renderSurveyList();
+}
+
+async function deleteSurvey(id) {
+  if (!_sb) return;
+  const s = allSurveys.find(x => x.id === id);
+  if (!confirm(`「${s?.title}」を削除しますか？回答記録もすべて削除されます。`)) return;
+  const { error } = await _sb.from('surveys').delete().eq('id', id);
+  if (error) { showToast('削除に失敗しました: ' + error.message, 'error'); return; }
+  showToast('削除しました', 'success');
+  await loadSurveys(); renderSurveyList();
+}
+
+// ══════════════════════════════════════
+//  編集
+// ══════════════════════════════════════
+let editingSurveyId = null;
+function openEditModal(id) {
+  const s = allSurveys.find(x => x.id === id);
+  if (!s) return;
+  editingSurveyId = id;
+  document.getElementById('e-title').value = s.title;
+  document.getElementById('e-description').value = s.description ?? '';
+  document.querySelectorAll('#e-target-categories input').forEach(el => {
+    el.checked = (s.target_categories ?? []).includes(el.value);
+  });
+  openModal('modal-edit');
+}
+
+document.getElementById('btn-save-edit').addEventListener('click', async () => {
+  if (!editingSurveyId || !_sb) return;
+  const title = document.getElementById('e-title').value.trim();
+  if (!title) { showToast('タイトルを入力してください', 'error'); return; }
+  const description = document.getElementById('e-description').value.trim();
+  const cats = [...document.querySelectorAll('#e-target-categories input:checked')].map(el => el.value);
+
+  const { error } = await _sb.from('surveys').update({
+    title, description, target_categories: cats.length ? cats : null,
+  }).eq('id', editingSurveyId);
+
+  if (error) { showToast('保存に失敗しました: ' + error.message, 'error'); return; }
+  showToast('保存しました', 'success');
+  closeModal('modal-edit');
+  await loadSurveys(); renderSurveyList();
+});
+
+// ══════════════════════════════════════
+//  回答状況モーダル・督促メール
+// ══════════════════════════════════════
+function openStatusModal(id) {
+  currentStatusSurvey = allSurveys.find(x => x.id === id);
+  if (!currentStatusSurvey) return;
+  currentStatusView = 'answered';
+  document.querySelectorAll('.status-view-tab').forEach(b => b.classList.toggle('active', b.dataset.view === 'answered'));
+  document.getElementById('status-modal-title').textContent = `回答状況 — ${currentStatusSurvey.title}`;
+  document.getElementById('status-reminder-area').style.display = 'none';
+  renderStatusList();
+  openModal('modal-status');
+}
+
+document.querySelectorAll('.status-view-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.status-view-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentStatusView = btn.dataset.view;
+    renderStatusList();
+  });
+});
+
+function renderStatusList() {
+  if (!currentStatusSurvey) return;
+  const targets    = targetMembersFor(currentStatusSurvey);
+  const respondedIds = new Set((responseCounts[currentStatusSurvey.id] ?? []).map(r => r.member_id));
+  const list = currentStatusView === 'answered'
+    ? targets.filter(m => respondedIds.has(m.id))
+    : targets.filter(m => !respondedIds.has(m.id));
+
+  const listEl = document.getElementById('status-resp-list');
+  if (!list.length) {
+    listEl.innerHTML = `<p style="text-align:center;padding:var(--space-6);color:var(--gray-400);font-size:var(--text-sm);">該当する団員がいません。</p>`;
+  } else {
+    listEl.innerHTML = list.map(m => `
+      <div class="resp-row">
+        <span>${escHtml(m.last_name)} ${escHtml(m.first_name)}</span>
+        <span style="color:var(--gray-400);font-size:var(--text-xs);">${escHtml(CAT_LABELS[m.category] ?? '—')}</span>
+      </div>`).join('');
+  }
+
+  const reminderArea = document.getElementById('status-reminder-area');
+  if (currentStatusView === 'unanswered' && list.length > 0) {
+    reminderArea.style.display = 'block';
+    document.getElementById('reminder-subject').value = `【東大阪吹奏楽団】アンケートご回答のお願い（${currentStatusSurvey.title}）`;
+    document.getElementById('reminder-body').value =
+`団員の皆様
+
+以下のアンケートへのご回答をまだ確認できておりません。
+お手数ですがダッシュボードよりご回答をお願いいたします。
+
+■ アンケート名：${currentStatusSurvey.title}
+${currentStatusSurvey.description ? `■ 内容：${currentStatusSurvey.description}\n` : ''}
+──
+東大阪吹奏楽団`;
+  } else {
+    reminderArea.style.display = 'none';
+  }
+}
+
+document.getElementById('btn-send-reminder').addEventListener('click', () => {
+  if (!currentStatusSurvey) return;
+  const targets = targetMembersFor(currentStatusSurvey);
+  const respondedIds = new Set((responseCounts[currentStatusSurvey.id] ?? []).map(r => r.member_id));
+  const unanswered = targets.filter(m => !respondedIds.has(m.id) && m.email);
+
+  if (!unanswered.length) { showToast('メールアドレスのある未回答者がいません', 'error'); return; }
+
+  const subject = document.getElementById('reminder-subject').value;
+  const body    = document.getElementById('reminder-body').value;
+  const bcc     = unanswered.map(m => m.email).join(',');
+
+  const mailtoHref = `mailto:?bcc=${encodeURIComponent(bcc)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  if (typeof showMailPicker === 'function') {
+    showMailPicker(mailtoHref);
+  } else {
+    window.location.href = mailtoHref;
+  }
+});
+
+// ══════════════════════════════════════
+//  初期化
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!canDo('surveys_admin')) {
+    document.getElementById('no-permission').style.display = 'block';
+    return;
+  }
+  document.getElementById('sa-app').style.display = 'block';
+
+  await Promise.all([loadMembers(), loadSurveys()]);
+  renderSurveyList();
+});
+</script>
+</body>
+</html>
