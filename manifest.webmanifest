@@ -1,0 +1,22 @@
+{
+  "name": "東大阪吹奏楽団 ひがすいポータル",
+  "short_name": "ひがすい",
+  "description": "東大阪吹奏楽団 団員向けポータル",
+  "lang": "ja",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1b2a",
+  "theme_color": "#0d1b2a",
+  "icons": [
+    { "src": "android-chrome-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "android-chrome-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "android-chrome-512x512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "活動予定", "short_name": "予定", "url": "./pages/schedule.html", "icons": [{ "src": "android-chrome-192x192.png", "sizes": "192x192" }] },
+    { "name": "楽譜一覧", "short_name": "楽譜", "url": "./pages/scores.html", "icons": [{ "src": "android-chrome-192x192.png", "sizes": "192x192" }] },
+    { "name": "団費登録", "short_name": "団費", "url": "./pages/dues.html", "icons": [{ "src": "android-chrome-192x192.png", "sizes": "192x192" }] }
+  ]
+}

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>オフライン — 東大阪吹奏楽団</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 16px; background: #0d1b2a; color: #fff;
+      font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .card {
+      width: 100%; max-width: 400px; text-align: center; padding: 40px 28px;
+      background: rgba(255,255,255,.04); border: 1px solid rgba(201,168,76,.25); border-radius: 16px;
+    }
+    .eyebrow { font-size: 12px; letter-spacing: .2em; color: #c9a84c; margin-bottom: 12px; }
+    h1 { font-size: 22px; margin-bottom: 12px; line-height: 1.4; }
+    p  { font-size: 14px; color: rgba(255,255,255,.6); line-height: 1.8; margin-bottom: 24px; }
+    button {
+      padding: 12px 28px; border: none; border-radius: 8px; cursor: pointer;
+      background: #c9a84c; color: #0d1b2a; font-weight: 700; font-size: 14px; font-family: inherit;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <p class="eyebrow">OFFLINE</p>
+    <h1>インターネットに<br>接続されていません</h1>
+    <p>通信環境をご確認のうえ、もう一度お試しください。</p>
+    <button type="button" onclick="location.reload()">再読み込み</button>
+  </div>
+</body>
+</html>
