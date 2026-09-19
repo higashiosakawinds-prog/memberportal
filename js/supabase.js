@@ -56,6 +56,7 @@ const Auth = {
   },
 
   async signOut() {
+    await window.HigasuiPWA?.push?.detach?.();
     if (_sb) await _sb.auth.signOut();
     localStorage.removeItem('hs_user');
     const isRoot = !window.location.pathname.includes('/pages/');
