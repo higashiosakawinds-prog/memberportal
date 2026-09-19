@@ -75,6 +75,7 @@
     <div class="settings-tabs fade-in fade-in-1">
       <button class="settings-tab active" data-tab="profile">個人情報</button>
       <button class="settings-tab" data-tab="password">パスワード変更</button>
+      <button class="settings-tab" data-tab="notify">通知</button>
     </div>
 
     <!-- ── 個人情報パネル ── -->
@@ -259,6 +260,51 @@
         </div>
       </div>
     </div>
+
+    <div class="settings-panel fade-in fade-in-2" id="panel-notify">
+  <div class="card" style="max-width:560px;">
+    <div class="card__header"><span class="card__title">プッシュ通知</span></div>
+    <div class="card__body">
+
+      <!-- 状態表示 -->
+      <div id="push-status" style="margin-bottom:var(--space-4);"></div>
+
+      <button class="btn btn-gold" id="btn-push-toggle" style="display:none;"></button>
+
+      <!-- 通知の種類 -->
+      <p class="section-label" style="margin-top:var(--space-8);">受け取る通知の種類</p>
+      <div style="display:flex;flex-direction:column;gap:var(--space-3);margin-bottom:var(--space-5);">
+        <label style="display:flex;gap:var(--space-3);align-items:flex-start;cursor:pointer;">
+          <input type="checkbox" id="pref-attendance" style="width:18px;height:18px;margin-top:2px;accent-color:var(--navy-600);">
+          <span><strong style="color:var(--navy-800);">出欠登録のリマインド</strong><br>
+            <small style="color:var(--gray-500);">活動の3日前・前日に、出欠が未登録の場合のみ</small></span>
+        </label>
+        <label style="display:flex;gap:var(--space-3);align-items:flex-start;cursor:pointer;">
+          <input type="checkbox" id="pref-dues" style="width:18px;height:18px;margin-top:2px;accent-color:var(--navy-600);">
+          <span><strong style="color:var(--navy-800);">団費未払いのお知らせ</strong><br>
+            <small style="color:var(--gray-500);">毎月10日・25日に、当月分が未払いの場合のみ</small></span>
+        </label>
+        <label style="display:flex;gap:var(--space-3);align-items:flex-start;cursor:pointer;">
+          <input type="checkbox" id="pref-scores" style="width:18px;height:18px;margin-top:2px;accent-color:var(--navy-600);">
+          <span><strong style="color:var(--navy-800);">楽譜の公開開始</strong><br>
+            <small style="color:var(--gray-500);">新しい楽譜が公開されたとき</small></span>
+        </label>
+        <label style="display:flex;gap:var(--space-3);align-items:flex-start;cursor:pointer;">
+          <input type="checkbox" id="pref-lending" style="width:18px;height:18px;margin-top:2px;accent-color:var(--navy-600);">
+          <span><strong style="color:var(--navy-800);">楽譜貸出の返却期限</strong><br>
+            <small style="color:var(--gray-500);">返却期限の前日・当日</small></span>
+        </label>
+      </div>
+      <div style="display:flex;justify-content:flex-end;">
+        <button class="btn btn-gold" id="btn-save-prefs">設定を保存する</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<script>
 
   </main>
 </div>
@@ -474,6 +520,79 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('パスワードを変更しました', 'success');
   });
 });
+(function () {
+  const PREF_KEYS = ['attendance', 'dues', 'scores', 'lending'];
+
+  const STATUS_HTML = {
+    'need-install': `<div class="alert alert-warning"><span>iPhoneでは、<strong>ホーム画面に追加したアプリから開いた場合のみ</strong>通知を受け取れます。Safariの共有ボタン →「ホーム画面に追加」の後、そのアイコンから起動してこの画面を開いてください（iOS 16.4以降が必要です）。</span></div>`,
+    'unsupported':  `<div class="alert alert-warning"><span>この端末・ブラウザはプッシュ通知に対応していません。</span></div>`,
+    'denied':       `<div class="alert alert-warning"><span>通知がブロックされています。端末の設定（iPhone: 設定 → 通知 → ひがすい、Android: アプリ情報 → 通知）から許可してください。</span></div>`,
+    'on':           `<div class="alert alert-success"><span>この端末の通知は<strong>オン</strong>です。</span></div>`,
+    'off':          `<div class="alert alert-info"><span>この端末の通知は<strong>オフ</strong>です。下のボタンでオンにできます。</span></div>`,
+  };
+
+  async function refreshPushUi() {
+    const push = window.HigasuiPWA?.push;
+    const statusEl = document.getElementById('push-status');
+    const btn = document.getElementById('btn-push-toggle');
+    if (!push) { statusEl.innerHTML = STATUS_HTML.unsupported; btn.style.display = 'none'; return; }
+
+    const st = await push.state();
+    statusEl.innerHTML = STATUS_HTML[st] ?? '';
+    if (st === 'on' || st === 'off') {
+      btn.style.display = 'inline-flex';
+      btn.textContent = st === 'on' ? 'この端末の通知をオフにする' : 'この端末の通知をオンにする';
+      btn.className = st === 'on' ? 'btn btn-outline' : 'btn btn-gold';
+      btn.dataset.state = st;
+    } else {
+      btn.style.display = 'none';
+    }
+  }
+
+  async function loadPrefs() {
+    const user = getSessionUser();
+    if (!_sb || !user) return;
+    const { data } = await _sb.from('notification_prefs').select('*').eq('user_id', user.id).maybeSingle();
+    PREF_KEYS.forEach(k => {
+      document.getElementById(`pref-${k}`).checked = data ? data[k] !== false : true; // 未設定は全てオン
+    });
+  }
+
+  window.addEventListener('load', () => {
+    // pwa.js（動的読み込み）の準備完了を待ってから状態を表示
+    setTimeout(refreshPushUi, 300);
+    loadPrefs();
+
+    document.getElementById('btn-push-toggle').addEventListener('click', async e => {
+      const btn = e.currentTarget;
+      const push = window.HigasuiPWA.push;
+      btn.disabled = true;
+      try {
+        if (btn.dataset.state === 'on') {
+          await push.disable();
+          showToast('この端末の通知をオフにしました', 'success');
+        } else {
+          await push.enable();
+          showToast('通知をオンにしました', 'success');
+        }
+      } catch (err) {
+        showToast(err.message || '通知の設定に失敗しました', 'error');
+      }
+      btn.disabled = false;
+      refreshPushUi();
+    });
+
+    document.getElementById('btn-save-prefs').addEventListener('click', async () => {
+      const user = getSessionUser();
+      if (!_sb || !user) { showToast('ログインが必要です', 'error'); return; }
+      const row = { user_id: user.id, updated_at: new Date().toISOString() };
+      PREF_KEYS.forEach(k => { row[k] = document.getElementById(`pref-${k}`).checked; });
+      const { error } = await _sb.from('notification_prefs').upsert(row, { onConflict: 'user_id' });
+      if (error) { showToast('保存に失敗しました: ' + error.message, 'error'); return; }
+      showToast('通知設定を保存しました', 'success');
+    });
+  });
+})();
 </script>
 </body>
 </html>
