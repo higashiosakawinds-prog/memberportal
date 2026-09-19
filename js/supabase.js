@@ -205,3 +205,12 @@ async function _checkSupabaseConnection() {
     console.groupEnd();
   }
 }
+
+// ── PWA 初期化の読み込み ──
+(function () {
+  const p = location.pathname;
+  const root = p.includes('/pages/auth/') ? '../../' : p.includes('/pages/') ? '../' : '';
+  const s = document.createElement('script');
+  s.src = root + 'js/pwa.js';
+  document.head.appendChild(s);
+})();
