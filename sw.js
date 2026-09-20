@@ -10,7 +10,7 @@
  *
  * 更新時は VERSION を上げてください。
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL_CACHE   = `higasui-shell-${VERSION}`;
 const RUNTIME_CACHE = `higasui-runtime-${VERSION}`;
 const NETWORK_TIMEOUT_MS = 4000;
@@ -128,6 +128,7 @@ self.addEventListener('push', event => {
     body: data.body || '',
     icon: 'android-chrome-192x192.png',
     badge: 'android-chrome-192x192.png',
+    tag: data.tag || undefined,   // 同じtagの通知は上書きされ、通知センターが溢れない
     data: { url: data.url || './index.html' },
   }));
 });
