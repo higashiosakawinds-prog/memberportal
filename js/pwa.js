@@ -104,9 +104,103 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show); else show();
   }
 
+  // ══════════════════════════════════════
+  //  プッシュ通知
+  // ══════════════════════════════════════
+  // ★ `npx web-push generate-vapid-keys` で作成した「公開鍵」を貼り付けてください（秘密鍵は絶対に入れない）
+  const VAPID_PUBLIC_KEY = 'BK7QD_FkF3V1pLaQliH0T8zt2uABb5kAJpMIbRhIgi982GwgMRD3WPv77FHD7weKw_ZnTVu55KzyNaU6_NAE0Ok';
+
+  function urlB64ToUint8Array(b64) {
+    const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+    const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+  }
+
+  async function registerOnServer(sub) {
+    const j = sub.toJSON();
+    const { error } = await _sb.rpc('register_push_subscription', {
+      p_endpoint: j.endpoint,
+      p_p256dh:   j.keys.p256dh,
+      p_auth:     j.keys.auth,
+      p_ua:       navigator.userAgent,
+    });
+    if (error) throw error;
+  }
+
+  const HigasuiPush = {
+    supported() {
+      return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    },
+
+    /** 'need-install'(iOSでホーム画面未追加) | 'unsupported' | 'denied' | 'on' | 'off' */
+    async state() {
+      if (isIOS && !isStandalone) return 'need-install';
+      if (!this.supported()) return 'unsupported';
+      if (Notification.permission === 'denied') return 'denied';
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      return (sub && Notification.permission === 'granted') ? 'on' : 'off';
+    },
+
+    /** 必ずボタンのクリックなど、ユーザー操作の中から呼ぶこと（iOS必須） */
+    async enable() {
+      if (!this.supported()) throw new Error('この端末・ブラウザはプッシュ通知に対応していません');
+      if (VAPID_PUBLIC_KEY.startsWith('REPLACE_')) throw new Error('VAPID公開鍵が未設定です（pwa.js）');
+      if (typeof _sb === 'undefined' || !_sb) throw new Error('Supabase未接続です');
+
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') throw new Error('通知が許可されませんでした');
+
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+      }
+      await registerOnServer(sub);
+    },
+
+    /** この端末の通知をオフにする */
+    async disable() {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) return;
+      const endpoint = sub.endpoint;
+      await sub.unsubscribe();
+      if (typeof _sb !== 'undefined' && _sb) await _sb.from('push_subscriptions').delete().eq('endpoint', endpoint);
+    },
+
+    /** ログアウト直前に呼ぶ: サーバー上の紐付けだけ外す（別の人が同じ端末でログインしても前の人宛の通知が届かないように） */
+    async detach() {
+      try {
+        if (!this.supported()) return;
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub && typeof _sb !== 'undefined' && _sb) {
+          await _sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+        }
+      } catch (e) { console.warn('[HighasuiDX] push detach 失敗:', e.message); }
+    },
+  };
+
+  // 許可済みの端末は、起動のたびに静かに再登録する（ユーザー切替・購読更新への追従）
+  window.addEventListener('load', async () => {
+    try {
+      if (!HigasuiPush.supported() || Notification.permission !== 'granted') return;
+      if (typeof getSessionUser === 'function' && !getSessionUser()) return;
+      if (typeof _sb === 'undefined' || !_sb) return;
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) await registerOnServer(sub);
+    } catch (e) { /* 未ログイン等は無視 */ }
+  });
+
   // 他スクリプトから手動でインストールを促したい場合用
   window.HigasuiPWA = {
     isStandalone,
+    push: HigasuiPush,
     async promptInstall() {
       if (!deferredPrompt) return false;
       deferredPrompt.prompt();
