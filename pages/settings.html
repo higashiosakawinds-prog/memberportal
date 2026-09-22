@@ -294,6 +294,11 @@
           <span><strong style="color:var(--navy-800);">楽譜貸出の返却期限</strong><br>
             <small style="color:var(--gray-500);">返却期限の3日前・前日・当日</small></span>
         </label>
+        <label style="display:flex;gap:var(--space-3);align-items:flex-start;cursor:pointer;">
+          <input type="checkbox" id="pref-surveys" style="width:18px;height:18px;margin-top:2px;accent-color:var(--navy-600);">
+          <span><strong style="color:var(--navy-800);">アンケート回答期限のお知らせ</strong><br>
+            <small style="color:var(--gray-500);">回答期限の3日前・前日・当日に、未回答の場合のみ</small></span>
+        </label>
       </div>
       <div style="display:flex;justify-content:flex-end;">
         <button class="btn btn-gold" id="btn-save-prefs">設定を保存する</button>
@@ -518,7 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 (function () {
-  const PREF_KEYS = ['attendance', 'dues', 'scores', 'lending'];
+  const PREF_KEYS = ['attendance', 'dues', 'scores', 'lending', 'surveys'];
 
   const STATUS_HTML = {
     'need-install': `<div class="alert alert-warning"><span>iPhoneでは、<strong>ホーム画面に追加したアプリから開いた場合のみ</strong>通知を受け取れます。Safariの共有ボタン →「ホーム画面に追加」の後、そのアイコンから起動してこの画面を開いてください（iOS 16.4以降が必要です）。</span></div>`,
