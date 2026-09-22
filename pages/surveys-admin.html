@@ -129,6 +129,17 @@
               <input type="text" id="c-entry-id" class="form-control" placeholder="例：1234567890" inputmode="numeric">
               <span class="form-hint">「セットアップ手順」タブの手順3で確認した entry.<strong>この数字部分</strong> を入力してください。</span>
             </div>
+            <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);">
+              <div class="form-group">
+                <label class="form-label">回答開始日（任意）</label>
+                <input type="date" id="c-start-date" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label">回答終了日（任意）</label>
+                <input type="date" id="c-end-date" class="form-control">
+                <span class="form-hint">設定すると、締切3日前・前日・当日に未回答の団員へお知らせが届きます。</span>
+              </div>
+            </div>
             <div class="form-group">
               <label class="form-label">対象区分（未選択の場合は全員が対象になります）</label>
               <div class="cat-check-group" id="c-target-categories">
@@ -231,6 +242,16 @@
       <div class="form-group">
         <label class="form-label">説明</label>
         <textarea id="e-description" class="form-control" rows="2"></textarea>
+      </div>
+      <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);">
+        <div class="form-group">
+          <label class="form-label">回答開始日（任意）</label>
+          <input type="date" id="e-start-date" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">回答終了日（任意）</label>
+          <input type="date" id="e-end-date" class="form-control">
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">対象区分（未選択の場合は全員）</label>
@@ -439,6 +460,11 @@ function renderSurveyList() {
       ? s.target_categories.map(c => CAT_LABELS[c] ?? c).join('、')
       : '全員';
 
+    const fmtD = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' }) : null;
+    const periodLabel = (s.start_date || s.end_date)
+      ? `${fmtD(s.start_date) ?? '—'} 〜 ${fmtD(s.end_date) ?? '期限なし'}`
+      : null;
+
     return `
       <div class="survey-card">
         <div class="survey-card__head">
@@ -446,7 +472,7 @@ function renderSurveyList() {
             <span class="badge status-${s.status}" style="font-size:10px;margin-bottom:6px;display:inline-block;">${STATUS_LABEL[s.status]}</span>
             <p class="survey-card__title">${escHtml(s.title)}</p>
             ${s.description ? `<p class="survey-card__desc">${escHtml(s.description)}</p>` : ''}
-            <p class="survey-card__meta">対象：${escHtml(catLabel)}　／　ID：<span style="font-family:var(--font-numeric);">${escHtml(s.id)}</span></p>
+            <p class="survey-card__meta">対象：${escHtml(catLabel)}${periodLabel ? `　／　回答期間：${escHtml(periodLabel)}` : ''}　／　ID：<span style="font-family:var(--font-numeric);">${escHtml(s.id)}</span></p>
           </div>
         </div>
         <div class="survey-card__progress-wrap">
@@ -468,11 +494,14 @@ document.getElementById('btn-create-survey').addEventListener('click', async () 
   const description = document.getElementById('c-description').value.trim();
   const formUrl     = document.getElementById('c-form-url').value.trim();
   const entryId     = document.getElementById('c-entry-id').value.trim();
+  const startDate   = document.getElementById('c-start-date').value || null;
+  const endDate     = document.getElementById('c-end-date').value || null;
   const cats        = [...document.querySelectorAll('#c-target-categories input:checked')].map(el => el.value);
 
   if (!title)   { showToast('タイトルを入力してください', 'error'); return; }
   if (!formUrl) { showToast('GoogleフォームのURLを入力してください', 'error'); return; }
   if (!/^\d+$/.test(entryId)) { showToast('回答者ID用エントリー番号は数字で入力してください', 'error'); return; }
+  if (startDate && endDate && startDate > endDate) { showToast('回答終了日は開始日より後にしてください', 'error'); return; }
   if (!_sb) { showToast('Supabase未接続のため作成できません', 'error'); return; }
 
   const sessionUser = getSessionUser();
@@ -483,6 +512,8 @@ document.getElementById('btn-create-survey').addEventListener('click', async () 
     title, description,
     form_view_url:   formUrl,
     member_entry_id: entryId,
+    start_date:      startDate,
+    end_date:        endDate,
     target_categories: cats.length ? cats : null,
     status: 'draft',
     created_by: sessionUser?.id ?? null,
@@ -494,7 +525,7 @@ document.getElementById('btn-create-survey').addEventListener('click', async () 
   if (error) { showToast('作成に失敗しました: ' + error.message, 'error'); return; }
 
   showToast(`下書きを作成しました。Apps ScriptのSURVEY_IDに「${data.id}」を設定してください。`, 'success');
-  ['c-title','c-description','c-form-url','c-entry-id'].forEach(id => document.getElementById(id).value = '');
+  ['c-title','c-description','c-form-url','c-entry-id','c-start-date','c-end-date'].forEach(id => document.getElementById(id).value = '');
   document.querySelectorAll('#c-target-categories input').forEach(el => el.checked = false);
 
   await loadSurveys();
@@ -542,6 +573,8 @@ function openEditModal(id) {
   editingSurveyId = id;
   document.getElementById('e-title').value = s.title;
   document.getElementById('e-description').value = s.description ?? '';
+  document.getElementById('e-start-date').value = s.start_date ?? '';
+  document.getElementById('e-end-date').value = s.end_date ?? '';
   document.querySelectorAll('#e-target-categories input').forEach(el => {
     el.checked = (s.target_categories ?? []).includes(el.value);
   });
@@ -553,10 +586,14 @@ document.getElementById('btn-save-edit').addEventListener('click', async () => {
   const title = document.getElementById('e-title').value.trim();
   if (!title) { showToast('タイトルを入力してください', 'error'); return; }
   const description = document.getElementById('e-description').value.trim();
+  const startDate = document.getElementById('e-start-date').value || null;
+  const endDate   = document.getElementById('e-end-date').value || null;
+  if (startDate && endDate && startDate > endDate) { showToast('回答終了日は開始日より後にしてください', 'error'); return; }
   const cats = [...document.querySelectorAll('#e-target-categories input:checked')].map(el => el.value);
 
   const { error } = await _sb.from('surveys').update({
     title, description, target_categories: cats.length ? cats : null,
+    start_date: startDate, end_date: endDate,
   }).eq('id', editingSurveyId);
 
   if (error) { showToast('保存に失敗しました: ' + error.message, 'error'); return; }
