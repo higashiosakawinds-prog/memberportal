@@ -114,17 +114,17 @@ const ROLE_PERMISSIONS = {
 // ─────────────────────────────────────────
 const ROLE_DEFINITIONS = [
   { value: 'gm',        label: 'GM',       color: '#c0392b' },
-  { value: 'leader',    label: '団長',     color: '#a93226' },
-  { value: 'subleader', label: '副団長',   color: '#d35400' },
-  { value: 'conductor', label: '指揮委員',  color: '#1a2e4a' },
-  { value: 'planner',   label: 'エンジニア委員', color: '#2471a3' },
-  { value: 'treasurer', label: '会計委員', color: '#8a6f1e' },
-  { value: 'conector',  label: '広報委員', color: '#117a65' },
-  { value: 'librarian', label: '楽譜委員', color: '#1e8449' },
-  { value: 'reserver',  label: '予約委員', color: '#7d3c98' },
-  { value: 'equipment', label: '備品委員', color: '#b9770e' },
-  { value: 'safety',    label: '安全委員', color: '#c2185b' },
-  { value: 'safety',    label: '議事録委員', color: '#c2185b' },
+  { value: 'leader',    label: '団長',     color: '#c0392b' },
+  { value: 'subleader', label: '副団長',   color: '#c0392b' },
+  { value: 'conductor', label: '指揮委員',  color: '#b33e5c' },
+  { value: 'planner',   label: 'エンジニア委員', color: '#26499d' },
+  { value: 'treasurer', label: '会計委員', color: '#bf9000' },
+  { value: 'conector',  label: '広報委員', color: '#25b7c0' },
+  { value: 'librarian', label: '楽譜委員', color: '#915da3' },
+  { value: 'reserver',  label: '予約委員', color: '#456A2C' },
+  { value: 'equipment', label: '備品委員', color: '#ed6d35' },
+  { value: 'safety',    label: '安全委員', color: '#388F98' },
+  { value: 'safety',    label: '議事録委員', color: '#9cbb1c' },
   { value: 'member',    label: '一般団員', color: '#566573' },
 ];
 
