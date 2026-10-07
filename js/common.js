@@ -120,7 +120,7 @@ const ROLE_DEFINITIONS = [
   { value: 'engineer',   label: 'エンジニア委員', color: '#26499d' },
   { value: 'treasurer', label: '会計委員', color: '#bf9000' },
   { value: 'conector',  label: '広報委員', color: '#25b7c0' },
-  { value: 'librarian', label: '楽譜委員', color: '#915da3' },
+  { value: 'librarian', label: '蔵書委員', color: '#915da3' },
   { value: 'reserver',  label: '予約委員', color: '#456A2C' },
   { value: 'equipment', label: '備品委員', color: '#ed6d35' },
   { value: 'safety',    label: '安全委員', color: '#388F98' },
