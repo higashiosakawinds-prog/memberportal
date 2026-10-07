@@ -108,22 +108,36 @@ const ROLE_PERMISSIONS = {
 
 // ─────────────────────────────────────────
 // 役職定義（表示名・バッジ色）
+//   ★ 色を変えたい場合は color の値（16進カラーコード）だけ編集してください。
+//   バッジの文字色＝color、背景＝color を薄めた色（自動計算）になります。
+//   ヘッダーの自分の役職バッジは「白背景＋この色」で表示されます。
 // ─────────────────────────────────────────
 const ROLE_DEFINITIONS = [
-  { value: 'gm',        label: 'GM',     badgeClass: 'badge-danger'  },
-  { value: 'leader',     label: '団長',   badgeClass: 'badge-danger'  },
-  { value: 'subleader',     label: '副団長',   badgeClass: 'badge-danger'  },
-  { value: 'conductor', label: '指揮者', badgeClass: 'badge-navy'    },
-  { value: 'planner',   label: '企画委員', badgeClass: 'badge-navy'  },
-  { value: 'treasurer', label: '会計委員',   badgeClass: 'badge-gold'    },
-  { value: 'conector', label: '広報委員', badgeClass: 'badge-success'},
-  { value: 'librarian', label: '楽譜委員', badgeClass: 'badge-success'},
-  { value: 'reserver', label: '予約委員', badgeClass: 'badge-success'},
-  { value: 'equipment', label: '備品委員', badgeClass: 'badge-success'},
-  { value: 'safety', label: '安全委員', badgeClass: 'badge-success'},
-  { value: 'member',    label: '一般団員', badgeClass: 'badge-navy'  },
+  { value: 'gm',        label: 'GM',       color: '#c0392b' },
+  { value: 'leader',    label: '団長',     color: '#a93226' },
+  { value: 'subleader', label: '副団長',   color: '#d35400' },
+  { value: 'conductor', label: '指揮委員',  color: '#1a2e4a' },
+  { value: 'planner',   label: 'エンジニア委員', color: '#2471a3' },
+  { value: 'treasurer', label: '会計委員', color: '#8a6f1e' },
+  { value: 'conector',  label: '広報委員', color: '#117a65' },
+  { value: 'librarian', label: '楽譜委員', color: '#1e8449' },
+  { value: 'reserver',  label: '予約委員', color: '#7d3c98' },
+  { value: 'equipment', label: '備品委員', color: '#b9770e' },
+  { value: 'safety',    label: '安全委員', color: '#c2185b' },
+  { value: 'safety',    label: '議事録委員', color: '#c2185b' },
+  { value: 'member',    label: '一般団員', color: '#566573' },
 ];
 
+const ROLE_DEFAULT_COLOR = '#1a2e4a'; // 定義にない役職のとき
+
+// 16進カラー → rgba 文字列（背景の薄い色を作るため）
+function hexToRgba(hex, alpha) {
+  let h = String(hex || '').replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const n = parseInt(h, 16);
+  if (isNaN(n) || h.length !== 6) return `rgba(26,46,74,${alpha})`;
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
 // ─────────────────────────────────────────
 // セッションユーザー取得
 // ─────────────────────────────────────────
