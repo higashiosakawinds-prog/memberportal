@@ -117,10 +117,13 @@ ul, ol { list-style: none; }
   flex-wrap: wrap;
   justify-content: flex-end;
 }
-/* ヘッダー内バッジは少し小さく */
+/* ヘッダー内バッジ：白背景＋役職カラー（暗いヘッダーでも見やすくする） */
 .header-user-roles .badge {
   font-size: 10px;
-  padding: 1px 6px;
+  padding: 1px 8px;
+  background: #fff !important;               /* 役職色の薄い背景を白で上書き */
+  border: 1px solid currentColor;            /* 役職カラーの縁取り */
+  font-weight: 700;
 }
 
 /* ── ログアウトボタンのテキスト（スマホで非表示）── */
