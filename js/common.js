@@ -175,8 +175,9 @@ function renderRoleBadges(roles) {
   if (!roles || roles.length === 0) return '<span class="badge badge-navy">—</span>';
   const arr = Array.isArray(roles) ? roles : [roles];
   return arr.map(r => {
-    const def = ROLE_DEFINITIONS.find(d => d.value === r);
-    return `<span class="badge ${def?.badgeClass ?? 'badge-navy'}">${def?.label ?? r}</span>`;
+    const def   = ROLE_DEFINITIONS.find(d => d.value === r);
+    const color = def?.color ?? ROLE_DEFAULT_COLOR;
+    return `<span class="badge role-badge" style="color:${color};background:${hexToRgba(color, 0.12)};">${def?.label ?? r}</span>`;
   }).join(' ');
 }
 
