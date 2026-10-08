@@ -289,6 +289,7 @@ let duesFees        = {};
 let paymentRecords  = {};
 let selectedMonth   = '';
 let availableMonths = [];
+let paymentsFailed  = false;
 
 // ══════════════════════════════════════
 //  ユーティリティ
@@ -334,15 +335,19 @@ async function loadMyPayments(memberId) {
     }
     return r;
   }
-  try {
-    const res = await fetch(`${DUES_GAS_URL}?action=getMyPayments&memberId=${encodeURIComponent(memberId)}`,
-      { method:'GET', redirect:'follow' });
-    const json = await res.json();
-    return json.data ?? {};
-  } catch (e) {
-    console.warn('支払い取得失敗', e.message);
-    return {};
-  }
+  const json = await Net.gas(`${DUES_GAS_URL}?action=getMyPayments&memberId=${encodeURIComponent(memberId)}`);
+  if (!json.ok) { console.warn('支払い取得失敗', json.error); return null; }
+  return json.data ?? {};
+}
+
+async function reloadPayments() {
+  const user = getSessionUser();
+  const r = user ? await loadMyPayments(user.id) : {};
+  if (r === null) { showToast('まだ取得できません。通信状況を確認してください。', 'error'); return; }
+  paymentsFailed = false;
+  paymentRecords = r;
+  renderActionArea();
+  renderHistory();
 }
 
 // ══════════════════════════════════════
@@ -419,6 +424,10 @@ function selectMonth(m) { selectedMonth = m; renderMonthTabs(); renderActionArea
 // ══════════════════════════════════════
 function renderActionArea() {
   const area   = document.getElementById('payment-action-area');
+  if (paymentsFailed) {
+    Net.showError(area, reloadPayments, '支払い状況を取得できませんでした。誤った操作を防ぐため、取得できるまで操作できません。');
+    return;
+  }
   const pm     = myProfile?.payment_method;
   const rec    = paymentRecords[selectedMonth];
   const paid   = rec?.paid ?? false;
@@ -540,18 +549,23 @@ async function doRecord(method) {
     return;
   }
   try {
-    const res = await fetch(DUES_GAS_URL, {
-      method:'POST', redirect:'follow',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({ action:'recordPayment', memberId:user.id, month:selectedMonth, method, confirmedAt:now,
-        name: myProfile ? `${myProfile.last_name}${myProfile.first_name}` : (user?.name ?? ''),
-        category: myProfile?.category ?? '' }),
-    });
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error);
-    paymentRecords[selectedMonth] = { paid: true, confirmed_at: now };
-    showToast('支払いを記録しました', 'success');
-    renderActionArea(); renderHistory();
+  const json = await Net.gas(DUES_GAS_URL, {
+    method: 'POST',
+    body: { action:'recordPayment', memberId:user.id, month:selectedMonth, method, confirmedAt:now,
+      name: myProfile ? `${myProfile.last_name}${myProfile.first_name}` : (user?.name ?? ''),
+      category: myProfile?.category ?? '' },
+  });
+  if (!json.ok) {
+    showToast(json.network
+      ? '通信が不安定なため記録できませんでした。通信状況を確認して、もう一度チェックしてください。'
+      : '記録に失敗しました', 'error');
+    const cb = document.getElementById('credit-cb');
+    if (cb) cb.checked = false;
+    return;
+  }
+  paymentRecords[selectedMonth] = { paid: true, confirmed_at: now };
+  showToast('支払いを記録しました', 'success');
+  renderActionArea(); renderHistory();
   } catch (e) {
     showToast('記録に失敗しました', 'error');
     const cb = document.getElementById('credit-cb');
@@ -564,6 +578,10 @@ async function doRecord(method) {
 // ══════════════════════════════════════
 function renderHistory() {
   const tbody = document.getElementById('history-tbody');
+  if (paymentsFailed) {
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:var(--space-6);color:var(--gray-500);">⚠ 取得できませんでした</td></tr>`;
+    return;
+  }
   const now   = new Date();
   tbody.innerHTML = Array.from({length:12},(_,i) => {
     const d   = new Date(now.getFullYear(), now.getMonth()-i, 1);
@@ -603,6 +621,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   duesFees       = await loadFees();
   paymentRecords = user ? await loadMyPayments(user.id) : {};
+  if (paymentRecords === null) { paymentsFailed = true; paymentRecords = {}; }
 
   // 特例制度の状態を読み込んでから描画
   mySpecialMeasure = await loadMySpecialMeasure();
