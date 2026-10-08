@@ -428,26 +428,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     } // end else (publicScores > 0)
   } catch (e) {
     console.warn('[HighasuiDX] 公開中楽譜の取得失敗:', e.message);
-    wrap.innerHTML = `
-      <div style="text-align:center;padding:var(--space-6);color:var(--gray-500);background:var(--white);border-radius:var(--radius-lg);border:1px dashed var(--gray-300);">
-        <p style="font-size:var(--text-sm);">楽譜データの取得に失敗しました。</p>
-      </div>`;
+    wrap.innerHTML = `...`;
   }
 
-  // ─── 連絡セクション ───
-  await loadContactMessages();
-
-  // ─── 楽譜貸出申請セクション ───
-await loadMyLendingStatus();
-
-  // ─── 団費支払いセクション ───
-  await loadDuesStatus();
-
-    // ─── 今後の活動予定 ───
-  await loadUpcomingActivities();
-
-  // ─── アンケート ───
-  await loadSurveys();
+  const sections = [
+    ['contact-messages-wrap',    loadContactMessages],
+    ['lending-status-wrap',      loadMyLendingStatus],
+    ['dues-status-wrap',         loadDuesStatus],
+    ['upcoming-activities-wrap', loadUpcomingActivities],
+    ['surveys-wrap',             loadSurveys],
+  ];
+  sections.forEach(([id, fn]) => {
+    const run = () => fn().catch(e => {
+      console.warn('[HighasuiDX]', id, e?.message);
+      Net.showError(document.getElementById(id), run);
+    });
+    run();
+  });
 });
 
 // ── 楽譜貸出申請ステータス読み込み（グローバル） ──
@@ -464,7 +461,8 @@ async function loadMyLendingStatus() {
     .select('*').eq('requester_id', sessionUser.id)
     .in('status', ['pending','lending']).order('created_at', { ascending: false });
 
-  if (error || !data || data.length === 0) {
+  if (error) throw error;   // → 2-1 の仕組みが再試行ボタン付きで表示
+  if (!data || data.length === 0) {
     wrap.innerHTML = `<div style="text-align:center;padding:var(--space-6);color:var(--gray-500);background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--gray-200);">
       <p style="font-size:var(--text-sm);">貸出申請はありません。</p></div>`;
     return;
@@ -577,7 +575,7 @@ async function loadUpcomingActivities() {
     const sessionUser = getSessionUser();
     const gasOk = ACTIVITY_GAS_URL_DASH && !ACTIVITY_GAS_URL_DASH.includes('YOUR_ACTIVITY');
 
-    const [actResult, myAtt] = await Promise.all([
+    const [actResult, attRes] = await Promise.all([
       _sb.from('activities')
         .select('id, title, activity_date, start_time, end_time, location, activity_type, is_cancelled')
         .gte('activity_date', today)
@@ -585,10 +583,10 @@ async function loadUpcomingActivities() {
         .eq('is_cancelled', false)
         .order('activity_date', { ascending: true }),
       (sessionUser && gasOk)
-        ? fetch(`${ACTIVITY_GAS_URL_DASH}?action=getMyAttendance&memberId=${encodeURIComponent(sessionUser.id)}&_t=${Date.now()}`, { method:'GET', redirect:'follow' })
-            .then(r => r.json()).then(j => j.ok ? (j.data ?? {}) : {}).catch(() => ({}))
-        : Promise.resolve({}),
+        ? Net.gas(`${ACTIVITY_GAS_URL_DASH}?action=getMyAttendance&memberId=${encodeURIComponent(sessionUser.id)}&_t=${Date.now()}`)
+        : Promise.resolve({ ok: true, data: {} }),
     ]);
+    const myAtt = attRes.ok ? (attRes.data ?? {}) : null;
 
     if (actResult.error) throw actResult.error;
     const data = actResult.data ?? [];
@@ -624,10 +622,12 @@ async function loadUpcomingActivities() {
       const isToday = a.activity_date === today;
 
       // 自分の出欠バッジ
-      const rec = myAtt[a.id];
+      const rec = myAtt?.[a.id];                      // ← myAtt[a.id] から変更
       let attCell;
       if (!sessionUser) {
         attCell = '<span style="font-size:var(--text-xs);color:var(--gray-400);">—</span>';
+      } else if (myAtt === null) {                    // ← 追加
+        attCell = '<span style="font-size:10px;color:var(--warning);">取得失敗</span>';
       } else if (rec?.status) {
         const s = rec.status;
         attCell = `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:9999px;font-size:10px;font-weight:700;${ATT_STYLE[s] ?? ''}">${ATT_ICON[s] ?? ''}${ATT_LABEL[s] ?? s}</span>`;
@@ -938,16 +938,9 @@ async function loadDuesStatus() {
   // 支払いデータ取得
   let paymentRecords = {};
   if (isGasOk) {
-    try {
-      const res = await fetch(
-        `${DUES_GAS_URL}?action=getMyPayments&memberId=${encodeURIComponent(sessionUser.id)}`,
-        { method: 'GET', redirect: 'follow' }
-      );
-      const json = await res.json();
-      paymentRecords = json.data ?? {};
-    } catch (e) {
-      console.warn('[HighasuiDX] 団費データ取得失敗:', e.message);
-    }
+    const json = await Net.gas(`${DUES_GAS_URL}?action=getMyPayments&memberId=${encodeURIComponent(sessionUser.id)}`);
+    if (!json.ok) throw new Error(json.error || '団費データの取得に失敗しました');
+    paymentRecords = json.data ?? {};
   }
 
   // 休団中かどうか確認（Supabase profileのcategory）
