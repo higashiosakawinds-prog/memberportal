@@ -378,13 +378,21 @@ function openDetailModal(memberId) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const { data: membersData, error: membersError } = await DB.profiles.list();
-  if (membersError) {
-    console.warn('[HighasuiDX] 団員データ取得失敗。デモデータを表示します。');
+  const isDev = ['localhost', '127.0.0.1'].includes(location.hostname);
+
+  async function loadMembersPage() {
+    const { data, error } = await DB.profiles.list();
+    if (error || (!_sb && !isDev)) {
+      Net.showError(document.getElementById('member-list'), loadMembersPage,
+        '団員データを取得できませんでした。');
+      return;
+    }
+    // デモデータは開発環境（localhost）かつ未接続のときだけ
+    allMembers = (data.length === 0 && isDev) ? DEMO_MEMBERS : data;
+    buildPartFilter(allMembers);
+    renderList();
   }
-  allMembers = (membersData && membersData.length > 0) ? membersData : DEMO_MEMBERS;
-  buildPartFilter(allMembers);
-  renderList();
+  await loadMembersPage();
 
   document.getElementById('search-input').addEventListener('input', renderList);
   document.getElementById('filter-category').addEventListener('change', renderList);
