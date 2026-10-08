@@ -722,20 +722,23 @@ async function sendChatMessage() {
   btn.disabled = true; btn.textContent = '送信中…';
 
   try {
-    const res = await fetch(VISITOR_SEND_GAS_URL, {
+    const json = await Net.gas(VISITOR_SEND_GAS_URL, {
       method: 'POST',
-      redirect: 'follow',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // プリフライト回避のためtext/plainで送る（GAS側でJSON.parseする）
-      body: JSON.stringify({
+      timeout: 60000,
+      body: {
         visitRequestId: currentDetail.id,
         to: currentDetail.email,
         subject: currentDetail.gmail_thread_id ? null : `${currentDetail.name}様の見学について`,
         body,
         threadId: currentDetail.gmail_thread_id || null,
-      }),
+      },
     });
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error || '送信に失敗しました');
+    if (!json.ok) {
+      throw new Error(json.network
+        ? '通信が不安定です。メールは送信済みの可能性があります。数分後にやりとり履歴を確認してから、必要な場合のみ再送してください'
+        : (json.error || '送信に失敗しました'));
+    }
+
 
     // スレッドが新規作成された場合はローカル状態にも反映
     if (!currentDetail.gmail_thread_id) {
