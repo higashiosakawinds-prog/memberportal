@@ -390,7 +390,7 @@ function updateSyncChip(state) {
 /** GS から全件取得 */
 async function fetchFromGS(showResult = false) {
   if (!isGsConfigured()) {
-    allEntries = [...DEMO_ENTRIES].sort(byDateDesc);
+    allEntries = [...DEMO_ENTRIES].sort(byDateDesc);   // 未設定時のみデモ（既存どおり）
     updateSyncChip('none');
     renderTable();
     return;
@@ -399,24 +399,31 @@ async function fetchFromGS(showResult = false) {
   setBtnRefreshSpinning(true);
   updateSyncChip('wait');
 
-  try {
-    const res = await fetch(GS_URL, { method: 'GET', redirect: 'follow' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    if (!json.ok || !Array.isArray(json.data)) throw new Error('レスポンス形式エラー');
+  const json = await Net.gas(GS_URL);
+  setBtnRefreshSpinning(false);
 
-    allEntries = json.data.sort(byDateDesc);
-    updateSyncChip('ok');
-    if (showResult) showToast(`${allEntries.length}件を読み込みました`, 'success');
-  } catch (err) {
-    console.warn('[HighasuiDX] GS取得エラー:', err.message);
+  if (!json.ok || !Array.isArray(json.data)) {
+    console.warn('[HighasuiDX] GS取得エラー:', json.error);
     updateSyncChip('err');
-    if (allEntries.length === 0) allEntries = [...DEMO_ENTRIES].sort(byDateDesc);
-    if (showResult) showToast('スプレッドシートへの接続に失敗しました', 'error');
-  } finally {
-    setBtnRefreshSpinning(false);
-    renderTable();
+    // ★ 変更：失敗時にデモデータへ差し替えない
+    if (allEntries.length === 0) renderLoadError();   // 初回失敗：エラー表示
+    else renderTable();                               // 更新失敗：既存データを維持
+    showToast('スプレッドシートへの接続に失敗しました', 'error');
+    return;
   }
+
+  allEntries = json.data.sort(byDateDesc);
+  updateSyncChip('ok');
+  if (showResult) showToast(`${allEntries.length}件を読み込みました`, 'success');
+  renderTable();
+}
+
+function renderLoadError() {
+  document.getElementById('ledger-tbody').innerHTML =
+    `<tr><td colspan="6" style="text-align:center;padding:var(--space-10);color:var(--danger);">
+      ⚠ 出納帳を取得できませんでした。通信状況を確認して「更新」を押してください。</td></tr>`;
+  ['total-income','total-expense','total-balance'].forEach(id =>
+    document.getElementById(id).textContent = '—');
 }
 
 /** GS へデータを POST（追加 or 削除）*/
@@ -657,15 +664,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (isGsConfigured()) {
       const result = await postToGS({ date, type, category: cat, amount, description: desc, vendor });
-      if (result) {
-        entry.id = result.id ?? tempId;
-        showToast('スプレッドシートに保存しました', 'success');
-      } else {
-        showToast('シートへの保存に失敗しました。ローカルのみ追加しました。', 'error');
+      if (!result) {
+        showToast('保存できませんでした。通信状況を確認し、「更新」で登録済みでないかを確かめてから再度お試しください。', 'error');
+        btn.disabled = false;
+        btn.textContent = '保存する';
+        return;
       }
+      entry.id = result.id ?? tempId;
+      showToast('スプレッドシートに保存しました', 'success');
     } else {
       showToast('仕訳を追加しました（ローカルのみ）', 'success');
     }
+
+  allEntries = json.data.sort(byDateDesc);
+  updateSyncChip('ok');
+  if (showResult) showToast(`${allEntries.length}件を読み込みました`, 'success');
+  renderTable();
+}
+
+function renderLoadError() {
+  document.getElementById('ledger-tbody').innerHTML =
+    `<tr><td colspan="6" style="text-align:center;padding:var(--space-10);color:var(--danger);">
+      ⚠ 出納帳を取得できませんでした。通信状況を確認して「更新」を押してください。</td></tr>`;
+  ['total-income','total-expense','total-balance'].forEach(id =>
+    document.getElementById(id).textContent = '—');
+}
 
     allEntries = [entry, ...allEntries].sort(byDateDesc);
     closeModal('modal-add');
