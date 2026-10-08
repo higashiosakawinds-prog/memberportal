@@ -454,6 +454,8 @@ let months3         = [];  // 直近3ヶ月 ['YYYY-MM', ...]
 let pendingQr       = null;
 let scanStream      = null;
 let scanTimer       = null;
+let paymentsLoadOk  = false;   // 支払いデータ(GAS)を正常取得できたか
+let specialLoadOk   = false;   // 特例制度データを正常取得できたか
 
 // ══════════════════════════════════════
 //  ユーティリティ
@@ -520,13 +522,18 @@ async function loadAllPayments() {
         r[m.id][k] = { paid: Math.random() > 0.35, confirmed_at: new Date().toISOString() };
       });
     });
+    paymentsLoadOk = true;      // ← 追加
     return r;
   }
-  try {
-    const res = await fetch(`${DUES_GAS_URL}?action=getAllPayments`,{method:'GET',redirect:'follow'});
-    const json = await res.json();
-    return json.data ?? {};
-  } catch (e) { console.warn('全支払い取得失敗',e.message); return {}; }
+  // ▼ 置き換え：失敗時は {} ではなく「直前のデータ」を返し、フラグで失敗を伝える
+  const json = await Net.gas(`${DUES_GAS_URL}?action=getAllPayments`);
+  if (!json.ok) {
+    console.warn('全支払い取得失敗', json.error);
+    paymentsLoadOk = false;
+    return allPayments;
+  }
+  paymentsLoadOk = true;
+  return json.data ?? {};
 }
 
 // ══════════════════════════════════════
@@ -536,22 +543,21 @@ async function loadAllPayments() {
 //  特例制度の読み込み（Supabase）
 // ══════════════════════════════════════
 async function loadSpecialMeasures() {
-  if (!_sb) return {};
+  if (!_sb) { specialLoadOk = false; return {}; }       // ← 追加
   try {
-    const { data, error } = await _sb
-      .from('special_measures')
-      .select('member_id, status, actual_start_month, actual_end_month')
-      .eq('status', 'approved');
+    const { data, error } = await _sb.from('special_measures')...;
     if (error) throw new Error(error.message);
     const map = {};
     (data ?? []).forEach(sm => { map[sm.member_id] = sm; });
+    specialLoadOk = true;                                // ← 追加
     return map;
   } catch (e) {
-    console.warn('[HighasuiDX] 特例制度取得失敗:', e.message);
-    return {};
+    console.warn('[HigasuiPortal] 特例制度取得失敗:', e.message);
+    specialLoadOk = false;                               // ← 追加
+    return specialMeasures;                              // ← {} から変更（直前の値を維持）
   }
 }
-
+  
 function renderStatusTable() {
   months3.forEach((m,i) => {
     const el = document.getElementById(`mh${i}`);
@@ -620,23 +626,28 @@ async function updatePay(memberId, month, paid) {
   const m = allMembers.find(x => x.id === memberId);
 
   if (isGasOk()) {
-    try {
-      await fetch(DUES_GAS_URL, {
-        method:'POST', redirect:'follow',
-        headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body: JSON.stringify({
-          action: paid ? 'recordPayment' : 'cancelPayment',
-          memberId, month, confirmedAt: now,
-          name:     m ? `${m.last_name}${m.first_name}` : '',
-          category: m?.category ?? '',
-        }),
-      });
-    } catch(e){ console.warn('支払い更新失敗',e.message); }
+    const json = await Net.gas(DUES_GAS_URL, {
+      method: 'POST',
+      body: {
+        action: paid ? 'recordPayment' : 'cancelPayment',
+        memberId, month, confirmedAt: now,
+        name:     m ? `${m.last_name}${m.first_name}` : '',
+        category: m?.category ?? '',
+      },
+    });
+    if (!json.ok) {
+      showToast('通信に失敗したため記録できませんでした。通信状況を確認してもう一度お試しください。', 'error');
+      return false;
+    }
   }
+
+  if (!allPayments[memberId]) allPayments[memberId] = {};
+  allPayments[memberId][month] = { paid, confirmed_at: paid ? now : null };
 
   showToast(paid ? '支払い済みにしました' : '支払いを取り消しました', 'success');
   renderStatusTable();
   updateUnpaidList();
+  return true;
 }
 
 // ══════════════════════════════════════
@@ -756,7 +767,8 @@ function showQrErr(msg) {
 
 async function approveQr() {
   if (!pendingQr) return;
-  await updatePay(pendingQr.memberId, pendingQr.month, true);
+  const ok = await updatePay(pendingQr.memberId, pendingQr.month, true);
+  if (!ok) return;                                   // ← 追加（失敗時は確認画面を維持）
   document.getElementById('qr-confirm').style.display = 'none';
   pendingQr = null;
 }
@@ -843,6 +855,11 @@ async function openRegisterModal() {
 
   btn.disabled = false;
   btn.textContent = '今月の支払いを登録';
+
+    if (!paymentsLoadOk || !specialLoadOk) {
+    showToast('支払い・特例制度のデータを取得できませんでした。通信状況を確認してもう一度お試しください。', 'error');
+    return;
+  }
 
   // 月選択を初期化
   const sel = document.getElementById('reg-month');
@@ -1263,6 +1280,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   allPayments     = await loadAllPayments();
   specialMeasures = await loadSpecialMeasures();
 
+    if (!paymentsLoadOk) {
+    Net.banner('支払いデータを取得できていません。表示は正確ではありません。',
+      { action: { label: '再読み込み', fn: () => location.reload() } });
+  }
+
+
   // 描画
   renderStatusTable();
   renderFeeGrid();
@@ -1297,6 +1320,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // メール
   document.getElementById('btn-copy').addEventListener('click', () => {
+    if (!paymentsLoadOk) { showToast('支払いデータを取得できていません。ページを再読み込みしてください。', 'error'); return; }
     const month  = document.getElementById('mail-month').value;
     const emails = allMembers
       .filter(m => m.category !== 'rest' && !(allPayments[m.id]?.[month]?.paid ?? false))
@@ -1307,6 +1331,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('btn-open-mail').addEventListener('click', () => {
+    if (!paymentsLoadOk) { showToast('支払いデータを取得できていないため督促できません。ページを再読み込みしてください。', 'error'); return; }
     const month   = document.getElementById('mail-month').value;
     const subject = document.getElementById('mail-subject').value;
     const body    = document.getElementById('mail-body').value;
