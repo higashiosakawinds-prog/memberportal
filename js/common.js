@@ -37,6 +37,7 @@
       src:  (e.filename || '').split('/').pop(),
       line: e.lineno, col: e.colno,
     });
+    maybePrompt();
   });
   window.addEventListener('unhandledrejection', e => {
     push({
@@ -45,7 +46,47 @@
       msg:  'Promise: ' + String(e.reason?.message ?? e.reason ?? 'rejection'),
       src:  '', line: '', col: '',
     });
+    maybePrompt();
   });
+
+  // ── エラー時に「報告する」通知バーを出す（1ページ表示につき1回・12秒で自動消滅） ──
+  //   押すと feedback.html が「不具合」固定・対象画面セット済みで開き、
+  //   直近のエラー記録(hs_error_log)が自動添付されます。
+  const SKIP_PAGES = ['feedback', 'feedback-admin', 'login', 'register', 'profile-setup'];
+  let promptShown = false;
+  function feedbackHref() {
+    const isRoot = !location.pathname.includes('/pages/');
+    const base = isRoot ? 'pages/feedback.html' : 'feedback.html';
+    return `${base}?kind=bug&page=${encodeURIComponent(pageId())}`;
+  }
+  function maybePrompt() {
+    try {
+      if (promptShown) return;
+      if (SKIP_PAGES.includes(pageId())) return;   // 報告ページ自身・ログイン系では出さない
+      if (location.pathname.includes('/auth/')) return;
+      promptShown = true;                           // 同じページ表示では1回だけ
+      const render = () => {
+        if (!document.body || document.getElementById('hs-error-report-bar')) return;
+        const bar = document.createElement('div');
+        bar.id = 'hs-error-report-bar';
+        bar.style.cssText =
+          'position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:9500;width:420px;max-width:92%;' +
+          'background:var(--navy-900,#0d1b2a);color:#fff;border:1px solid rgba(201,168,76,.4);border-radius:12px;' +
+          'box-shadow:0 10px 30px rgba(0,0,0,.25);padding:12px 14px;display:flex;align-items:center;gap:10px;' +
+          'font-size:13px;line-height:1.6;';
+        bar.innerHTML =
+          '<span style="flex:0 0 auto;font-size:18px;">⚠</span>' +
+          '<span style="flex:1 1 auto;">問題が発生したようです。開発チームに報告できます。</span>' +
+          '<a href="' + feedbackHref() + '" style="flex:0 0 auto;background:var(--gold-500,#c9a84c);color:var(--navy-900,#0d1b2a);font-weight:700;text-decoration:none;padding:6px 12px;border-radius:8px;font-size:12px;white-space:nowrap;">報告する</a>' +
+          '<button type="button" aria-label="閉じる" style="flex:0 0 auto;background:transparent;border:none;color:rgba(255,255,255,.65);font-size:18px;cursor:pointer;line-height:1;padding:0 2px;">&times;</button>';
+        bar.querySelector('button').onclick = () => bar.remove();
+        document.body.appendChild(bar);
+        setTimeout(() => bar.remove(), 12000);
+      };
+      if (document.body) render();
+      else document.addEventListener('DOMContentLoaded', render, { once: true });
+    } catch { /* 通知の失敗はアプリ動作に影響させない */ }
+  }
 })();
 
 // ═══════════════════════════════════════════════════════
