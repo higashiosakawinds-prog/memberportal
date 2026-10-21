@@ -80,7 +80,7 @@
 
         <!-- ② 内容 -->
         <div class="form-group">
-          <label class="form-label">② 内容をひとこと <span class="required">*</span></label>
+          <label class="form-label">② 内容 <span class="required">*</span></label>
           <textarea id="fb-body" class="form-control" rows="4"
             placeholder="例）団費のページで「支払をする」ボタンを押しても何も起きません／出席の人数が一覧でも見られると嬉しいです"
             style="resize:vertical;line-height:1.7;"></textarea>
@@ -194,6 +194,24 @@ function getRecentErrors() {
       `[${e.time ?? ''}] (${e.page ?? '-'}) ${e.msg ?? ''}${e.src ? ` @${e.src}:${e.line ?? ''}` : ''}`
     ).join('\n');
   } catch { return ''; }
+}
+
+// エラー発生時の通知バーなどから ?kind=bug&page=xxx で開かれたとき、種類と対象画面を自動セット
+function applyUrlParams() {
+  try {
+    const p = new URLSearchParams(location.search);
+    const kind = p.get('kind');
+    if (kind && ['bug', 'feature', 'question'].includes(kind)) {
+      selectedKind = kind;
+      document.querySelectorAll('.kind-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.kind === kind));
+    }
+    const page = p.get('page');
+    if (page) {
+      const sel = document.getElementById('fb-page');
+      if (sel && [...sel.options].some(o => o.value === page)) sel.value = page;
+    }
+  } catch { /* パラメータ不正時は無視 */ }
 }
 
 function initKindButtons() {
@@ -320,6 +338,7 @@ function renderHistory(list) {
 document.addEventListener('DOMContentLoaded', async () => {
   initKindButtons();
   initPageSelect();
+  applyUrlParams();
   renderAutoInfo();
   document.getElementById('btn-fb-submit').addEventListener('click', () => Net.lock('fb-submit', submitFeedback));
   renderHistory(await loadMyFeedback());
@@ -327,3 +346,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 </script>
 </body>
 </html>
+
