@@ -10,7 +10,7 @@
  *
  * 更新時は VERSION を上げてください。
  */
-const VERSION = 'v3';
+const VERSION = 'v4';
 const SHELL_CACHE   = `higasui-shell-${VERSION}`;
 const RUNTIME_CACHE = `higasui-runtime-${VERSION}`;
 const NETWORK_TIMEOUT_MS = 4000;
@@ -36,6 +36,8 @@ const SHELL_FILES = [
   'pages/applications.html',
   'pages/instruments.html',
   'pages/settings.html',
+  'pages/survey.html',
+  'pages/surveys-admin.html',
   'pages/auth/login.html',
   'pages/auth/register.html',
 ];
