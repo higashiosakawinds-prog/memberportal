@@ -4,6 +4,51 @@
  */
 
 // ═══════════════════════════════════════════════════════
+//  ★ 直近のJSエラー記録（不具合報告の自動添付用）
+//
+//  各ページで発生した未処理エラーを sessionStorage に最大10件だけ
+//  ため込みます。「不具合・要望」ページ(feedback.html)が、直前にいた
+//  ページのエラーを拾って報告に添付できるようにするためのものです。
+//  （同一タブ内のページ遷移では sessionStorage は保持されます）
+// ═══════════════════════════════════════════════════════
+(function initErrorBuffer() {
+  const KEY = 'hs_error_log';
+  const MAX = 10;
+  function pageId() {
+    try {
+      const f = location.pathname.split('/').pop().replace('.html', '');
+      return (f === 'index' || f === '') ? 'dashboard' : f;
+    } catch { return '-'; }
+  }
+  function push(entry) {
+    try {
+      const raw = sessionStorage.getItem(KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      arr.push(entry);
+      while (arr.length > MAX) arr.shift();
+      sessionStorage.setItem(KEY, JSON.stringify(arr));
+    } catch { /* プライベートモード等では黙ってスキップ */ }
+  }
+  window.addEventListener('error', e => {
+    push({
+      time: new Date().toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }),
+      page: pageId(),
+      msg:  String(e.message ?? e.error?.message ?? 'error'),
+      src:  (e.filename || '').split('/').pop(),
+      line: e.lineno, col: e.colno,
+    });
+  });
+  window.addEventListener('unhandledrejection', e => {
+    push({
+      time: new Date().toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }),
+      page: pageId(),
+      msg:  'Promise: ' + String(e.reason?.message ?? e.reason ?? 'rejection'),
+      src:  '', line: '', col: '',
+    });
+  });
+})();
+
+// ═══════════════════════════════════════════════════════
 //  ★ メンテナンス設定テーブル
 //
 //  各ページIDに対して true を設定するとメンテナンス中になります。
@@ -38,6 +83,8 @@ const MAINTENANCE_CONFIG = {
   visitors:           false,    //見学者連絡
   applications:       false,   // 各種申請
   'surveys-admin':    false,   // アンケート管理
+  feedback:           false,   // 不具合・要望（送信）
+  'feedback-admin':   false,   // 要望・不具合管理
 };
 
 // メンテナンス中ページの閲覧を許可するロール
@@ -81,6 +128,7 @@ const ROLE_PERMISSIONS = {
   nav_activities:  ['gm', 'leader', 'subleader','reserver'],        // 活動記録管理（幹部）
   nav_visitors: ['gm','leader','subleader'],
   nav_surveys_admin:      ['gm', 'leader','subleader'],      // アンケート管理（幹部のみ）
+  nav_feedback_admin:     ['gm', 'leader','subleader','engineer'], // 要望・不具合管理（幹部＋エンジニア委員）
 
   // ── 各ページの操作（編集・追加・削除）権限 ──
   // ページ内で canDo('キー名') を呼び出して判定します
@@ -104,6 +152,7 @@ const ROLE_PERMISSIONS = {
   requests_approve:       ['all'],
   members_edit:           ['all'],
   surveys_admin:          ['gm', 'leader','subleader'],      // アンケート作成・管理
+  feedback_admin:         ['gm', 'leader','subleader','engineer'], // 要望・不具合管理（閲覧・操作）
 };
 
 // ─────────────────────────────────────────
@@ -285,6 +334,10 @@ const NAV_ITEMS = [
   icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 3h6m2 5H7a2 2 0 01-2-2V6a2 2 0 012-2h5.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V18a2 2 0 01-2 2z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 9h1"/></svg>`,
 },
       {
+  id: 'feedback-admin', permKey: 'nav_feedback_admin', label: '要望・不具合管理', href: 'pages/feedback-admin.html',
+  icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>`,
+},
+      {
         id: 'requests', permKey: 'nav_requests', label: '団員申請', href: 'pages/requests.html',
         icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"/></svg>`,
       },
@@ -324,6 +377,8 @@ function getPageLabel(pageId) {
     settings:             '設定',
     applications:         '各種申請',
     'surveys-admin':      'アンケート管理',
+    feedback:             '不具合・要望',
+    'feedback-admin':     '要望・不具合管理',
   };
   return labels[pageId] ?? pageId;
 }
@@ -714,6 +769,14 @@ function renderSidebar() {
           <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"/>
         </svg>
         <span>各種申請</span>
+      </a>
+      <a href="${rootPrefix}pages/feedback.html"
+         class="sidebar-item ${currentPageId === 'feedback' ? 'active' : ''}"
+         data-page="feedback">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+        </svg>
+        <span>不具合・要望</span>
       </a>
       <a href="${rootPrefix}pages/settings.html"
          class="sidebar-item ${currentPageId === 'settings' ? 'active' : ''}"
