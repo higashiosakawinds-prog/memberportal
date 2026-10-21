@@ -124,6 +124,7 @@ const MAINTENANCE_CONFIG = {
   visitors:           false,    //見学者連絡
   applications:       false,   // 各種申請
   'surveys-admin':    false,   // アンケート管理
+  survey:             false,   // アンケート回答（団員）
   feedback:           false,   // 不具合・要望（送信）
   'feedback-admin':   false,   // 要望・不具合管理
 };
@@ -418,6 +419,7 @@ function getPageLabel(pageId) {
     settings:             '設定',
     applications:         '各種申請',
     'surveys-admin':      'アンケート管理',
+    survey:               'アンケート回答',
     feedback:             '不具合・要望',
     'feedback-admin':     '要望・不具合管理',
   };
