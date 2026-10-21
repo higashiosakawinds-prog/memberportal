@@ -966,13 +966,18 @@ async function loadDuesStatus() {
 
 
 // ── アンケート回答用リンクを生成 ──
-// Googleフォームの「事前入力したリンク」の仕組みを利用し、
-// 「回答者ID」質問のentry番号に自分のmemberIdを差し込む。
+// システム内の回答ページ（pages/survey.html?id=...）へのリンクを生成する。
+// 旧方式（Googleフォーム連携）のアンケートは questions を持たないため、
+// その場合のみ従来どおり外部フォームの事前入力リンクを生成する（後方互換）。
 function buildSurveyLink(survey, sessionUser) {
-  const base = survey.form_view_url;
-  const sep  = base.includes('?') ? '&' : '?';
-  const memberId = sessionUser?.id ?? '';
-  return `${base}${sep}entry.${survey.member_entry_id}=${encodeURIComponent(memberId)}`;
+  const hasQuestions = Array.isArray(survey.questions) && survey.questions.length > 0;
+  if (!hasQuestions && survey.form_view_url) {
+    const base = survey.form_view_url;
+    const sep  = base.includes('?') ? '&' : '?';
+    const memberId = sessionUser?.id ?? '';
+    return { url: `${base}${sep}entry.${survey.member_entry_id}=${encodeURIComponent(memberId)}`, external: true };
+  }
+  return { url: `pages/survey.html?id=${encodeURIComponent(survey.id)}`, external: false };
 }
 
 // ── アンケート一覧・回答状況の読み込み ──
@@ -991,7 +996,7 @@ async function loadSurveys() {
   try {
     const { data: surveys, error } = await _sb
       .from('surveys')
-      .select('id, title, description, form_view_url, member_entry_id, target_categories, start_date, end_date, published_at')
+      .select('id, title, description, form_view_url, member_entry_id, questions, target_categories, start_date, end_date, published_at')
       .eq('status', 'published')
       .order('published_at', { ascending: false });
 
@@ -1032,7 +1037,9 @@ async function loadSurveys() {
       <div style="display:flex;flex-direction:column;gap:var(--space-3);">
         ${targetSurveys.map(s => {
           const answered = !!myResponses[s.id];
-          const link = buildSurveyLink(s, sessionUser);
+          const linkInfo = buildSurveyLink(s, sessionUser);
+          const link = linkInfo.url;
+          const linkTarget = linkInfo.external ? ' target="_blank" rel="noopener"' : '';
           const fmtD = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('ja-JP', { month:'numeric', day:'numeric', weekday:'short' }) : null;
           const deadline = s.end_date ? `〜 ${fmtD(s.end_date)} まで` : (s.start_date ? `${fmtD(s.start_date)} 〜` : null);
           return `
@@ -1050,7 +1057,7 @@ async function loadSurveys() {
                 </span>` : ''}
               ${!sessionUser
                 ? `<span style="font-size:var(--text-xs);color:var(--gray-400);">ログインすると回答できます</span>`
-                : `<a href="${escHtml(link)}" target="_blank" rel="noopener" class="btn ${answered ? 'btn-outline' : 'btn-gold'} btn-sm">${answered ? '回答を開く' : '回答する'}</a>`}
+                : `<a href="${escHtml(link)}"${linkTarget} class="btn ${answered ? 'btn-outline' : 'btn-gold'} btn-sm">${answered ? '回答を確認・修正' : '回答する'}</a>`}
             </div>
           </div>`;
         }).join('')}
