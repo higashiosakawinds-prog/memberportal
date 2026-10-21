@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>アンケート回答 — 東大阪吹奏楽団</title>
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/common.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .sv-wrap { max-width: 720px; margin: 0 auto; }
+
+    /* タイトルカード（上部にゴールドのアクセント） */
+    .sv-head-card {
+      background: var(--white); border: 1px solid var(--gray-200);
+      border-top: 6px solid var(--gold-500);
+      border-radius: var(--radius-lg); padding: var(--space-6) var(--space-6) var(--space-5);
+      margin-bottom: var(--space-5);
+    }
+    .sv-head-card__title { font-size: var(--text-2xl); font-weight: 700; color: var(--navy-800); line-height: 1.4; }
+    .sv-head-card__desc  { font-size: var(--text-sm); color: var(--gray-700); margin-top: var(--space-3); white-space: pre-wrap; line-height: 1.8; }
+    .sv-head-card__meta  { font-size: var(--text-xs); color: var(--gray-500); margin-top: var(--space-4); display:flex; gap:var(--space-4); flex-wrap:wrap; }
+
+    .sv-q-card {
+      background: var(--white); border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg); padding: var(--space-5) var(--space-6);
+      margin-bottom: var(--space-4);
+    }
+    .sv-q-card.invalid { border-color: var(--danger); }
+    .sv-q-title { font-size: var(--text-base); font-weight: 600; color: var(--navy-800); line-height: 1.7; }
+    .sv-q-title .required { color: var(--danger); margin-left: 4px; }
+    .sv-q-desc  { font-size: var(--text-sm); color: var(--gray-500); margin-top: 4px; white-space: pre-wrap; }
+    .sv-q-body  { margin-top: var(--space-4); }
+
+    /* 選択肢 */
+    .sv-opt { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-2) 0; cursor:pointer; font-size:var(--text-sm); color:var(--gray-700); }
+    .sv-opt input { width:18px; height:18px; accent-color: var(--navy-600); flex-shrink:0; cursor:pointer; }
+    .sv-opt__other-text { flex:1; max-width:260px; }
+
+    /* 均等目盛 */
+    .sv-scale { display:flex; align-items:flex-end; gap:var(--space-2); flex-wrap:wrap; }
+    .sv-scale__labels { display:flex; justify-content:space-between; font-size:var(--text-xs); color:var(--gray-500); margin-top:6px; }
+    .sv-scale__item { display:flex; flex-direction:column; align-items:center; gap:4px; font-size:var(--text-xs); color:var(--gray-600); }
+    .sv-scale__item input { width:18px; height:18px; accent-color: var(--navy-600); }
+
+    .sv-q-error { color: var(--danger); font-size: var(--text-xs); margin-top: var(--space-2); display:none; }
+    .sv-q-card.invalid .sv-q-error { display:block; }
+
+    .sv-actions { display:flex; align-items:center; gap:var(--space-3); margin:var(--space-6) 0 var(--space-10); flex-wrap:wrap; }
+    .sv-answered-note {
+      display:flex; align-items:center; gap:var(--space-2);
+      background:rgba(39,174,96,.1); color:#1e8449; border:1px solid rgba(39,174,96,.25);
+      padding:var(--space-3) var(--space-4); border-radius:var(--radius-md);
+      font-size:var(--text-sm); margin-bottom:var(--space-5);
+    }
+  </style>
+</head>
+<body>
+<header class="site-header" id="site-header"></header>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+<div class="app-layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main-content">
+
+    <div class="page-header fade-in">
+      <div>
+        <p class="page-header__eyebrow">SURVEY</p>
+        <h1 class="page-header__title">アンケート回答</h1>
+      </div>
+      <div class="page-header__actions">
+        <a href="../index.html" class="btn btn-outline btn-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/></svg>
+          ダッシュボードへ
+        </a>
+      </div>
+    </div>
+
+    <div class="sv-wrap">
+      <div id="sv-state" class="state-box">
+        <div class="loading-spinner"></div>
+        <p>アンケートを読み込み中…</p>
+      </div>
+      <div id="sv-form" style="display:none;"></div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<script src="../js/supabase.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/common.js"></script>
+<script>
+let survey        = null;
+let existingResp  = null;   // 既存の自分の回答（あれば修正モード）
+let isEditMode    = false;
+
+function getParam(name) {
+  return new URLSearchParams(window.location.search).get(name);
+}
+
+function showState(html, isError = false) {
+  const el = document.getElementById('sv-state');
+  el.className = 'state-box' + (isError ? ' error' : '');
+  el.innerHTML = html;
+  el.style.display = 'block';
+  document.getElementById('sv-form').style.display = 'none';
+}
+
+// ══════════════════════════════════════
+//  読み込み
+// ══════════════════════════════════════
+async function init() {
+  if (!_sb) { showState('<p>Supabase未接続のためアンケートを表示できません。</p>', true); return; }
+
+  const id = getParam('id');
+  if (!id) { showState('<p>アンケートが指定されていません。</p>', true); return; }
+
+  const sessionUser = getSessionUser();
+  if (!sessionUser) { showState('<p>回答するにはログインが必要です。</p>', true); return; }
+
+  const { data, error } = await _sb.from('surveys').select('*').eq('id', id).maybeSingle();
+  if (error)  { showState('<p>アンケートの取得に失敗しました。時間をおいて再度お試しください。</p>', true); return; }
+  if (!data)  { showState('<p>このアンケートは見つかりませんでした。すでに締め切られた可能性があります。</p>', true); return; }
+
+  survey = data;
+
+  if (survey.status !== 'published') {
+    showState('<p>このアンケートは現在受付していません。</p>', true); return;
+  }
+
+  // 回答期間チェック
+  const today = new Date(); today.setHours(0,0,0,0);
+  if (survey.start_date && new Date(survey.start_date + 'T00:00:00') > today) {
+    showState(`<p>このアンケートの回答開始前です（${fmtDate(survey.start_date)}より受付）。</p>`, true); return;
+  }
+  if (survey.end_date && new Date(survey.end_date + 'T23:59:59') < new Date()) {
+    showState(`<p>このアンケートの回答期間は終了しました（${fmtDate(survey.end_date)}まで）。</p>`, true); return;
+  }
+
+  const questions = Array.isArray(survey.questions) ? survey.questions : [];
+  if (questions.length === 0) {
+    showState('<p>このアンケートにはまだ質問が設定されていません。</p>', true); return;
+  }
+
+  // 既存の自分の回答を取得（修正モード判定）
+  const { data: resp } = await _sb.from('survey_responses')
+    .select('*').eq('survey_id', survey.id).eq('member_id', sessionUser.id).maybeSingle();
+  existingResp = resp ?? null;
+  isEditMode   = !!existingResp;
+
+  renderForm();
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  return new Date(d + 'T00:00:00').toLocaleDateString('ja-JP', { year:'numeric', month:'numeric', day:'numeric', weekday:'short' });
+}
+
+// ══════════════════════════════════════
+//  フォーム描画
+// ══════════════════════════════════════
+function renderForm() {
+  document.getElementById('sv-state').style.display = 'none';
+  const wrap = document.getElementById('sv-form');
+  wrap.style.display = 'block';
+
+  const questions = survey.questions;
+  const ans = existingResp?.answers ?? {};
+
+  const canEdit = survey.allow_response_edit !== false;
+
+  const periodLabel = (survey.start_date || survey.end_date)
+    ? `回答期間：${fmtDate(survey.start_date) || '—'} 〜 ${fmtDate(survey.end_date) || '期限なし'}`
+    : null;
+
+  let html = `
+    <div class="sv-head-card fade-in">
+      <p class="sv-head-card__title">${escHtml(survey.title)}</p>
+      ${survey.description ? `<p class="sv-head-card__desc">${escHtml(survey.description)}</p>` : ''}
+      <div class="sv-head-card__meta">
+        ${periodLabel ? `<span>📅 ${escHtml(periodLabel)}</span>` : ''}
+        <span><span class="required" style="color:var(--danger);">*</span> は必須項目です</span>
+      </div>
+    </div>`;
+
+  if (isEditMode) {
+    html += `
+      <div class="sv-answered-note fade-in">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+        <span>このアンケートには回答済みです。${canEdit ? '内容を修正して再送信できます。' : 'このアンケートは回答の修正ができない設定です。'}</span>
+      </div>`;
+  }
+
+  html += questions.map((q, idx) => renderQuestion(q, idx, ans)).join('');
+
+  const disabledAll = isEditMode && !canEdit;
+
+  html += `
+    <div class="sv-actions">
+      <button class="btn btn-gold" id="sv-submit" ${disabledAll ? 'disabled' : ''}>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
+        ${isEditMode ? '回答を修正して送信' : '回答を送信する'}
+      </button>
+      ${isEditMode ? `<button class="btn btn-outline" id="sv-withdraw" style="color:var(--danger);border-color:var(--danger);">回答を取り消す</button>` : ''}
+    </div>`;
+
+  wrap.innerHTML = html;
+
+  // 修正不可モードでは入力を無効化
+  if (disabledAll) {
+    wrap.querySelectorAll('input, textarea, select').forEach(el => el.disabled = true);
+  }
+
+  document.getElementById('sv-submit')?.addEventListener('click', submitResponse);
+  document.getElementById('sv-withdraw')?.addEventListener('click', withdrawResponse);
+
+  // 「その他」欄に入力したら、その選択肢を自動的に選択状態にする
+  wrap.querySelectorAll('[data-other-text]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const qid = inp.dataset.otherText;
+      const otherRadio = wrap.querySelector(`input[data-qid="${qid}"][data-other="1"]`);
+      if (otherRadio && inp.value.trim()) otherRadio.checked = true;
+    });
+  });
+}
+
+function renderQuestion(q, idx, ans) {
+  const val = ans[q.id];
+  const req = q.required ? '<span class="required">*</span>' : '';
+  let body = '';
+
+  switch (q.type) {
+    case 'short_text':
+      body = `<input type="text" class="form-control" data-qid="${q.id}" data-type="short_text" value="${escHtml(val ?? '')}" placeholder="回答を入力">`;
+      break;
+
+    case 'paragraph':
+      body = `<textarea class="form-control" rows="4" data-qid="${q.id}" data-type="paragraph" placeholder="回答を入力" style="resize:vertical;">${escHtml(val ?? '')}</textarea>`;
+      break;
+
+    case 'radio':
+      body = renderChoices(q, val, 'radio');
+      break;
+
+    case 'checkbox':
+      body = renderChoices(q, val, 'checkbox');
+      break;
+
+    case 'dropdown': {
+      const opts = (q.options ?? []).map(o =>
+        `<option value="${escHtml(o)}" ${val === o ? 'selected' : ''}>${escHtml(o)}</option>`).join('');
+      body = `<select class="form-control" data-qid="${q.id}" data-type="dropdown">
+                <option value="">選択してください</option>${opts}
+              </select>`;
+      break;
+    }
+
+    case 'linear_scale': {
+      const min = Number(q.scale_min ?? 1), max = Number(q.scale_max ?? 5);
+      let items = '';
+      for (let n = min; n <= max; n++) {
+        items += `<label class="sv-scale__item">
+                    <span>${n}</span>
+                    <input type="radio" name="scale_${q.id}" data-qid="${q.id}" data-type="linear_scale" value="${n}" ${String(val) === String(n) ? 'checked' : ''}>
+                  </label>`;
+      }
+      body = `
+        <div class="sv-scale">${items}</div>
+        ${(q.scale_min_label || q.scale_max_label) ? `
+          <div class="sv-scale__labels">
+            <span>${escHtml(q.scale_min_label ?? '')}</span>
+            <span>${escHtml(q.scale_max_label ?? '')}</span>
+          </div>` : ''}`;
+      break;
+    }
+
+    case 'date':
+      body = `<input type="date" class="form-control" data-qid="${q.id}" data-type="date" value="${escHtml(val ?? '')}" style="max-width:220px;">`;
+      break;
+
+    case 'time':
+      body = `<input type="time" class="form-control" data-qid="${q.id}" data-type="time" value="${escHtml(val ?? '')}" style="max-width:180px;">`;
+      break;
+
+    default:
+      body = `<p style="color:var(--gray-400);font-size:var(--text-sm);">未対応の質問形式です。</p>`;
+  }
+
+  return `
+    <div class="sv-q-card fade-in" data-qcard="${q.id}">
+      <p class="sv-q-title">${escHtml(q.title)} ${req}</p>
+      ${q.description ? `<p class="sv-q-desc">${escHtml(q.description)}</p>` : ''}
+      <div class="sv-q-body">${body}</div>
+      <p class="sv-q-error">この質問は必須です。</p>
+    </div>`;
+}
+
+// ラジオ／チェックボックスの選択肢（その他対応）
+function renderChoices(q, val, kind) {
+  const inputType = kind === 'radio' ? 'radio' : 'checkbox';
+  const name = `opt_${q.id}`;
+  const options = q.options ?? [];
+  const selected = kind === 'checkbox' ? (Array.isArray(val) ? val : []) : [val];
+
+  // 「その他」の既存値を割り出す（定義済み選択肢に無い回答＝その他）
+  let otherChecked = false, otherText = '';
+  if (q.allow_other) {
+    const extras = selected.filter(v => v != null && !options.includes(v));
+    if (extras.length) { otherChecked = true; otherText = extras[0]; }
+  }
+
+  let html = options.map(o => {
+    const checked = selected.includes(o) ? 'checked' : '';
+    return `<label class="sv-opt">
+              <input type="${inputType}" name="${name}" data-qid="${q.id}" data-type="${kind}" value="${escHtml(o)}" ${checked}>
+              <span>${escHtml(o)}</span>
+            </label>`;
+  }).join('');
+
+  if (q.allow_other) {
+    html += `<div class="sv-opt">
+               <label class="sv-opt" style="padding:0;gap:var(--space-3);">
+                 <input type="${inputType}" name="${name}" data-qid="${q.id}" data-type="${kind}" data-other="1" value="__other__" ${otherChecked ? 'checked' : ''}>
+                 <span>その他：</span>
+               </label>
+               <input type="text" class="form-control sv-opt__other-text" data-other-text="${q.id}" value="${escHtml(otherText)}" placeholder="自由記述">
+             </div>`;
+  }
+  return html;
+}
+
+// ══════════════════════════════════════
+//  回答の収集・検証
+// ══════════════════════════════════════
+function collectAnswers() {
+  const answers = {};
+  const errors  = [];
+
+  survey.questions.forEach(q => {
+    let value;
+
+    if (q.type === 'checkbox') {
+      const boxes = document.querySelectorAll(`input[data-qid="${q.id}"]:checked`);
+      const arr = [];
+      boxes.forEach(b => {
+        if (b.dataset.other) {
+          const t = document.querySelector(`[data-other-text="${q.id}"]`)?.value.trim();
+          if (t) arr.push(t);
+        } else {
+          arr.push(b.value);
+        }
+      });
+      value = arr;
+      if (q.required && arr.length === 0) errors.push(q.id);
+
+    } else if (q.type === 'radio') {
+      const sel = document.querySelector(`input[data-qid="${q.id}"]:checked`);
+      if (sel) {
+        if (sel.dataset.other) {
+          value = document.querySelector(`[data-other-text="${q.id}"]`)?.value.trim() || '';
+        } else {
+          value = sel.value;
+        }
+      } else {
+        value = '';
+      }
+      if (q.required && !value) errors.push(q.id);
+
+    } else if (q.type === 'linear_scale') {
+      const sel = document.querySelector(`input[data-qid="${q.id}"]:checked`);
+      value = sel ? sel.value : '';
+      if (q.required && !value) errors.push(q.id);
+
+    } else {
+      // short_text / paragraph / dropdown / date / time
+      const el = document.querySelector(`[data-qid="${q.id}"]`);
+      value = (el?.value ?? '').trim();
+      if (q.required && !value) errors.push(q.id);
+    }
+
+    answers[q.id] = value;
+  });
+
+  return { answers, errors };
+}
+
+function markErrors(errors) {
+  document.querySelectorAll('.sv-q-card').forEach(c => c.classList.remove('invalid'));
+  errors.forEach(qid => {
+    document.querySelector(`[data-qcard="${qid}"]`)?.classList.add('invalid');
+  });
+  if (errors.length) {
+    document.querySelector(`[data-qcard="${errors[0]}"]`)?.scrollIntoView({ behavior:'smooth', block:'center' });
+  }
+}
+
+// ══════════════════════════════════════
+//  送信
+// ══════════════════════════════════════
+async function submitResponse() {
+  const sessionUser = getSessionUser();
+  if (!sessionUser || !_sb) { showToast('ログイン情報を確認できませんでした', 'error'); return; }
+
+  const { answers, errors } = collectAnswers();
+  markErrors(errors);
+  if (errors.length) { showToast(`未回答の必須項目が ${errors.length} 件あります`, 'error'); return; }
+
+  const btn = document.getElementById('sv-submit');
+  btn.disabled = true; const label = btn.innerHTML; btn.textContent = '送信中…';
+
+  const payload = {
+    survey_id:    survey.id,
+    member_id:    sessionUser.id,
+    answers,
+    responded_at: new Date().toISOString(),
+  };
+
+  // upsert（1人1回。既存があれば更新）
+  const { error } = await _sb.from('survey_responses')
+    .upsert(payload, { onConflict: 'survey_id,member_id' });
+
+  btn.disabled = false; btn.innerHTML = label;
+
+  if (error) {
+    console.error('[HighasuiDX] 回答送信失敗:', error);
+    showToast('送信に失敗しました: ' + error.message, 'error');
+    return;
+  }
+
+  showCompleted();
+}
+
+async function withdrawResponse() {
+  const sessionUser = getSessionUser();
+  if (!sessionUser || !_sb) return;
+  if (!confirm('このアンケートへの回答を取り消しますか？入力した内容は削除されます。')) return;
+
+  const { error } = await _sb.from('survey_responses')
+    .delete().eq('survey_id', survey.id).eq('member_id', sessionUser.id);
+
+  if (error) { showToast('取り消しに失敗しました: ' + error.message, 'error'); return; }
+  showToast('回答を取り消しました', 'success');
+  setTimeout(() => { window.location.href = '../index.html'; }, 900);
+}
+
+function showCompleted() {
+  const wrap = document.getElementById('sv-form');
+  wrap.innerHTML = `
+    <div class="sv-head-card fade-in" style="text-align:center;border-top-color:var(--success);padding:var(--space-10) var(--space-6);">
+      <div style="width:64px;height:64px;border-radius:50%;background:rgba(39,174,96,.12);display:flex;align-items:center;justify-content:center;margin:0 auto var(--space-5);">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="var(--success)" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+      </div>
+      <p class="sv-head-card__title" style="font-size:var(--text-xl);">回答を受け付けました</p>
+      <p class="sv-head-card__desc" style="text-align:center;">ご回答ありがとうございました。${survey.allow_response_edit !== false ? '<br>回答期間内であれば、ダッシュボードからいつでも内容を修正できます。' : ''}</p>
+      <div style="margin-top:var(--space-6);">
+        <a href="../index.html" class="btn btn-gold btn-sm">ダッシュボードに戻る</a>
+      </div>
+    </div>`;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ══════════════════════════════════════
+//  初期化
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  if (getSessionUser()) init();
+});
+</script>
+</body>
+</html>
