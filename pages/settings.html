@@ -299,6 +299,12 @@
           <span><strong style="color:var(--navy-800);">アンケート回答期限のお知らせ</strong><br>
             <small style="color:var(--gray-500);">回答期限の3日前・前日・当日に、未回答の場合のみ</small></span>
         </label>
+        <!-- 幹部（団長・副団長・GM）のみ表示。JSで表示切替 -->
+        <label id="pref-visitors-wrap" style="display:none;gap:var(--space-3);align-items:flex-start;cursor:pointer;border-top:1px solid var(--gray-200);padding-top:var(--space-3);">
+          <input type="checkbox" id="pref-visitors" style="width:18px;height:18px;margin-top:2px;accent-color:var(--navy-600);">
+          <span><strong style="color:var(--navy-800);">見学者からの新着メッセージ</strong><span class="badge badge-navy" style="font-size:10px;margin-left:6px;">幹部向け</span><br>
+            <small style="color:var(--gray-500);">見学者からメールの返信が届いたとき（団長・副団長・GM のみ）</small></span>
+        </label>
       </div>
       <div style="display:flex;justify-content:flex-end;">
         <button class="btn btn-gold" id="btn-save-prefs">設定を保存する</button>
@@ -521,7 +527,15 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 (function () {
-  const PREF_KEYS = ['attendance', 'dues', 'scores', 'lending', 'surveys'];
+  const PREF_KEYS = ['attendance', 'dues', 'scores', 'lending', 'surveys', 'visitors'];
+  // 見学者通知は幹部（団長・副団長・GM）だけが受け取れる
+  const VISITOR_MANAGER_ROLES = ['gm', 'leader', 'subleader'];
+  function isVisitorManager() {
+    const u = getSessionUser();
+    if (!u) return false;
+    const roles = Array.isArray(u.roles) ? u.roles : [u.role].filter(Boolean);
+    return roles.some(r => VISITOR_MANAGER_ROLES.includes(r));
+  }
 
   const STATUS_HTML = {
     'need-install': `<div class="alert alert-warning"><span>iPhoneでは、<strong>ホーム画面に追加したアプリから開いた場合のみ</strong>通知を受け取れます。Safariの共有ボタン →「ホーム画面に追加」の後、そのアイコンから起動してこの画面を開いてください（iOS 16.4以降が必要です）。</span></div>`,
@@ -552,9 +566,16 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadPrefs() {
     const user = getSessionUser();
     if (!_sb || !user) return;
+    // 幹部のときだけ見学者通知の項目を出す
+    if (isVisitorManager()) {
+      const wrap = document.getElementById('pref-visitors-wrap');
+      if (wrap) wrap.style.display = 'flex';
+    }
     const { data } = await _sb.from('notification_prefs').select('*').eq('user_id', user.id).maybeSingle();
     PREF_KEYS.forEach(k => {
-      document.getElementById(`pref-${k}`).checked = data ? data[k] !== false : true; // 未設定は全てオン
+      const el = document.getElementById(`pref-${k}`);
+      if (!el) return;
+      el.checked = data ? data[k] !== false : true; // 未設定は全てオン
     });
   }
 
@@ -586,7 +607,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const user = getSessionUser();
       if (!_sb || !user) { showToast('ログインが必要です', 'error'); return; }
       const row = { user_id: user.id, updated_at: new Date().toISOString() };
-      PREF_KEYS.forEach(k => { row[k] = document.getElementById(`pref-${k}`).checked; });
+      PREF_KEYS.forEach(k => {
+        const el = document.getElementById(`pref-${k}`);
+        if (el) row[k] = el.checked;
+      });
       const { error } = await _sb.from('notification_prefs').upsert(row, { onConflict: 'user_id' });
       if (error) { showToast('保存に失敗しました: ' + error.message, 'error'); return; }
       showToast('通知設定を保存しました', 'success');
