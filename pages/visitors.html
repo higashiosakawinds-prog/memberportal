@@ -21,7 +21,25 @@
 
     /* ── ツールバー ── */
     .vr-toolbar { display:flex; gap:var(--space-3); flex-wrap:wrap; margin-bottom:var(--space-5); align-items:center; }
-    .vr-toolbar input { flex:1; min-width:200px; }
+    .vr-toolbar #search-input { flex:1; min-width:200px; }
+    .vr-sort-wrap { display:flex; align-items:center; gap:var(--space-2); }
+    .vr-sort-label { font-size:var(--text-xs); color:var(--gray-500); white-space:nowrap; }
+    .vr-sort-wrap select { width:auto; min-width:180px; }
+
+    /* ── 練習日ごとビュー ── */
+    .vr-day-group { margin-bottom:var(--space-5); }
+    .vr-day-head {
+      display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap;
+      padding:var(--space-3) var(--space-4); border-radius:var(--radius-md);
+      background:var(--navy-800); color:var(--white); margin-bottom:var(--space-2);
+    }
+    .vr-day-head.is-past { background:var(--gray-300); color:var(--gray-700); }
+    .vr-day-head__date { font-weight:700; font-size:var(--text-base); }
+    .vr-day-head__meta { font-size:var(--text-xs); opacity:.85; }
+    .vr-day-head__count { margin-left:auto; font-family:var(--font-numeric); font-weight:700; font-size:var(--text-sm);
+      background:rgba(255,255,255,.18); padding:2px 10px; border-radius:var(--radius-full); }
+    .vr-day-head.is-past .vr-day-head__count { background:rgba(0,0,0,.08); }
+    .vr-day-empty { text-align:center; color:var(--gray-500); padding:var(--space-10); background:var(--white); border:1px solid var(--gray-200); border-radius:var(--radius-lg); }
 
     /* ── 表示切替タブ（対応中 / アーカイブ） ── */
     .vr-viewmode-tabs { display:flex; gap:0; border-bottom:2px solid var(--gray-200); margin-bottom:var(--space-5); }
@@ -199,8 +217,21 @@
       <div class="vr-stats fade-in fade-in-1" id="vr-stats"></div>
 
       <!-- ツールバー -->
-      <div class="vr-toolbar fade-in fade-in-2">
+      <div class="vr-toolbar fade-in fade-in-2" id="vr-toolbar">
         <input type="text" id="search-input" class="form-control" placeholder="名前・メール・電話番号で検索…">
+        <div class="vr-sort-wrap" id="vr-sort-wrap">
+          <label for="sort-select" class="vr-sort-label">並べ替え</label>
+          <select id="sort-select" class="form-control">
+            <option value="recommended">おすすめ（要対応を優先）</option>
+            <option value="visit_asc">見学日が近い順</option>
+            <option value="contact_desc">連絡が新しい順</option>
+            <option value="contact_asc">連絡が古い順</option>
+          </select>
+        </div>
+        <button class="btn btn-gold btn-sm" id="btn-register">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+          見学者を登録
+        </button>
         <button class="btn btn-outline btn-sm" id="btn-reload">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
           更新
@@ -245,6 +276,26 @@
   </div>
 </div>
 
+<!-- ══ 見学者 手動登録モーダル ══ -->
+<div class="modal-overlay" id="modal-register">
+  <div class="modal">
+    <div class="modal__header">
+      <h2 class="modal__title">見学者を登録</h2>
+      <button class="modal__close" onclick="closeModal('modal-register')">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal__body" id="register-body"></div>
+    <div class="modal__footer" style="justify-content:flex-end;gap:var(--space-3);">
+      <button class="btn btn-outline" onclick="closeModal('modal-register')">キャンセル</button>
+      <button class="btn btn-gold" id="btn-register-save" onclick="submitRegister()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+        この内容で登録
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 <script src="../js/supabase.js"></script>
 <script src="../js/config.js"></script>
@@ -282,9 +333,11 @@ const isVisitorGasOk = () => VISITOR_SEND_GAS_URL && !VISITOR_SEND_GAS_URL.inclu
 // ══════════════════════════════════════
 let allRequests   = [];
 let activitiesMap = {};   // { activityId: activityRow }
+let practicesByDate = {}; // { 'YYYY-MM-DD': activityRow }（練習のみ／日付から練習を引く用）
 let staffMembers  = [];   // 担当者候補
 let activeFilter  = 'all';
-let viewMode      = 'active'; // 'active' = 対応中（アーカイブ以外） / 'archived' = アーカイブのみ
+let viewMode      = 'active'; // 'active' = 対応中 / 'archived' = アーカイブ / 'byday' = 練習日ごと
+let sortMode      = 'recommended'; // 一覧の並べ替え（recommended / visit_asc / contact_desc / contact_asc）
 let currentDetail = null; // 編集中のレコード（ローカルコピー）
 let currentMessages = [];  // 開いている見学者のチャット履歴
 let chatPollTimer = null;  // モーダルを開いている間の自動更新タイマー
@@ -312,6 +365,29 @@ function fmtActivityDate(a) {
   const W = ['日','月','火','水','木','金','土'];
   const t = a.start_time ? ` ${a.start_time.slice(0,5)}〜` : '';
   return `${d.getMonth()+1}/${d.getDate()}(${W[d.getDay()]})${t}`;
+}
+// 'YYYY-MM-DD' を「M/D(曜)」に整形（確定見学日の表示用）
+function fmtYmd(ymd) {
+  if (!ymd) return '—';
+  const d = new Date(ymd + 'T00:00:00');
+  if (isNaN(d)) return ymd;
+  const W = ['日','月','火','水','木','金','土'];
+  return `${d.getMonth()+1}/${d.getDate()}(${W[d.getDay()]})`;
+}
+const todayYmd = () => new Date().toLocaleDateString('sv-SE'); // 'YYYY-MM-DD'（ローカル日付）
+
+// 今後の練習日を <option> 群にする（確定見学日の「練習日から選ぶ」補助。selected は選択中の日付）
+function upcomingPracticeOptions(selected) {
+  const t = todayYmd();
+  const list = Object.values(activitiesMap)
+    .filter(a => a.activity_type === 'practice' && !a.is_cancelled && a.activity_date >= t)
+    .sort((a, b) => a.activity_date.localeCompare(b.activity_date));
+  return ['<option value="">練習日から選ぶ…</option>']
+    .concat(list.map(a => {
+      const t2 = a.start_time ? ` ${a.start_time.slice(0,5)}〜` : '';
+      const loc = a.location ? `　${a.location}` : '';
+      return `<option value="${a.activity_date}" ${a.activity_date === selected ? 'selected' : ''}>${escHtml(fmtYmd(a.activity_date) + t2 + loc)}</option>`;
+    })).join('');
 }
 
 function canManageVisitors() {
@@ -344,7 +420,7 @@ async function loadAll() {
 
   const [reqRes, actRes, memRes] = await Promise.all([
     _sb.from('visit_requests').select('*').order('created_at', { ascending: false }),
-    _sb.from('activities').select('id, activity_date, start_time, activity_type'),
+    _sb.from('activities').select('id, activity_date, start_time, end_time, location, activity_type, is_cancelled'),
     _sb.from('profiles').select('id, last_name, first_name, roles'),
   ]);
 
@@ -356,7 +432,11 @@ async function loadAll() {
 
   allRequests = reqRes.data ?? [];
   activitiesMap = {};
-  (actRes.data ?? []).forEach(a => { activitiesMap[a.id] = a; });
+  practicesByDate = {};
+  (actRes.data ?? []).forEach(a => {
+    activitiesMap[a.id] = a;
+    if (a.activity_type === 'practice' && !a.is_cancelled) practicesByDate[a.activity_date] = a;
+  });
   staffMembers = (memRes.data ?? []).filter(m => {
     const roles = Array.isArray(m.roles) ? m.roles : [];
     return roles.some(r => VISITOR_MANAGER_ROLES.includes(r));
@@ -374,6 +454,7 @@ function renderViewModeTabs() {
   const archivedCount = allRequests.filter(r => r.archived).length;
   const tabs = [
     { key:'active',   label:'対応中' },
+    { key:'byday',    label:'練習日ごと' },
     { key:'archived', label:`アーカイブ${archivedCount ? `（${archivedCount}）` : ''}` },
   ];
   document.getElementById('vr-viewmode-tabs').innerHTML = tabs.map(t => `
@@ -389,6 +470,20 @@ function setViewMode(mode) {
 }
 
 function renderStats() {
+  const statsEl = document.getElementById('vr-stats');
+  const toolbarEl = document.getElementById('vr-toolbar');
+  const sortWrap = document.getElementById('vr-sort-wrap');
+  // 練習日ごとビューでは集計カード・要対応バナー・並べ替えは使わないので隠す
+  if (viewMode === 'byday') {
+    statsEl.style.display = 'none';
+    document.getElementById('vr-action-banner').style.display = 'none';
+    if (sortWrap) sortWrap.style.display = 'none';
+    if (toolbarEl) toolbarEl.style.display = 'flex';
+    return;
+  }
+  statsEl.style.display = 'grid';
+  if (sortWrap) sortWrap.style.display = 'flex';
+
   const scoped = allRequests.filter(r => !!r.archived === (viewMode === 'archived'));
   const counts = { all: scoped.length };
   STATUS_DEFS.forEach(s => { counts[s.key] = scoped.filter(r => r.status === s.key).length; });
@@ -456,6 +551,9 @@ function setFilter(key) {
 //  一覧描画
 // ══════════════════════════════════════
 function renderList() {
+  // 練習日ごとビューは別描画
+  if (viewMode === 'byday') { renderByDay(); return; }
+
   const kw = document.getElementById('search-input').value.trim().toLowerCase();
 
   const filtered = allRequests.filter(r => {
@@ -469,20 +567,10 @@ function renderList() {
     return true;
   });
 
-  // 優先度順に並べ替え：①要対応（新着返信→新規の順・古い順）②対応中 ③入団・辞退（済み）は最後
-  const priority = r => needsAction(r) ? 0 : (r.status === 'joined' || r.status === 'declined' ? 2 : 1);
-  filtered.sort((a, b) => {
-    const pa = priority(a), pb = priority(b);
-    if (pa !== pb) return pa - pb;
-    if (pa === 0) {
-      const ua = a.has_unread_reply ? 0 : 1, ub = b.has_unread_reply ? 0 : 1;
-      if (ua !== ub) return ua - ub;                                   // 新着返信を先に
-      return new Date(a.created_at) - new Date(b.created_at);          // 待たせている順（古い順）
-    }
-    return new Date(b.created_at) - new Date(a.created_at);            // それ以外は新しい順
-  });
+  sortRequests(filtered);
 
   const listEl = document.getElementById('vr-list');
+  listEl.className = 'vr-list'; // 練習日ごとビューで外した囲みを戻す
   if (!filtered.length) {
     const emptyMsg = viewMode === 'archived'
       ? 'アーカイブ済みの見学申込はありません。'
@@ -491,43 +579,140 @@ function renderList() {
     return;
   }
 
-  listEl.innerHTML = filtered.map(r => {
-    const status   = STATUS_MAP[r.status] ?? STATUS_MAP.new;
-    const assignee = staffMembers.find(m => m.id === r.assigned_to);
+  listEl.innerHTML = filtered.map(rowHtml).join('');
+}
+
+// 並べ替え（sortMode に従う）。recommended は従来の優先度順。
+function sortRequests(arr) {
+  const priority = r => needsAction(r) ? 0 : (r.status === 'joined' || r.status === 'declined' ? 2 : 1);
+  if (sortMode === 'visit_asc') {
+    // 見学日が近い順（未設定は末尾）。同日は連絡が古い順。
+    arr.sort((a, b) => {
+      const da = a.scheduled_visit_date || '', db = b.scheduled_visit_date || '';
+      if (!!da !== !!db) return da ? -1 : 1;
+      if (da !== db) return da.localeCompare(db);
+      return new Date(a.created_at) - new Date(b.created_at);
+    });
+  } else if (sortMode === 'contact_desc') {
+    arr.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  } else if (sortMode === 'contact_asc') {
+    arr.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  } else {
+    // recommended：①要対応（新着返信→新規の順・古い順）②対応中 ③入団・辞退は最後
+    arr.sort((a, b) => {
+      const pa = priority(a), pb = priority(b);
+      if (pa !== pb) return pa - pb;
+      if (pa === 0) {
+        const ua = a.has_unread_reply ? 0 : 1, ub = b.has_unread_reply ? 0 : 1;
+        if (ua !== ub) return ua - ub;
+        return new Date(a.created_at) - new Date(b.created_at);
+      }
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+  }
+}
+
+// 1件ぶんの行HTML（一覧・練習日ごとビューで共用）
+function rowHtml(r) {
+  const status   = STATUS_MAP[r.status] ?? STATUS_MAP.new;
+  const assignee = staffMembers.find(m => m.id === r.assigned_to);
+
+  // 確定見学日があればそれを優先表示。なければ希望日程の要約。
+  let dateLabel;
+  if (r.scheduled_visit_date) {
+    dateLabel = `🗓 見学日 ${fmtYmd(r.scheduled_visit_date)}`;
+  } else {
     const dateIds  = r.date_request_activity_ids ?? [];
     const firstAct = dateIds.map(id => activitiesMap[id]).filter(Boolean).sort((a,b) => a.activity_date.localeCompare(b.activity_date))[0];
     const dateSummary = dateIds.length
       ? `${fmtActivityDate(firstAct)}${dateIds.length > 1 ? ` 他${dateIds.length - 1}件` : ''}`
       : (r.date_request_note ? '希望日程（自由記述あり）' : '希望日程未指定');
+    dateLabel = `📅 希望 ${dateSummary}`;
+  }
 
-    const action   = needsAction(r);
-    const isUnread = action;
-    const rowCls   = action ? 'is-action'
-                   : (r.status === 'joined' ? 'is-joined'
-                   : (r.status === 'declined' ? 'is-resolved' : ''));
+  const action   = needsAction(r);
+  const rowCls   = action ? 'is-action'
+                 : (r.status === 'joined' ? 'is-joined'
+                 : (r.status === 'declined' ? 'is-resolved' : ''));
 
-    // 要対応の理由を示すチップ（新着返信を優先）
-    const chip = r.has_unread_reply
-      ? '<span class="vr-row__chip chip-reply">🔵 新着返信</span>'
-      : (r.status === 'new' ? '<span class="vr-row__chip chip-new">🆕 新規・未対応</span>' : '');
+  const chip = r.has_unread_reply
+    ? '<span class="vr-row__chip chip-reply">🔵 新着返信</span>'
+    : (r.status === 'new' ? '<span class="vr-row__chip chip-new">🆕 新規・未対応</span>' : '');
+
+  const contact = r.email ? `✉️ ${escHtml(r.email)}` : (r.source ? `📨 ${escHtml(r.source)}` : '');
+
+  return `
+    <div class="vr-row ${rowCls}" onclick="openDetail('${r.id}')">
+      <span class="vr-row__dot ${action ? '' : 'read'}"></span>
+      <div class="vr-row__main">
+        <div class="vr-row__top">
+          ${chip}
+          <span class="vr-row__name">${escHtml(r.name)}</span>
+          <span class="badge ${status.css}" style="font-size:10px;">${escHtml(status.label)}</span>
+          ${r.member_type === 'minor' ? '<span class="badge badge-warning" style="font-size:10px;">未成年</span>' : ''}
+          ${PART_LABELS[r.part] ? `<span class="badge badge-navy" style="font-size:10px;">${escHtml(PART_LABELS[r.part])}</span>` : ''}
+        </div>
+        <div class="vr-row__sub">${escHtml(dateLabel)}　${contact}</div>
+      </div>
+      <div class="vr-row__meta">
+        <span class="vr-row__assignee">${assignee ? `👤 ${escHtml(assignee.last_name)}` : '未割当'}</span>
+        <span class="vr-row__date">${escHtml(fmtRelative(r.created_at))}</span>
+      </div>
+    </div>`;
+}
+
+// ══════════════════════════════════════
+//  練習日ごとの見学予定者一覧
+// ══════════════════════════════════════
+function renderByDay() {
+  const kw = document.getElementById('search-input').value.trim().toLowerCase();
+  const listEl = document.getElementById('vr-list');
+
+  // アーカイブ以外＆確定見学日あり。キーワード検索も反映。
+  const scoped = allRequests.filter(r => {
+    if (r.archived || !r.scheduled_visit_date) return false;
+    if (kw) {
+      const text = `${r.name}${r.yomi ?? ''}${r.email ?? ''}${r.phone ?? ''}`.toLowerCase();
+      if (!text.includes(kw)) return false;
+    }
+    return true;
+  });
+
+  if (!scoped.length) {
+    listEl.innerHTML = `<div class="vr-day-empty">確定した見学日のある見学者はいません。<br>各見学者の詳細画面で「確定見学日」を設定すると、ここに練習日ごとに表示されます。</div>`;
+    return;
+  }
+
+  // 日付でグループ化
+  const groups = {};
+  scoped.forEach(r => { (groups[r.scheduled_visit_date] ??= []).push(r); });
+
+  const today = todayYmd();
+  // 未来を先に（近い順）、過去は後ろに（新しい順）
+  const dates = Object.keys(groups).sort((a, b) => {
+    const fa = a >= today, fb = b >= today;
+    if (fa !== fb) return fa ? -1 : 1;
+    return fa ? a.localeCompare(b) : b.localeCompare(a);
+  });
+
+  listEl.className = ''; // リスト枠の囲みを外してグループ単位の表示にする
+  listEl.innerHTML = dates.map(date => {
+    const rows = groups[date];
+    rows.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const act = practicesByDate[date];
+    const isPast = date < today;
+    const meta = act
+      ? `${act.start_time ? act.start_time.slice(0,5) + '〜' : ''}${act.end_time ? act.end_time.slice(0,5) : ''}${act.location ? '　' + escHtml(act.location) : ''}`
+      : '（この日は練習予定なし — 単発の見学日）';
 
     return `
-      <div class="vr-row ${rowCls}" onclick="openDetail('${r.id}')">
-        <span class="vr-row__dot ${isUnread ? '' : 'read'}"></span>
-        <div class="vr-row__main">
-          <div class="vr-row__top">
-            ${chip}
-            <span class="vr-row__name">${escHtml(r.name)}</span>
-            <span class="badge ${status.css}" style="font-size:10px;">${escHtml(status.label)}</span>
-            ${r.member_type === 'minor' ? '<span class="badge badge-warning" style="font-size:10px;">未成年</span>' : ''}
-            ${PART_LABELS[r.part] ? `<span class="badge badge-navy" style="font-size:10px;">${escHtml(PART_LABELS[r.part])}</span>` : ''}
-          </div>
-          <div class="vr-row__sub">📅 ${escHtml(dateSummary)}　✉️ ${escHtml(r.email)}</div>
+      <div class="vr-day-group">
+        <div class="vr-day-head ${isPast ? 'is-past' : ''}">
+          <span class="vr-day-head__date">🗓 ${escHtml(fmtYmd(date))}</span>
+          <span class="vr-day-head__meta">${meta}</span>
+          <span class="vr-day-head__count">見学 ${rows.length}名</span>
         </div>
-        <div class="vr-row__meta">
-          <span class="vr-row__assignee">${assignee ? `👤 ${escHtml(assignee.last_name)}` : '未割当'}</span>
-          <span class="vr-row__date">${escHtml(fmtRelative(r.created_at))}</span>
-        </div>
+        <div class="vr-list">${rows.map(rowHtml).join('')}</div>
       </div>`;
   }).join('');
 }
@@ -563,6 +748,7 @@ function openDetail(id) {
       <dt>メール</dt><dd><a href="mailto:${escHtml(r.email)}" style="color:var(--navy-600);text-decoration:underline;">${escHtml(r.email)}</a></dd>
       <dt>電話番号</dt><dd>${r.phone ? `<a href="tel:${escHtml(r.phone)}" style="color:var(--navy-600);text-decoration:underline;">${escHtml(r.phone)}</a>` : '—'}</dd>
       <dt>LINE ID</dt><dd>${escHtml(r.line_id ?? '—')}</dd>
+      <dt>申込経路</dt><dd>${escHtml(r.source ?? '—')}</dd>
     </dl>
 
     ${r.member_type === 'minor' ? `
@@ -572,9 +758,23 @@ function openDetail(id) {
       <dt>保護者連絡先</dt><dd>${r.emergency_phone ? `<a href="tel:${escHtml(r.emergency_phone)}" style="color:var(--navy-600);text-decoration:underline;">${escHtml(r.emergency_phone)}</a>` : '—'}</dd>
     </dl>` : ''}
 
-    <p class="detail-section-label">希望日程・コメント</p>
+    <p class="detail-section-label">希望日程（申込時）</p>
     <div style="margin-bottom:var(--space-2);">${dateChips}</div>
     ${r.date_request_note ? `<p style="font-size:var(--text-sm);color:var(--gray-700);white-space:pre-wrap;background:var(--gray-100);padding:var(--space-3);border-radius:var(--radius-md);">${escHtml(r.date_request_note)}</p>` : ''}
+
+    <p class="detail-section-label">確定見学日（こちらで修正できます）</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:var(--space-3);align-items:end;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" style="font-size:var(--text-xs);">見学日</label>
+        <input type="date" id="detail-visit-date" class="form-control" value="${escHtml(r.scheduled_visit_date ?? '')}">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" style="font-size:var(--text-xs);">練習日から選ぶ</label>
+        <select id="detail-visit-practice" class="form-control" onchange="pickVisitPractice(this.value)">${upcomingPracticeOptions(r.scheduled_visit_date)}</select>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline" onclick="clearVisitDate()" style="margin-bottom:0;">クリア</button>
+    </div>
+    <p style="font-size:10px;color:var(--gray-400);margin:4px 0 0;">※見学日を設定すると「練習日ごと」タブに表示され、見学日順の並べ替えにも反映されます。</p>
 
     <div class="vr-quick-actions">
       ${r.phone ? `<a class="btn btn-sm btn-outline" href="tel:${escHtml(r.phone)}">📞 電話する</a>` : ''}
@@ -900,6 +1100,19 @@ function selectDetailStatus(key) {
   });
 }
 
+// 「練習日から選ぶ」セレクトで選んだ日付を、確定見学日の入力欄へ反映
+function pickVisitPractice(ymd) {
+  if (!ymd) return;
+  const input = document.getElementById('detail-visit-date');
+  if (input) input.value = ymd;
+}
+function clearVisitDate() {
+  const input = document.getElementById('detail-visit-date');
+  if (input) input.value = '';
+  const sel = document.getElementById('detail-visit-practice');
+  if (sel) sel.value = '';
+}
+
 function bumpVisitCount(delta) {
   const el = document.getElementById('detail-visit-count');
   const next = Math.max(0, Math.min(3, parseInt(el.textContent) + delta));
@@ -910,6 +1123,102 @@ function copyText(text) {
   navigator.clipboard.writeText(text)
     .then(() => showToast('コピーしました', 'success'))
     .catch(() => showToast('コピーに失敗しました', 'error'));
+}
+
+// ══════════════════════════════════════
+//  見学者の手動登録（Instagram等・幹部が代理で登録）
+// ══════════════════════════════════════
+const SOURCE_OPTIONS = ['Instagram', 'X（旧Twitter）', '知人・団員の紹介', 'ポスター・チラシ', '当団サイト', '直接問い合わせ', 'その他'];
+
+function openRegisterModal() {
+  const partOptions = ['<option value="">未定・相談したい</option>']
+    .concat(Object.entries(PART_LABELS)
+      .filter(([k]) => k !== 'undecided')
+      .map(([k, v]) => `<option value="${k}">${escHtml(v)}</option>`)).join('');
+  const assigneeOptions = ['<option value="">未割当</option>']
+    .concat(staffMembers.map(m => `<option value="${m.id}">${escHtml(m.last_name)}${escHtml(m.first_name)}</option>`)).join('');
+  const sourceOptions = SOURCE_OPTIONS.map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+  const statusOptions = STATUS_DEFS.map(s => `<option value="${s.key}" ${s.key === 'contacted' ? 'selected' : ''}>${escHtml(s.label)}</option>`).join('');
+
+  document.getElementById('register-body').innerHTML = `
+    <p style="font-size:var(--text-xs);color:var(--gray-500);margin:0 0 var(--space-4);">InstagramのDMや紹介など、申込フォーム以外から来た見学者をこちらで登録します。メールアドレスが分かる場合は入力すると、この画面からメール送信もできます。</p>
+
+    <div class="form-group">
+      <label class="form-label">お名前 <span style="color:var(--danger);">*</span></label>
+      <input type="text" id="reg-name" class="form-control" placeholder="山田 花子">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);">
+      <div class="form-group"><label class="form-label">ふりがな</label><input type="text" id="reg-yomi" class="form-control" placeholder="やまだ はなこ"></div>
+      <div class="form-group"><label class="form-label">申込経路 <span style="color:var(--danger);">*</span></label><select id="reg-source" class="form-control">${sourceOptions}</select></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);">
+      <div class="form-group"><label class="form-label">希望パート</label><select id="reg-part" class="form-control">${partOptions}</select></div>
+      <div class="form-group"><label class="form-label">会員区分</label><select id="reg-member-type" class="form-control"><option value="adult">成人</option><option value="minor">未成年</option></select></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);">
+      <div class="form-group"><label class="form-label">メール（任意）</label><input type="email" id="reg-email" class="form-control" placeholder="分かる場合のみ"></div>
+      <div class="form-group"><label class="form-label">電話番号（任意）</label><input type="tel" id="reg-phone" class="form-control"></div>
+    </div>
+    <div class="form-group"><label class="form-label">LINE ID（任意）</label><input type="text" id="reg-line" class="form-control"></div>
+
+    <p class="detail-section-label">確定見学日（任意）</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:var(--space-3);align-items:end;">
+      <div class="form-group" style="margin-bottom:0;"><label class="form-label" style="font-size:var(--text-xs);">見学日</label><input type="date" id="reg-visit-date" class="form-control"></div>
+      <div class="form-group" style="margin-bottom:0;"><label class="form-label" style="font-size:var(--text-xs);">練習日から選ぶ</label><select id="reg-visit-practice" class="form-control" onchange="if(this.value)document.getElementById('reg-visit-date').value=this.value;">${upcomingPracticeOptions(null)}</select></div>
+      <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('reg-visit-date').value='';document.getElementById('reg-visit-practice').value='';" style="margin-bottom:0;">クリア</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-top:var(--space-4);">
+      <div class="form-group"><label class="form-label">対応ステータス</label><select id="reg-status" class="form-control">${statusOptions}</select></div>
+      <div class="form-group"><label class="form-label">担当者</label><select id="reg-assignee" class="form-control">${assigneeOptions}</select></div>
+    </div>
+    <div class="form-group" style="margin-bottom:0;"><label class="form-label">内部メモ（任意・申込者には非公開）</label><textarea id="reg-notes" class="form-control" rows="2" placeholder="InstagramのDM内容など"></textarea></div>
+  `;
+  openModal('modal-register');
+}
+
+async function submitRegister() {
+  if (!_sb) { showToast('Supabase未接続です', 'error'); return; }
+  const name = document.getElementById('reg-name').value.trim();
+  if (!name) { showToast('お名前を入力してください', 'error'); return; }
+
+  const payload = {
+    name,
+    yomi:                 document.getElementById('reg-yomi').value.trim() || null,
+    source:               document.getElementById('reg-source').value || null,
+    part:                 document.getElementById('reg-part').value || null,
+    member_type:          document.getElementById('reg-member-type').value,
+    email:                document.getElementById('reg-email').value.trim() || null,
+    phone:                document.getElementById('reg-phone').value.trim() || null,
+    line_id:              document.getElementById('reg-line').value.trim() || null,
+    scheduled_visit_date: document.getElementById('reg-visit-date').value || null,
+    status:               document.getElementById('reg-status').value,
+    assigned_to:          document.getElementById('reg-assignee').value || null,
+    internal_notes:       document.getElementById('reg-notes').value.trim() || null,
+  };
+
+  const btn = document.getElementById('btn-register-save');
+  btn.disabled = true; btn.textContent = '登録中…';
+
+  const { data, error } = await _sb.from('visit_requests').insert(payload).select().single();
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg> この内容で登録';
+
+  if (error) {
+    const hint = /row-level security|permission|policy/i.test(error.message)
+      ? '（登録権限のRLS設定が必要です。visit_requests_patch.sql を実行してください）'
+      : '';
+    showToast('登録に失敗しました: ' + error.message + hint, 'error');
+    return;
+  }
+
+  allRequests.unshift(data);
+  closeModal('modal-register');
+  renderViewModeTabs();
+  renderStats();
+  renderList();
+  showToast('見学者を登録しました', 'success');
 }
 
 // ══════════════════════════════════════
@@ -950,10 +1259,11 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.disabled = true; btn.textContent = '保存中…';
 
     const payload = {
-      status:         currentDetail.status,
-      assigned_to:    document.getElementById('detail-assignee').value || null,
-      visit_count:    parseInt(document.getElementById('detail-visit-count').textContent) || 0,
-      internal_notes: document.getElementById('detail-notes').value.trim() || null,
+      status:               currentDetail.status,
+      assigned_to:          document.getElementById('detail-assignee').value || null,
+      visit_count:          parseInt(document.getElementById('detail-visit-count').textContent) || 0,
+      internal_notes:       document.getElementById('detail-notes').value.trim() || null,
+      scheduled_visit_date: document.getElementById('detail-visit-date').value || null,
     };
 
     const { error } = await _sb.from('visit_requests').update(payload).eq('id', currentDetail.id);
@@ -973,6 +1283,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('search-input').addEventListener('input', renderList);
   document.getElementById('btn-reload').addEventListener('click', loadAll);
+  document.getElementById('btn-register').addEventListener('click', openRegisterModal);
+  document.getElementById('sort-select').addEventListener('change', e => {
+    sortMode = e.target.value;
+    renderList();
+  });
 });
 
 // ══════════════════════════════════════
