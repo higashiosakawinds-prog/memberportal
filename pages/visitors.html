@@ -59,6 +59,41 @@
     .status-badge-joined    { background:rgba(39,174,96,.12);  color:#1e8449; }
     .status-badge-declined  { background:var(--gray-200);      color:var(--gray-500); }
 
+    /* ── PC専用ガード（スマホ表示時に出す案内） ── */
+    .vr-device-block { display:none; padding:var(--space-16) var(--space-6); text-align:center; }
+    .vr-device-block__icon  { font-size:46px; margin-bottom:var(--space-4); }
+    .vr-device-block__title { font-size:var(--text-xl); font-weight:700; color:var(--navy-800); margin-bottom:var(--space-3); }
+    .vr-device-block__text  { font-size:var(--text-sm); color:var(--gray-600); line-height:1.9; max-width:440px; margin:0 auto; }
+
+    /* ── 要対応バナー（対応中ビューの先頭に常時表示） ── */
+    .vr-action-banner {
+      display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); flex-wrap:wrap;
+      border-radius:var(--radius-lg); padding:var(--space-4) var(--space-5); margin-bottom:var(--space-5);
+    }
+    .vr-action-banner.has-action { background:rgba(192,57,43,.08); border:1px solid rgba(192,57,43,.28); }
+    .vr-action-banner.no-action  { background:rgba(39,174,96,.07);  border:1px solid rgba(39,174,96,.22); }
+    .vr-action-banner__main  { display:flex; align-items:center; gap:var(--space-4); }
+    .vr-action-banner__num   { font-family:var(--font-numeric); font-size:var(--text-2xl); font-weight:700; line-height:1; min-width:1.2ch; text-align:center; }
+    .vr-action-banner.has-action .vr-action-banner__num { color:var(--danger); }
+    .vr-action-banner.no-action  .vr-action-banner__num { color:#1e8449; }
+    .vr-action-banner__label { font-size:var(--text-sm); font-weight:700; color:var(--navy-800); }
+    .vr-action-banner__sub   { font-size:var(--text-xs); color:var(--gray-500); margin-top:2px; }
+
+    /* ── 行の優先度アクセント（左端のカラーバー＋地色） ── */
+    .vr-row { position:relative; }
+    .vr-row::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:transparent; }
+    .vr-row.is-action::before  { background:var(--danger); }
+    .vr-row.is-action          { background:rgba(192,57,43,.04); }
+    .vr-row.is-action:hover    { background:rgba(192,57,43,.08); }
+    .vr-row.is-joined::before  { background:#27ae60; }
+    .vr-row.is-resolved        { opacity:.6; }
+    .vr-row__chip {
+      display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:var(--radius-full);
+      font-size:10px; font-weight:700; white-space:nowrap;
+    }
+    .vr-row__chip.chip-reply { background:rgba(41,128,185,.14); color:#1a5276; }
+    .vr-row__chip.chip-new   { background:rgba(192,57,43,.12); color:var(--danger); }
+
     /* ── 詳細モーダル ── */
     #modal-detail .modal { max-width:640px; }
     .vr-dl { display:grid; grid-template-columns:110px 1fr; gap:var(--space-2) var(--space-4); font-size:var(--text-sm); }
@@ -140,10 +175,25 @@
       <a href="../index.html" class="btn btn-outline" style="margin-top:var(--space-6);">ダッシュボードに戻る</a>
     </div>
 
+    <!-- スマホ向け案内（PC専用・JSで表示切替） -->
+    <div id="no-device" class="vr-device-block">
+      <div class="vr-device-block__icon">🖥️</div>
+      <p class="vr-device-block__title">見学者対応はパソコン専用です</p>
+      <p class="vr-device-block__text">
+        見学者へのメール送信を安定して行うため、この画面はパソコンからのみ操作できます。<br>
+        スマートフォンでは、回線が不安定なときに「送信したのにエラーになる」「二重送信される」といった不具合が起きやすいためです。<br><br>
+        お手数ですが、パソコンのブラウザから開いてご利用ください。
+      </p>
+      <a href="../index.html" class="btn btn-outline" style="margin-top:var(--space-6);">ダッシュボードに戻る</a>
+    </div>
+
     <div id="vr-app" style="display:none;">
 
       <!-- 表示切替（対応中 / アーカイブ） -->
       <div class="vr-viewmode-tabs fade-in fade-in-1" id="vr-viewmode-tabs"></div>
+
+      <!-- 要対応バナー（JSで内容・表示切替） -->
+      <div class="vr-action-banner no-action fade-in fade-in-1" id="vr-action-banner" style="display:none;"></div>
 
       <!-- 集計カード（フィルタ兼用） -->
       <div class="vr-stats fade-in fade-in-1" id="vr-stats"></div>
@@ -271,6 +321,21 @@ function canManageVisitors() {
   return roles.some(r => VISITOR_MANAGER_ROLES.includes(r));
 }
 
+// 「要対応」＝対応中かつ（新規・未対応／相手から新着返信あり）。一覧の優先表示とバナー集計に使う
+function needsAction(r) {
+  return !r.archived && (r.status === 'new' || r.has_unread_reply);
+}
+
+// スマホ判定（PC専用ガード用）。スマホのUA、または「タッチ操作＋短辺が狭い端末」をスマホとみなす。
+// タブレット・PC（マウス操作／大画面）はブロックしない。読み込み時に一度だけ判定する。
+function isPhoneDevice() {
+  const ua = navigator.userAgent || '';
+  const uaPhone = /iPhone|iPod|Android.+Mobile|Windows Phone|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  const coarse  = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const narrow  = Math.min(window.innerWidth, window.innerHeight) < 768;
+  return uaPhone || (coarse && narrow);
+}
+
 // ══════════════════════════════════════
 //  データ読み込み
 // ══════════════════════════════════════
@@ -342,6 +407,43 @@ function renderStats() {
       <p class="vr-stat__num">${counts[c.key] ?? 0}</p>
       <p class="vr-stat__label">${escHtml(c.label)}</p>
     </div>`).join('');
+
+  // 要対応バナー（対応中ビューのときだけ、新規＋新着返信の件数を目立たせる）
+  const actionCount = scoped.filter(needsAction).length;
+  const newCount    = scoped.filter(r => r.status === 'new').length;
+  const replyCount  = scoped.filter(r => r.has_unread_reply).length;
+  renderActionBanner(actionCount, newCount, replyCount);
+}
+
+// 「要対応 N件」バナーを描画。0件のときは達成感のある表示に切り替える。
+function renderActionBanner(total, newC, replyC) {
+  const el = document.getElementById('vr-action-banner');
+  if (!el) return;
+  if (viewMode === 'archived') { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+
+  if (total > 0) {
+    const filtering = activeFilter === 'action';
+    el.className = 'vr-action-banner has-action fade-in';
+    el.innerHTML = `
+      <div class="vr-action-banner__main">
+        <span class="vr-action-banner__num">${total}</span>
+        <div>
+          <p class="vr-action-banner__label">要対応の見学者がいます</p>
+          <p class="vr-action-banner__sub">🆕 新規・未対応 ${newC}件　／　🔵 新着返信 ${replyC}件</p>
+        </div>
+      </div>
+      <button class="btn btn-sm ${filtering ? 'btn-gold' : 'btn-outline'}" onclick="setFilter('${filtering ? 'all' : 'action'}')">
+        ${filtering ? 'すべて表示' : '要対応だけ表示'}
+      </button>`;
+  } else {
+    el.className = 'vr-action-banner no-action fade-in';
+    el.innerHTML = `
+      <div class="vr-action-banner__main">
+        <span class="vr-action-banner__num">0</span>
+        <p class="vr-action-banner__label" style="font-weight:600;color:var(--gray-600);">対応待ちはありません 🎉</p>
+      </div>`;
+  }
 }
 
 function setFilter(key) {
@@ -358,7 +460,8 @@ function renderList() {
 
   const filtered = allRequests.filter(r => {
     if (!!r.archived !== (viewMode === 'archived')) return false;
-    if (activeFilter !== 'all' && r.status !== activeFilter) return false;
+    if (activeFilter === 'action') { if (!needsAction(r)) return false; }
+    else if (activeFilter !== 'all' && r.status !== activeFilter) return false;
     if (kw) {
       const text = `${r.name}${r.yomi ?? ''}${r.email}${r.phone ?? ''}`.toLowerCase();
       if (!text.includes(kw)) return false;
@@ -366,9 +469,25 @@ function renderList() {
     return true;
   });
 
+  // 優先度順に並べ替え：①要対応（新着返信→新規の順・古い順）②対応中 ③入団・辞退（済み）は最後
+  const priority = r => needsAction(r) ? 0 : (r.status === 'joined' || r.status === 'declined' ? 2 : 1);
+  filtered.sort((a, b) => {
+    const pa = priority(a), pb = priority(b);
+    if (pa !== pb) return pa - pb;
+    if (pa === 0) {
+      const ua = a.has_unread_reply ? 0 : 1, ub = b.has_unread_reply ? 0 : 1;
+      if (ua !== ub) return ua - ub;                                   // 新着返信を先に
+      return new Date(a.created_at) - new Date(b.created_at);          // 待たせている順（古い順）
+    }
+    return new Date(b.created_at) - new Date(a.created_at);            // それ以外は新しい順
+  });
+
   const listEl = document.getElementById('vr-list');
   if (!filtered.length) {
-    listEl.innerHTML = `<div style="text-align:center;padding:var(--space-10);color:var(--gray-500);">${viewMode === 'archived' ? 'アーカイブ済みの見学申込はありません。' : '該当する見学申込はありません。'}</div>`;
+    const emptyMsg = viewMode === 'archived'
+      ? 'アーカイブ済みの見学申込はありません。'
+      : (activeFilter === 'action' ? '要対応の見学者はいません。' : '該当する見学申込はありません。');
+    listEl.innerHTML = `<div style="text-align:center;padding:var(--space-10);color:var(--gray-500);">${emptyMsg}</div>`;
     return;
   }
 
@@ -380,13 +499,24 @@ function renderList() {
     const dateSummary = dateIds.length
       ? `${fmtActivityDate(firstAct)}${dateIds.length > 1 ? ` 他${dateIds.length - 1}件` : ''}`
       : (r.date_request_note ? '希望日程（自由記述あり）' : '希望日程未指定');
-    const isUnread = r.status === 'new' || r.has_unread_reply;
+
+    const action   = needsAction(r);
+    const isUnread = action;
+    const rowCls   = action ? 'is-action'
+                   : (r.status === 'joined' ? 'is-joined'
+                   : (r.status === 'declined' ? 'is-resolved' : ''));
+
+    // 要対応の理由を示すチップ（新着返信を優先）
+    const chip = r.has_unread_reply
+      ? '<span class="vr-row__chip chip-reply">🔵 新着返信</span>'
+      : (r.status === 'new' ? '<span class="vr-row__chip chip-new">🆕 新規・未対応</span>' : '');
 
     return `
-      <div class="vr-row" onclick="openDetail('${r.id}')">
+      <div class="vr-row ${rowCls}" onclick="openDetail('${r.id}')">
         <span class="vr-row__dot ${isUnread ? '' : 'read'}"></span>
         <div class="vr-row__main">
           <div class="vr-row__top">
+            ${chip}
             <span class="vr-row__name">${escHtml(r.name)}</span>
             <span class="badge ${status.css}" style="font-size:10px;">${escHtml(status.label)}</span>
             ${r.member_type === 'minor' ? '<span class="badge badge-warning" style="font-size:10px;">未成年</span>' : ''}
@@ -725,9 +855,14 @@ async function sendChatMessage() {
       },
     });
     if (!json.ok) {
-      throw new Error(json.network
-        ? '通信が不安定です。メールは送信済みの可能性があります。数分後にやりとり履歴を確認してから、必要な場合のみ再送してください'
-        : (json.error || '送信に失敗しました'));
+      // 応答が返らなかった場合（回線切断・タイムアウト等）は送信できたか不確実。
+      // エラー扱いにせず、本文は残したまま数秒後に履歴を自動更新して結果を確認できるようにする。
+      if (json.network) {
+        showToast('通信が不安定で結果を確認できませんでした。数秒後に履歴を更新します。反映されていれば送信済みです（重複送信にご注意ください）', 'default');
+        setTimeout(() => loadChatMessages(currentDetail.id, { silent: true }), 6000);
+        return;
+      }
+      throw new Error(json.error || '送信に失敗しました');
     }
 
 
@@ -844,6 +979,11 @@ document.addEventListener('DOMContentLoaded', () => {
 //  初期化
 // ══════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async () => {
+  // PC専用ガード：スマホからは操作させず、案内だけ表示する
+  if (isPhoneDevice()) {
+    document.getElementById('no-device').style.display = 'block';
+    return;
+  }
   if (!canManageVisitors()) {
     document.getElementById('no-permission').style.display = 'block';
     return;
