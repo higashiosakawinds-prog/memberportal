@@ -28,7 +28,7 @@ const GAS = {
   // 活動・出欠用スプレッドシート
   ACTIVITY: 'https://script.google.com/macros/s/AKfycbzpDrOSmqliAEMOsPsTMIuiU8ScAxqLGFpOfdi-nGJ5TK2gVK95Pr4F5H4D4ceP-16R/exec',
   // 見学者メール送信用（Gmail）
-  VISITOR:  'https://script.google.com/macros/s/AKfycbxyXiBQQ-Fg_lkVZiPYzb5DoKDLdIHO_R7e2-0tGQQDTUWfdADyF2ithP0lx0Pp6dkCLA/exec',
+  VISITOR:  'https://script.google.com/macros/s/AKfycbzYkYBMlJFk4kuxSeJbPU6RzuD26tojo69kK8XQB1eh4i3zScfVxqaD6yUn7TlayjMhrw/exec',
 };
 
 // ── 後方互換：既存コードが参照している変数名をそのまま使えるようにする別名 ──
