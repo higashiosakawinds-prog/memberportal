@@ -8,9 +8,9 @@
  *  - Supabase・Google Apps Script・署名付きPDF URL など、上記以外の通信には一切介入しない
  *    （個人情報・認証・楽譜PDFをキャッシュに残さないため）
  *
- * 更新時は VERSION を上げてください。
+ * VERSION は main への push 時に GitHub Actions が自動で更新します（手で編集しない）。
  */
-const VERSION = 'v4';
+const VERSION = 'alpha-1.00';
 const SHELL_CACHE   = `higasui-shell-${VERSION}`;
 const RUNTIME_CACHE = `higasui-runtime-${VERSION}`;
 const NETWORK_TIMEOUT_MS = 4000;
