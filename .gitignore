@@ -3,3 +3,7 @@ dist
 .env
 *.local
 .DS_Store
+# 公開リポジトリのため、本番DBの構造(スキーマ/RLS)・ローカルDB設定は管理対象外
+supabase/migrations/
+supabase/snippets/
+supabase/.temp/
