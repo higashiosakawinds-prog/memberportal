@@ -20,7 +20,7 @@ const APP_VERSION = '2026.10';
 //  Google Apps Script（GAS）エンドポイント
 //   ・GAS を貼り替えたら、ここだけを変更すれば全ページに反映されます。
 // ══════════════════════════════════════════════════════════
-const GAS = {
+const _GAS_PROD = {
   // 団費（支払い記録）用スプレッドシート
   DUES:     'https://script.google.com/macros/s/AKfycbwvfg_SisVkhgPg8XqWWztiRKwOx7nwAP2JIJzTltuLeYvb8n1yzh2CCxCOEg_Vy91xlg/exec',
   // 出納帳用スプレッドシート
@@ -30,6 +30,15 @@ const GAS = {
   // 見学者メール送信用（Gmail）
   VISITOR:  'https://script.google.com/macros/s/AKfycbzYkYBMlJFk4kuxSeJbPU6RzuD26tojo69kK8XQB1eh4i3zScfVxqaD6yUn7TlayjMhrw/exec',
 };
+
+// localhost / 127.0.0.1（ローカル開発）で開いたときだけ、GAS を無効にする。
+//   ・テスト中に本番の台帳・Gmail（見学者へのメール）へ書き込まないため
+//   ・本番サイトでは _GAS_PROD がそのまま使われ、動作は変わらない
+//   ・見学者メールは visitors.html が 'YOUR_VISITOR_GAS_SCRIPT_ID' を検知して送信を止める
+const _GAS_LOCAL_DISABLED = 'about:blank#YOUR_VISITOR_GAS_SCRIPT_ID-local-disabled';
+const GAS = ['localhost', '127.0.0.1'].includes(location.hostname)
+  ? { DUES: _GAS_LOCAL_DISABLED, LEDGER: _GAS_LOCAL_DISABLED, ACTIVITY: _GAS_LOCAL_DISABLED, VISITOR: _GAS_LOCAL_DISABLED }
+  : _GAS_PROD;
 
 // ── 後方互換：既存コードが参照している変数名をそのまま使えるようにする別名 ──
 //   （各ページのコードは今まで通りこれらの名前で参照できます）

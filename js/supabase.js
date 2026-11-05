@@ -13,7 +13,15 @@
  */
 
 // ── 設定値（本番前にここを変更） ──
-const SUPABASE_CONFIG = {
+// localhost / 127.0.0.1 で開いたときだけ、ローカル Supabase（supabase start）に接続する。
+// それ以外（本番サイト）は従来どおり本番に接続する。
+//   ・ローカル用 anon キーは Supabase CLI 標準のデモ値（公開情報・ローカル専用）
+//   ・service_role キーは絶対にここへ書かない
+const _IS_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+const SUPABASE_CONFIG = _IS_LOCAL ? {
+  url:     'http://127.0.0.1:54321',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
+} : {
   url:     'https://iaqbkriorspsjldodhjy.supabase.co',
   anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhcWJrcmlvcnNwc2psZG9kaGp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MDE1MjEsImV4cCI6MjA5NDA3NzUyMX0.vuwBn8D2cvLdLRQ3X7rOPtHEG5cglY5wkzpnqOBVoJ8',
 };
