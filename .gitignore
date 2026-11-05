@@ -7,3 +7,6 @@ dist
 supabase/migrations/
 supabase/snippets/
 supabase/.temp/
+supabase/config.toml
+supabase/schema.sql
+supabase/seed.sql
