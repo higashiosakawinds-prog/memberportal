@@ -1,0 +1,62 @@
+# main に push されるたびに版数を +0.01 して、タグ・自動コミットを作る。
+#  - 版数は最新の alpha-X.YY タグから決める（タグが無い最初の1回は 1.00 のまま、タグだけ付ける）。
+#  - 大きく上げたいときは、手動でタグ alpha-2.00 を作る → 次の push で 2.01 になる。
+#  - 自動コミットは GITHUB_TOKEN で push するので、このワークフローは再実行されない。
+name: release-version
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-version
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 版数を決める
+        id: ver
+        run: |
+          last=$(git tag -l 'alpha-*' | sed 's/^alpha-//' | sort -V | tail -1)
+          if [ -z "$last" ]; then
+            next="1.00"; bump=false
+          else
+            major=${last%%.*}; minor=${last#*.}
+            minor=$(printf '%02d' $((10#$minor + 1)))
+            next="$major.$minor"; bump=true
+          fi
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+          echo "bump=$bump" >> "$GITHUB_OUTPUT"
+          echo "リリース版数: α $next"
+
+      - name: config.js / sw.js を書き換える
+        if: steps.ver.outputs.bump == 'true'
+        run: |
+          v='${{ steps.ver.outputs.next }}'
+          d=$(TZ=Asia/Tokyo date +%Y-%m-%d)
+          sed -i "s/^const APP_VERSION = '.*';/const APP_VERSION = '$v';/" js/config.js
+          sed -i "s/^const APP_RELEASED_AT = '.*';/const APP_RELEASED_AT = '$d';/" js/config.js
+          sed -i "s/^const VERSION = '.*';/const VERSION = 'alpha-$v';/" sw.js
+
+      - name: コミットしてタグを付ける
+        run: |
+          v='${{ steps.ver.outputs.next }}'
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ '${{ steps.ver.outputs.bump }}' = 'true' ]; then
+            git add js/config.js sw.js
+            git commit -m "chore: release α $v [skip ci]"
+            git push origin HEAD:main
+          fi
+          git tag "alpha-$v"
+          git push origin "alpha-$v"

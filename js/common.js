@@ -830,6 +830,9 @@ function renderSidebar() {
         </svg>
         <span>設定</span>
       </a>
+      <p class="sidebar-version" style="margin:var(--space-3) 0 0;padding:0 var(--space-4);font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:0.05em;">
+        ひがすいポータル ${typeof APP_VERSION_LABEL !== 'undefined' ? APP_VERSION_LABEL : ''}
+      </p>
     </div>
   `;
 

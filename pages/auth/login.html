@@ -97,9 +97,11 @@
     <div class="login-footer">
       <a href="register.html">新規登録はこちら</a>
     </div>
+    <p id="app-version" style="text-align:center;margin:var(--space-4) 0 0;font-size:11px;color:rgba(255,255,255,0.35);"></p>
   </div>
 </div>
  
+<script src="../../js/config.js"></script>
 <script src="../../js/supabase.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -179,6 +181,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.href = '../../index.html';
   };
  
+  const _v = document.getElementById('app-version');
+  if (_v && typeof APP_VERSION_LABEL !== 'undefined') _v.textContent = APP_VERSION_LABEL;
+
   btn.addEventListener('click', doLogin);
   document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 });
