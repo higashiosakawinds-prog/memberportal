@@ -122,13 +122,12 @@
         </div>
       </div>
 
-      <!-- 役職（複数選択） -->
+      <!-- 役職: 登録時は一般団員固定。役職は GM・団長・副団長が設定する（DB トリガーで強制） -->
       <div class="form-group" style="margin-top:var(--space-2);">
-        <label class="form-label">役職 <span class="required">*</span>
-          <span style="font-size:var(--text-xs);color:rgba(255,255,255,0.3);font-weight:400;">（複数選択可）</span>
-        </label>
-        <div class="role-checkbox-group" id="role-group"></div>
-        <span class="field-error-msg" id="err-role"></span>
+        <label class="form-label">役職</label>
+        <p style="font-size:var(--text-sm);color:rgba(255,255,255,0.6);margin:0;">
+          登録時は「一般団員」になります。委員などの役職は、登録後に GM・団長・副団長が設定します。
+        </p>
       </div>
 
       <div class="form-row">
@@ -265,23 +264,9 @@ function clearAllErrors() {
     const el = document.getElementById(e);
     if (el) { el.textContent = ''; el.classList.remove('show'); }
   });
-  const errRole = document.getElementById('err-role');
-  if (errRole) { errRole.textContent = ''; errRole.classList.remove('show'); }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-
-  // ── 役職チェックボックスを ROLE_DEFINITIONS から動的生成 ──
-  const roleGroup = document.getElementById('role-group');
-  ROLE_DEFINITIONS.forEach(def => {
-    const label = document.createElement('label');
-    label.className = 'role-checkbox-item';
-    label.innerHTML = `
-      <input type="checkbox" name="role" value="${def.value}"${def.value === 'member' ? ' checked' : ''}>
-      <span>${def.label}</span>
-    `;
-    roleGroup.appendChild(label);
-  });
 
   // ── セッション確認 ──
   // Supabaseの認証メールリンクをクリックするとURLにアクセストークンが含まれる。
@@ -366,13 +351,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       setFieldError('first-kana','err-first-kana','フリガナはカタカナで入力してください。'); hasError = true;
     }
 
-    const selectedRoles = [...document.querySelectorAll('input[name="role"]:checked')].map(cb => cb.value);
-    if (selectedRoles.length === 0) {
-      const errRole = document.getElementById('err-role');
-      errRole.textContent = '役職を1つ以上選択してください。';
-      errRole.classList.add('show');
-      hasError = true;
-    }
+    // 登録時の役職は一般団員固定（DB トリガー protect_profile_roles でも強制される）
+    const selectedRoles = ['member'];
 
     if (!part)       { setFieldError('part','err-part','パートを選択してください。'); hasError = true; }
     if (!category)   { setFieldError('category','err-category','区分を選択してください。'); hasError = true; }
