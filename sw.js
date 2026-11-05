@@ -10,7 +10,7 @@
  *
  * VERSION は main への push 時に GitHub Actions が自動で更新します（手で編集しない）。
  */
-const VERSION = 'alpha-1.00';
+const VERSION = 'alpha-1.01';
 const SHELL_CACHE   = `higasui-shell-${VERSION}`;
 const RUNTIME_CACHE = `higasui-runtime-${VERSION}`;
 const NETWORK_TIMEOUT_MS = 4000;
