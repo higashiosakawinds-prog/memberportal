@@ -438,6 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
   resetBtn.addEventListener('click', doReset);
   document.addEventListener('keydown', e => {
     if (e.key !== 'Enter' || e.isComposing) return;
+    if (e.target.closest?.('button, a')) return; // ボタン・リンク上の Enter はその click に任せる
     if (currentView === 'login') doLogin();
     else if (currentView === 'forgot') doForgot();
     else if (currentView === 'reset') doReset();
