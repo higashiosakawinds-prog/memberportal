@@ -170,7 +170,7 @@ const ROLE_PERMISSIONS = {
   nav_activities:  ['gm', 'leader', 'subleader','reserver'],        // 活動記録管理（幹部）
   nav_visitors: ['gm','leader','subleader'],
   nav_surveys_admin:      ['gm', 'leader','subleader'],      // アンケート管理（幹部のみ）
-  nav_feedback_admin:     ['gm', 'leader','subleader','engineer'], // 要望・不具合管理（幹部＋エンジニア委員）
+  nav_feedback_admin:     ['gm', 'leader','subleader','engineer'], // 要望・不具合管理（幹部＋IT委員）
 
   // ── 各ページの操作（編集・追加・削除）権限 ──
   // ページ内で canDo('キー名') を呼び出して判定します
@@ -208,7 +208,7 @@ const ROLE_DEFINITIONS = [
   { value: 'leader',    label: '団長',     color: '#c0392b' },
   { value: 'subleader', label: '副団長',   color: '#c0392b' },
   { value: 'conductor', label: '指揮委員',  color: '#b33e5c' },
-  { value: 'engineer',   label: 'エンジニア委員', color: '#26499d' },
+  { value: 'engineer',   label: 'IT委員', color: '#26499d' },
   { value: 'treasurer', label: '会計委員', color: '#bf9000' },
   { value: 'conector',  label: '広報委員', color: '#25b7c0' },
   { value: 'librarian', label: '蔵書委員', color: '#915da3' },
