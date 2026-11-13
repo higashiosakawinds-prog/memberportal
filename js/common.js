@@ -90,11 +90,13 @@
 })();
 
 // ═══════════════════════════════════════════════════════
-//  ★ メンテナンス設定テーブル
+//  ★ メンテナンス設定テーブル（ページ単位）
 //
 //  各ページIDに対して true を設定するとメンテナンス中になります。
-//  メンテナンス中のページは leader のみ閲覧可能で、
+//  メンテナンス中のページは 団長・GM・IT委員 のみ閲覧可能で、
 //  それ以外のユーザーにはメンテナンス案内が表示されます。
+//  ※ 大型更新時の「全体メンテナンス」（IT委員のみ）は下の SiteMaintenance で、
+//    設定画面から切り替えます（push 不要）。
 //
 //  ページIDはURLのファイル名から拡張子を除いたものです。
 //  例: scores.html → 'scores'  /  index.html → 'dashboard'
@@ -129,9 +131,193 @@ const MAINTENANCE_CONFIG = {
   'feedback-admin':   false,   // 要望・不具合管理
 };
 
-// メンテナンス中ページの閲覧を許可するロール
+// メンテナンス中ページの閲覧を許可するロール（ページ単位のメンテナンスだけに使う）
 // この配列にあるロールを持つユーザーは「メンテナンス中」でも閲覧できます
-const MAINTENANCE_BYPASS_ROLES = ['leader', 'gm'];
+const MAINTENANCE_BYPASS_ROLES = ['leader', 'gm', 'engineer'];
+
+// ═══════════════════════════════════════════════════════
+//  ★ 全体メンテナンス（v1.03）
+//
+//  ・設定は Supabase の system_maintenance（1行）。IT委員が設定画面から ON/OFF する
+//  ・状態は「画面が変わった時」だけ読む（ページを開く・移る・再読み込み・戻る）。定期的には読まない
+//  ・メンテナンス中: IT委員以外 → 全画面の案内 ／ IT委員 → 通常画面＋帯
+//    （通れるかどうかは DB が判定した can_bypass を使う。localStorage の役職は使わない）
+//  ・予告の表示期間中: 全員に予告の帯
+//  ・状態が読めないとき（通信失敗など）は止めない（通常表示）
+//  ・GAS への書き込み（GET 以外）の直前にだけ状態を読み直し、メンテナンス中かつ
+//    block_outbound のときは送信せずに「送信していません」を返す（開いたままの画面からの送信も止める）
+//  ・文面などは必ず textContent で表示する（innerHTML に入れない）
+// ═══════════════════════════════════════════════════════
+const SiteMaintenance = (() => {
+  const TIMEOUT_MS = 6000;
+  const BLOCK_MSG  = 'メンテナンス中のため送信していません。メンテナンス終了後にもう一度お試しください。';
+  const DEFAULT_MSG = 'システムの更新作業を行っています。終了まで今しばらくお待ちください。';
+  let inflight = null;
+  let savedOverflow = null;
+
+  // 状態を読む（失敗時は null）。毎回 DB から読む（キャッシュしない）。同時の呼び出しは1回にまとめる
+  function load() {
+    if (inflight) return inflight;
+    inflight = (async () => {
+      if (typeof _sb === 'undefined' || !_sb) return null;
+      const timer = new Promise(r => setTimeout(() => r({ data: null, error: 'timeout' }), TIMEOUT_MS));
+      const { data, error } = await Promise.race([_sb.rpc('get_maintenance_status'), timer]);
+      if (error || !data || typeof data !== 'object') return null;
+      return data;
+    })().catch(() => null).finally(() => { inflight = null; });
+    return inflight;
+  }
+
+  // ── 日時の表示（日本時間）。例: 11/30(日) 0:00〜1:30 ──
+  const fmtDay  = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' });
+  const fmtTime = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: 'numeric', minute: '2-digit' });
+  const toDate  = v => { const d = v ? new Date(v) : null; return d && !isNaN(d) ? d : null; };
+  function fmtDateTime(v) { const d = toDate(v); return d ? `${fmtDay.format(d)} ${fmtTime.format(d)}` : ''; }
+  function fmtRange(start, end) {
+    const s = toDate(start), e = toDate(end);
+    if (s && e) {
+      const sameDay = fmtDay.format(s) === fmtDay.format(e);
+      return `${fmtDateTime(s)}〜${sameDay ? fmtTime.format(e) : fmtDateTime(e)}`;
+    }
+    if (s) return `${fmtDateTime(s)}〜`;
+    if (e) return `〜${fmtDateTime(e)}`;
+    return '';
+  }
+
+  // 予告の表示期間か（端末の時計ではなく DB の時刻で判定）
+  function inNotice(s) {
+    if (!s || s.active) return false;
+    const start = toDate(s.notice_start);
+    if (!start) return false;
+    const now = toDate(s.server_now) || new Date();
+    const end = toDate(s.notice_end) || toDate(s.planned_end);
+    return now >= start && (!end || now < end);
+  }
+
+  function clear() {
+    document.getElementById('site-maint-banner')?.remove();
+    const ov = document.getElementById('site-maint-overlay');
+    if (ov) {
+      ov.remove();
+      document.body.style.overflow = savedOverflow ?? '';
+      savedOverflow = null;
+    }
+  }
+
+  function banner(kind, s) {
+    const el = document.createElement('div');
+    el.id = 'site-maint-banner';
+    el.setAttribute('role', 'status');
+    const isBypass = kind === 'bypass';
+    el.style.cssText =
+      'position:sticky;top:var(--header-height, 64px);z-index:50;margin:0 0 var(--space-4);padding:10px 14px;border-radius:var(--radius-md);' +
+      'font-size:var(--text-sm);line-height:1.7;' +
+      (isBypass
+        ? 'background:#c0392b;color:#fff;font-weight:700;'
+        : 'background:#fff7e0;color:#7a5200;border:1px solid #f0d58a;');
+    const range = fmtRange(s.planned_start, s.planned_end);
+    if (isBypass) {
+      el.textContent = `メンテナンス中（IT委員として表示しています）${range ? '　予定: ' + range : ''}`;
+    } else {
+      el.textContent = range
+        ? `${range} にメンテナンスを行います。この間はポータルを利用できません。`
+        : '近日中にメンテナンスを行います。この間はポータルを利用できません。';
+      if (s.message) {
+        const p = document.createElement('div');
+        p.style.cssText = 'font-size:var(--text-xs);margin-top:2px;white-space:pre-wrap;';
+        p.textContent = s.message;
+        el.appendChild(p);
+      }
+    }
+    const host = document.querySelector('.main-content') || document.body;
+    host.insertBefore(el, host.firstChild);
+  }
+
+  function overlay(s) {
+    const ov = document.createElement('div');
+    ov.id = 'site-maint-overlay';
+    ov.setAttribute('role', 'alertdialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.style.cssText =
+      'position:fixed;inset:0;z-index:9000;background:var(--gray-100);display:flex;align-items:flex-start;' +
+      'justify-content:center;padding:var(--space-4);overflow:auto;';
+    const box = document.createElement('div');
+    box.style.cssText =
+      'margin:auto;width:100%;max-width:480px;background:var(--white);border-radius:var(--radius-xl);border:1px solid var(--gray-200);' +
+      'box-shadow:var(--shadow-lg);padding:var(--space-10) var(--space-6);text-align:center;';
+    const eyebrow = document.createElement('p');
+    eyebrow.style.cssText = 'font-size:var(--text-xs);font-weight:500;color:var(--gold-500);letter-spacing:.2em;margin-bottom:var(--space-3);';
+    eyebrow.textContent = 'MAINTENANCE';
+    const h = document.createElement('h1');
+    h.style.cssText = 'font-family:var(--font-display);font-size:var(--text-xl);font-weight:700;color:var(--navy-800);margin-bottom:var(--space-4);line-height:1.4;';
+    h.textContent = 'ただいまメンテナンス中です';
+    const msg = document.createElement('p');
+    msg.style.cssText = 'font-size:var(--text-sm);color:var(--gray-700);line-height:1.8;white-space:pre-wrap;margin-bottom:var(--space-4);';
+    msg.textContent = s.message || DEFAULT_MSG;
+    box.append(eyebrow, h, msg);
+    if (s.planned_end) {
+      const end = document.createElement('p');
+      end.style.cssText = 'font-size:var(--text-sm);color:var(--navy-700);font-weight:700;margin-bottom:var(--space-6);';
+      end.textContent = `終了予定: ${fmtDateTime(s.planned_end)}`;
+      box.appendChild(end);
+    }
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-gold';
+    btn.textContent = '再読み込み';
+    btn.addEventListener('click', () => location.reload());
+    box.appendChild(btn);
+    // 案内がヘッダーごと覆うので、ログアウトの手段をここにも置く（サイドバーのログアウトと同じ処理）
+    if (document.getElementById('logout-btn')) {
+      const out = document.createElement('button');
+      out.type = 'button';
+      out.className = 'btn btn-outline';
+      out.style.marginLeft = 'var(--space-2)';
+      out.textContent = 'ログアウト';
+      out.addEventListener('click', () => document.getElementById('logout-btn')?.click());
+      box.appendChild(out);
+    }
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    if (savedOverflow === null) savedOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function render(s) {
+    clear();
+    if (!s) return;
+    if (s.active) { s.can_bypass ? banner('bypass', s) : overlay(s); return; }
+    if (inNotice(s)) banner('notice', s);
+  }
+
+  // 画面が変わった時に呼ぶ
+  async function apply() { render(await load()); }
+
+  // ── GAS への書き込みを止める（fetch を1か所で包む） ──
+  const GAS_RE = /^https:\/\/script\.google(usercontent)?\.com\//;
+  const origFetch = window.fetch.bind(window);
+  window.fetch = async function (input, init) {
+    try {
+      const url    = String(input?.url ?? input);
+      const method = String(init?.method ?? input?.method ?? 'GET').toUpperCase();
+      if (method !== 'GET' && method !== 'HEAD' && GAS_RE.test(url)) {
+        const s = await load();
+        if (s && s.active && s.block_outbound) {
+          try { showToast(BLOCK_MSG, 'error'); } catch { /* 表示の失敗は無視 */ }
+          return new Response(
+            JSON.stringify({ ok: false, success: false, maintenance: true, error: BLOCK_MSG }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+      }
+    } catch { /* 判定に失敗したら通常どおり送る */ }
+    return origFetch(input, init);
+  };
+
+  // 「戻る」でキャッシュから表示されたときも読み直す
+  window.addEventListener('pageshow', e => { if (e.persisted) apply(); });
+
+  return { load, apply, fmtRange, fmtDateTime, DEFAULT_MSG };
+})();
 
 // ═══════════════════════════════════════════════════════
 //  ★ 権限設定テーブル（ここを編集するだけで全ページの
@@ -170,7 +356,7 @@ const ROLE_PERMISSIONS = {
   nav_activities:  ['gm', 'leader', 'subleader','reserver'],        // 活動記録管理（幹部）
   nav_visitors: ['gm','leader','subleader'],
   nav_surveys_admin:      ['gm', 'leader','subleader'],      // アンケート管理（幹部のみ）
-  nav_feedback_admin:     ['gm', 'leader','subleader','engineer'], // 要望・不具合管理（幹部＋エンジニア委員）
+  nav_feedback_admin:     ['gm', 'leader','subleader','engineer'], // 要望・不具合管理（幹部＋IT委員）
 
   // ── 各ページの操作（編集・追加・削除）権限 ──
   // ページ内で canDo('キー名') を呼び出して判定します
@@ -208,7 +394,7 @@ const ROLE_DEFINITIONS = [
   { value: 'leader',    label: '団長',     color: '#c0392b' },
   { value: 'subleader', label: '副団長',   color: '#c0392b' },
   { value: 'conductor', label: '指揮委員',  color: '#b33e5c' },
-  { value: 'engineer',   label: 'エンジニア委員', color: '#26499d' },
+  { value: 'engineer',   label: 'IT委員', color: '#26499d' },
   { value: 'treasurer', label: '会計委員', color: '#bf9000' },
   { value: 'conector',  label: '広報委員', color: '#25b7c0' },
   { value: 'librarian', label: '蔵書委員', color: '#915da3' },
@@ -1054,7 +1240,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (checkAuth()) return;
   
   // ── メンテナンスチェック ──
-  checkMaintenance();
+  checkMaintenance();          // ページ単位（common.js の設定）
+  SiteMaintenance.apply();     // 全体（DB の設定。画面が変わった時だけ読む）
 
   // モーダル外クリックで閉じる
   document.querySelectorAll('.modal-overlay').forEach(overlay => {

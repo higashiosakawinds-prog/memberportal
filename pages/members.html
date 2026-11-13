@@ -367,7 +367,7 @@ function openDetailModal(memberId) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const isDev = ['localhost', '127.0.0.1'].includes(location.hostname);
+  const isDev = !!window._hsDevHost?.local;
 
   async function loadMembersPage() {
     const { data, error } = await DB.profiles.list();

@@ -41,7 +41,13 @@ const _GAS_PROD = {
 //   ・本番サイトでは _GAS_PROD がそのまま使われ、動作は変わらない
 //   ・見学者メールは visitors.html が 'YOUR_VISITOR_GAS_SCRIPT_ID' を検知して送信を止める
 const _GAS_LOCAL_DISABLED = 'about:blank#YOUR_VISITOR_GAS_SCRIPT_ID-local-disabled';
-const GAS = ['localhost', '127.0.0.1'].includes(location.hostname)
+//   ・iPhone での確認用トンネル（*.trycloudflare.com）も同じくローカル扱い（判定は supabase.js と共通）
+window._hsDevHost = window._hsDevHost || (() => {
+  const h = location.hostname;
+  const tunnel = /\.trycloudflare\.com$/.test(h);
+  return { local: tunnel || h === 'localhost' || h === '127.0.0.1', tunnel };
+})();
+const GAS = window._hsDevHost.local
   ? { DUES: _GAS_LOCAL_DISABLED, LEDGER: _GAS_LOCAL_DISABLED, ACTIVITY: _GAS_LOCAL_DISABLED, VISITOR: _GAS_LOCAL_DISABLED }
   : _GAS_PROD;
 
