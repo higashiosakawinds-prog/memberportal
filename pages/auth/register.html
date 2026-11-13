@@ -207,7 +207,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const { error } = await _sb.auth.signUp({ email, password });
+    // 確認メールのリンクはログイン画面に戻す（v1.04。Supabase の Redirect URLs に許可が必要）
+    const loginUrl = new URL('login.html', location.origin + location.pathname).href;
+    const { error } = await _sb.auth.signUp({ email, password, options: { emailRedirectTo: loginUrl } });
 
     if (error) {
       btn.disabled = false;

@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- メールのリンクのトークンが Referer で外に出ないように（v1.04） -->
+  <meta name="referrer" content="no-referrer">
   <title>ログイン — 東大阪吹奏楽団</title>
   <link rel="stylesheet" href="../../css/variables.css">
   <link rel="stylesheet" href="../../css/common.css">
@@ -330,10 +332,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (_sb) ({ error } = await _sb.auth.resetPasswordForEmail(email, { redirectTo: LOGIN_PAGE_URL }));
     forgotBtn.disabled = false;
     forgotBtn.textContent = '再設定メールを送る';
-    if (error) {
-      showError(error.status === 429
-        ? '短い間に何度も送信されています。しばらく待ってからお試しください。'
-        : 'メールを送れませんでした。しばらく経ってからお試しください。');
+    // 送信間隔の制限（429）は、登録済みのアドレスでしか起きないため成功と同じ表示にする（登録の有無を推測させない）
+    if (error && error.status !== 429) {
+      showError('メールを送れませんでした。しばらく経ってからお試しください。');
       return;
     }
     // 登録の有無は伝えない（他人のメールアドレスが登録済みかを調べられないように）
@@ -363,14 +364,22 @@ document.addEventListener('DOMContentLoaded', () => {
       } else showError('パスワードを変更できませんでした。しばらく経ってからお試しください。');
       return;
     }
-    // 変更後はいったんログアウトし（他の端末のログインも切れる）、新しいパスワードでログインしてもらう
-    try { await _sb.auth.signOut(); } catch { /* ログアウトの失敗は無視（ログイン画面に戻すだけ） */ }
+    // 変更後はいったんログアウトし、新しいパスワードでログインしてもらう。
+    //   全端末のログアウト（他の端末は最長1時間以内＝アクセストークンの期限までに切れる）。
+    //   signOut は失敗しても例外ではなく { error } を返すので、失敗時はこの端末だけでもログアウトして知らせる
+    let signOutFailed = false;
+    try {
+      const { error: soErr } = await _sb.auth.signOut();
+      if (soErr) { signOutFailed = true; await _sb.auth.signOut({ scope: 'local' }); }
+    } catch { signOutFailed = true; try { await _sb.auth.signOut({ scope: 'local' }); } catch { /* 無視 */ } }
     localStorage.removeItem('hs_user');
     document.getElementById('new-password').value = '';
     document.getElementById('new-password-confirm').value = '';
     setView('login');
     if (recoveryEmail) document.getElementById('email').value = recoveryEmail;
-    showInfo('パスワードを変更しました。新しいパスワードでログインしてください。');
+    showInfo(signOutFailed
+      ? 'パスワードを変更しました。ただし通信の都合で、ほかの端末のログアウトができなかった可能性があります。心配な場合は、少し時間をおいてもう一度パスワードを変更してください。新しいパスワードでログインしてください。'
+      : 'パスワードを変更しました。新しいパスワードでログインしてください。');
     document.getElementById('password').focus();
   };
 
@@ -404,7 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
       recoveryEmail = session.user?.email ?? '';
       setView('reset');
       if (recoveryEmail) document.getElementById('reset-lead').textContent =
-        `${recoveryEmail} の新しいパスワードを決めてください（${MIN_PASSWORD_LENGTH}文字以上）。`;
+        `${recoveryEmail} の新しいパスワードを決めてください（${MIN_PASSWORD_LENGTH}文字以上）。ご自分のメールアドレスでない場合は、何もせずにこの画面を閉じてください。`;
       document.getElementById('new-password').focus();
       return;
     }
