@@ -8,16 +8,14 @@
   <link rel="stylesheet" href="../css/common.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    .search-bar { display:flex; gap:var(--space-3); margin-bottom:var(--space-4); flex-wrap:wrap; }
-    .search-bar input, .search-bar select { flex:1; min-width:160px; }
-    .part-filter { display:flex; gap:var(--space-2); flex-wrap:wrap; margin-bottom:var(--space-4); }
-    .part-chip {
-      padding:var(--space-1) var(--space-3); border-radius:var(--radius-full);
-      font-size:var(--text-xs); font-weight:500; cursor:pointer;
-      border:1px solid var(--gray-300); background:var(--white); color:var(--gray-600);
-      transition:all var(--transition-fast);
+    .search-bar { display:flex; gap:var(--space-3); flex-wrap:wrap; }
+    .search-bar input { flex:2 1 200px; }
+    .search-bar select { flex:1 1 140px; min-width:140px; }
+    @media(max-width:640px) {
+      .search-bar { gap:var(--space-2); }
+      .search-bar input { flex-basis:100%; }
+      .search-bar select { min-width:0; flex-basis:calc(33.333% - var(--space-2)); }
     }
-    .part-chip.active { background:var(--navy-800); color:var(--gold-300); border-color:var(--navy-800); }
 
     /* ── メンバーリスト ── */
     .member-list { display:flex; flex-direction:column; gap:0; }
@@ -47,6 +45,9 @@
     }
     .member-row__kana {
       font-size:var(--text-xs); color:var(--gray-400);
+    }
+    .member-row__cat {
+      font-size:11px; color:var(--gray-500); white-space:nowrap;
     }
 
     /* 行2：メタ情報 */
@@ -118,27 +119,17 @@
       <div class="card__body">
         <div class="search-bar">
           <input type="text" id="search-input" class="form-control" placeholder="氏名・フリガナで検索…">
-          <select id="filter-category" class="form-control" style="max-width:160px;">
-            <option value="">すべての区分</option>
-            <option value="regular">正団員</option>
-            <option value="regular_student">正団員(学生)</option>
-            <option value="trainee">準団員</option>
-            <option value="staff">スタッフ</option>
-            <option value="rest">休団中</option>
-            <option value="support">賛助</option>
+          <!-- 選択肢は共通定義（config.js の区分・common.js の役職・下の PART_GROUPS）から作る -->
+          <select id="filter-part" class="form-control" aria-label="楽器で絞り込み">
+            <option value="">全楽器</option>
           </select>
-          <select id="filter-role" class="form-control" style="max-width:160px;">
-            <option value="">すべての役職</option>
-            <option value="gm">GM</option>
-            <option value="admin">管理者</option>
-            <option value="conductor">指揮者</option>
-            <option value="manager">運営委員</option>
-            <option value="treasurer">会計</option>
-            <option value="librarian">蔵書委員</option>
-            <option value="member">一般団員</option>
+          <select id="filter-category" class="form-control" aria-label="区分で絞り込み">
+            <option value="">全区分</option>
+          </select>
+          <select id="filter-role" class="form-control" aria-label="役職で絞り込み">
+            <option value="">全役職</option>
           </select>
         </div>
-        <div class="part-filter" id="part-filter"></div>
       </div>
     </div>
 
@@ -176,11 +167,18 @@
 <script src="../js/common.js"></script>
 <script>
 const PART_LABELS = {
-  piccolo:'Piccolo',flute:'Flute', oboe:'Oboe', clarinet:'Clarinet', bassoon:'Bassoon',
+  piccolo:'Piccolo',flute:'Flute', oboe:'Oboe', clarinet:'Clarinet', bassclarinet:'BassClarinet', bassoon:'Bassoon',
   ssaxophone:'S.Sax', asaxophone:'A.Sax', tsaxophone:'T.Sax', bsaxophone:'B.Sax', horn:'Horn', trumpet:'Trumpet', trombone:'Trombone',
   euphonium:'Euphonium', tuba:'Tuba', percussion:'Percussion', contrabass:'Contrabass',
   piano:'Piano', staff:'Staff', other:'Other',
 };
+// 楽器プルダウンの並び（設定画面・初回登録のパート選択と同じ順）
+const PART_GROUPS = [
+  { label:'木管楽器', parts:['piccolo','flute','oboe','clarinet','bassclarinet','bassoon','ssaxophone','asaxophone','tsaxophone','bsaxophone'] },
+  { label:'金管楽器', parts:['trumpet','horn','trombone','euphonium','tuba'] },
+  { label:'打楽器・その他', parts:['percussion','contrabass','piano'] },
+  { label:'その他', parts:['staff','other'] },
+];
 const CATEGORY_BADGE  = { regular:'badge-success', trainee:'badge-navy', rest:'badge-warning', support:'badge-gold' };
 
 // 詳細モーダルの閲覧権限ロール
@@ -199,7 +197,6 @@ const DEMO_MEMBERS = [
 ];
 
 let allMembers = [];
-let activePartFilter = '';
 
 // ─── 権限チェック：ログイン者が詳細閲覧可能か ───
 function canViewDetail() {
@@ -235,20 +232,27 @@ function formatCreatedAt(tsStr) {
 
 // ─── XSS対策 ───
 
-// ─── パート絞り込みチップ生成 ───
-function buildPartFilter(members) {
-  const parts = [...new Set(members.map(m => m.part).filter(Boolean))].sort();
-  const wrap = document.getElementById('part-filter');
-  wrap.innerHTML = `<button class="part-chip active" data-part="">すべて</button>` +
-    parts.map(p => `<button class="part-chip" data-part="${escHtml(p)}">${escHtml(PART_LABELS[p] ?? p)}</button>`).join('');
-  wrap.querySelectorAll('.part-chip').forEach(btn => {
-    btn.addEventListener('click', () => {
-      activePartFilter = btn.dataset.part;
-      wrap.querySelectorAll('.part-chip').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      renderList();
-    });
-  });
+// ─── 絞り込みプルダウン生成（区分・役職・楽器） ───
+function buildFilterOptions(members) {
+  const opt = (v, l) => `<option value="${escHtml(v)}">${escHtml(l)}</option>`;
+
+  // 区分：config.js の MEMBER_CATEGORY_LABELS（単一の定義元）
+  document.getElementById('filter-category').innerHTML =
+    opt('', '全区分') +
+    Object.entries(MEMBER_CATEGORY_LABELS).map(([v, l]) => opt(v, l)).join('');
+
+  // 役職：common.js の ROLE_DEFINITIONS（バッジと同じ定義）
+  document.getElementById('filter-role').innerHTML =
+    opt('', '全役職') +
+    ROLE_DEFINITIONS.map(d => opt(d.value, d.label)).join('');
+
+  // 楽器：PART_GROUPS の順。定義に無いパートの団員がいれば末尾に足す
+  const known = new Set(PART_GROUPS.flatMap(g => g.parts));
+  const extra = [...new Set(members.map(m => m.part).filter(p => p && !known.has(p)))].sort();
+  document.getElementById('filter-part').innerHTML =
+    opt('', '全楽器') +
+    PART_GROUPS.map(g => `<optgroup label="${escHtml(g.label)}">${g.parts.map(p => opt(p, PART_LABELS[p] ?? p)).join('')}</optgroup>`).join('') +
+    (extra.length ? `<optgroup label="未分類">${extra.map(p => opt(p, PART_LABELS[p] ?? p)).join('')}</optgroup>` : '');
 }
 
 // ─── リスト描画 ───
@@ -256,6 +260,7 @@ function renderList() {
   const keyword    = document.getElementById('search-input').value.trim().toLowerCase();
   const category   = document.getElementById('filter-category').value;
   const roleFilter = document.getElementById('filter-role').value;
+  const partFilter = document.getElementById('filter-part').value;
   const showDetail = canViewDetail();
 
   const filtered = allMembers.filter(m => {
@@ -266,7 +271,7 @@ function renderList() {
       const memberRoles = Array.isArray(m.roles) ? m.roles : [m.role].filter(Boolean);
       if (!memberRoles.includes(roleFilter)) return false;
     }
-    if (activePartFilter && m.part !== activePartFilter) return false;
+    if (partFilter && m.part !== partFilter) return false;
     return true;
   });
 
@@ -281,7 +286,6 @@ function renderList() {
   listEl.innerHTML = filtered.map(m => {
     const memberRoles = Array.isArray(m.roles) ? m.roles : [m.role].filter(Boolean);
     const roleBadges  = typeof renderRoleBadges === 'function' ? renderRoleBadges(memberRoles) : '';
-    const catCls      = CATEGORY_BADGE[m.category] ?? 'badge-navy';
 
     return `
       <div class="member-row">
@@ -289,13 +293,13 @@ function renderList() {
           <div class="member-row__line1">
             <span class="member-row__name">${escHtml(m.last_name)} ${escHtml(m.first_name)}</span>
             <span class="member-row__kana">${escHtml(m.last_kana)} ${escHtml(m.first_kana)}</span>
+            ${CAT_LABELS[m.category] ? `<span class="member-row__cat">${escHtml(CAT_LABELS[m.category])}</span>` : ''}
           </div>
           <div class="member-row__line2">
             <span class="member-row__part">${escHtml(PART_LABELS[m.part] ?? '—')}</span>
             <div class="member-row__badges">
               ${roleBadges}
               ${m.is_part_leader ? '<span class="badge badge-warning">PL</span>' : ''}
-              <span class="badge ${catCls}">${escHtml(CAT_LABELS[m.category] ?? '—')}</span>
             </div>
             <span class="member-row__joined">${escHtml(formatJoinedDate(m.joined_date))}〜</span>
           </div>
@@ -378,7 +382,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     // デモデータは開発環境（localhost）かつ未接続のときだけ
     allMembers = (data.length === 0 && isDev) ? DEMO_MEMBERS : data;
-    buildPartFilter(allMembers);
+    buildFilterOptions(allMembers);
     renderList();
   }
   await loadMembersPage();
@@ -386,6 +390,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('search-input').addEventListener('input', renderList);
   document.getElementById('filter-category').addEventListener('change', renderList);
   document.getElementById('filter-role').addEventListener('change', renderList);
+  document.getElementById('filter-part').addEventListener('change', renderList);
 });
 </script>
 </body>
