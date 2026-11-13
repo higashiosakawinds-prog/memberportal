@@ -112,6 +112,19 @@
     .vr-row__chip.chip-reply { background:rgba(41,128,185,.14); color:#1a5276; }
     .vr-row__chip.chip-new   { background:rgba(192,57,43,.12); color:var(--danger); }
 
+    /* ── 見学者の登録・詳細モーダル（スマホで幅を超えないよう、列は minmax(0,1fr)・狭い画面では1列） ── */
+    #modal-register .modal, #modal-detail .modal { overflow-x:hidden; }
+    .vr-reg-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:var(--space-4); }
+    .vr-reg-grid--date { grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:var(--space-3); align-items:end; }
+    .vr-reg-grid > * { min-width:0; }
+    #modal-register .form-control, #modal-detail .form-control { width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
+    @media(max-width:640px) {
+      .vr-reg-grid { grid-template-columns:minmax(0,1fr); gap:0; }
+      .form-grid-2.vr-reg-grid { gap:var(--space-3); }
+      .vr-reg-grid--date { grid-template-columns:minmax(0,1fr) auto; gap:var(--space-3); grid-auto-flow:row dense; }
+      .vr-reg-grid--date > .vr-reg-practice { grid-column:1 / -1; }
+    }
+
     /* ── 詳細モーダル ── */
     #modal-detail .modal { max-width:640px; }
     .vr-dl { display:grid; grid-template-columns:110px 1fr; gap:var(--space-2) var(--space-4); font-size:var(--text-sm); }
@@ -769,12 +782,12 @@ function openDetail(id) {
     ${r.date_request_note ? `<p style="font-size:var(--text-sm);color:var(--gray-700);white-space:pre-wrap;background:var(--gray-100);padding:var(--space-3);border-radius:var(--radius-md);">${escHtml(r.date_request_note)}</p>` : ''}
 
     <p class="detail-section-label">確定見学日（こちらで修正できます）</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:var(--space-3);align-items:end;">
+    <div class="vr-reg-grid vr-reg-grid--date">
       <div class="form-group" style="margin-bottom:0;">
         <label class="form-label" style="font-size:var(--text-xs);">見学日</label>
         <input type="date" id="detail-visit-date" class="form-control" value="${escHtml(r.scheduled_visit_date ?? '')}">
       </div>
-      <div class="form-group" style="margin-bottom:0;">
+      <div class="form-group vr-reg-practice" style="margin-bottom:0;">
         <label class="form-label" style="font-size:var(--text-xs);">練習日から選ぶ</label>
         <select id="detail-visit-practice" class="form-control" onchange="pickVisitPractice(this.value)">${upcomingPracticeOptions(r.scheduled_visit_date)}</select>
       </div>
@@ -826,7 +839,7 @@ function openDetail(id) {
     </div>
 
     <p class="detail-section-label">担当者・見学回数</p>
-    <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);">
+    <div class="form-grid-2 vr-reg-grid">
       <div class="form-group" style="margin-bottom:0;">
         <label class="form-label" style="font-size:var(--text-xs);">担当者</label>
         <select id="detail-assignee" class="form-control">${assigneeOptions}</select>
@@ -1158,28 +1171,28 @@ function openRegisterModal() {
       <label class="form-label">お名前 <span style="color:var(--danger);">*</span></label>
       <input type="text" id="reg-name" class="form-control" placeholder="山田 花子">
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);">
+    <div class="vr-reg-grid">
       <div class="form-group"><label class="form-label">ふりがな</label><input type="text" id="reg-yomi" class="form-control" placeholder="やまだ はなこ"></div>
       <div class="form-group"><label class="form-label">申込経路 <span style="color:var(--danger);">*</span></label><select id="reg-source" class="form-control">${sourceOptions}</select></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);">
+    <div class="vr-reg-grid">
       <div class="form-group"><label class="form-label">希望パート</label><select id="reg-part" class="form-control">${partOptions}</select></div>
       <div class="form-group"><label class="form-label">会員区分</label><select id="reg-member-type" class="form-control"><option value="adult">成人</option><option value="minor">未成年</option></select></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);">
+    <div class="vr-reg-grid">
       <div class="form-group"><label class="form-label">メール（任意）</label><input type="email" id="reg-email" class="form-control" placeholder="分かる場合のみ"></div>
       <div class="form-group"><label class="form-label">電話番号（任意）</label><input type="tel" id="reg-phone" class="form-control"></div>
     </div>
     <div class="form-group"><label class="form-label">LINE ID（任意）</label><input type="text" id="reg-line" class="form-control"></div>
 
     <p class="detail-section-label">確定見学日（任意）</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:var(--space-3);align-items:end;">
+    <div class="vr-reg-grid vr-reg-grid--date">
       <div class="form-group" style="margin-bottom:0;"><label class="form-label" style="font-size:var(--text-xs);">見学日</label><input type="date" id="reg-visit-date" class="form-control"></div>
-      <div class="form-group" style="margin-bottom:0;"><label class="form-label" style="font-size:var(--text-xs);">練習日から選ぶ</label><select id="reg-visit-practice" class="form-control" onchange="if(this.value)document.getElementById('reg-visit-date').value=this.value;">${upcomingPracticeOptions(null)}</select></div>
+      <div class="form-group vr-reg-practice" style="margin-bottom:0;"><label class="form-label" style="font-size:var(--text-xs);">練習日から選ぶ</label><select id="reg-visit-practice" class="form-control" onchange="if(this.value)document.getElementById('reg-visit-date').value=this.value;">${upcomingPracticeOptions(null)}</select></div>
       <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('reg-visit-date').value='';document.getElementById('reg-visit-practice').value='';" style="margin-bottom:0;">クリア</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-top:var(--space-4);">
+    <div class="vr-reg-grid" style="margin-top:var(--space-4);">
       <div class="form-group"><label class="form-label">対応ステータス</label><select id="reg-status" class="form-control">${statusOptions}</select></div>
       <div class="form-group"><label class="form-label">担当者</label><select id="reg-assignee" class="form-control">${assigneeOptions}</select></div>
     </div>

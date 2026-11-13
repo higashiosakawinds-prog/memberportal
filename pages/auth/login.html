@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- メールのリンクのトークンが Referer で外に出ないように（v1.04） -->
+  <meta name="referrer" content="no-referrer">
   <title>ログイン — 東大阪吹奏楽団</title>
   <link rel="stylesheet" href="../../css/variables.css">
   <link rel="stylesheet" href="../../css/common.css">
@@ -68,6 +70,23 @@
       color: #f1948a; font-size: var(--text-sm); margin-bottom: var(--space-4); display: none;
     }
     .error-box.show { display: block; }
+    .info-box {
+      background: rgba(39,174,96,0.14); border: 1px solid rgba(39,174,96,0.4);
+      border-radius: var(--radius-md); padding: var(--space-3) var(--space-4);
+      color: #a9dfbf; font-size: var(--text-sm); line-height: 1.7; margin-bottom: var(--space-4); display: none;
+    }
+    .info-box.show { display: block; }
+    .login-lead { font-size: var(--text-sm); color: var(--gray-300); line-height: 1.8; margin-bottom: var(--space-5); }
+    .login-sublink { text-align: right; margin: calc(-1 * var(--space-2)) 0 var(--space-4); }
+    .login-sublink button, .login-footer button {
+      background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
+      font-size: var(--text-sm); color: var(--gold-400); text-decoration: underline; text-underline-offset: 2px;
+    }
+    .login-resend { margin-top: var(--space-2); }
+    .login-resend button {
+      background: none; border: 1px solid rgba(241,148,138,0.5); color: #f1948a; cursor: pointer;
+      border-radius: var(--radius-md); padding: var(--space-1) var(--space-3); font-size: var(--text-xs); font-family: inherit;
+    }
   </style>
 </head>
 <body>
@@ -80,24 +99,54 @@
   </div>
  
   <div class="login-card">
-    <h2>ログイン</h2>
+    <h2 id="card-title">ログイン</h2>
     <!-- 全体メンテナンス中の案内（v1.03）。ログイン自体は止めない（IT委員がログインできるように） -->
     <div id="maint-notice" role="status" style="display:none;margin-bottom:16px;padding:10px 12px;border-radius:8px;background:#fff7e0;color:#7a5200;border:1px solid #f0d58a;font-size:13px;line-height:1.7;"></div>
-    <div class="error-box" id="error-box"></div>
- 
-    <div class="form-group">
-      <label class="form-label" for="email">メールアドレス <span class="required">*</span></label>
-      <input type="email" id="email" class="form-control" placeholder="example@mail.com" autocomplete="email">
+    <div class="error-box" id="error-box" role="alert"></div>
+    <div class="info-box" id="info-box" role="status"></div>
+
+    <!-- ① ログイン -->
+    <div id="view-login">
+      <div class="form-group">
+        <label class="form-label" for="email">メールアドレス <span class="required">*</span></label>
+        <input type="email" id="email" class="form-control" placeholder="example@mail.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="password">パスワード <span class="required">*</span></label>
+        <input type="password" id="password" class="form-control" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="login-sublink"><button type="button" id="to-forgot">パスワードを忘れた方</button></div>
+
+      <button class="login-submit" id="login-btn" type="button">ログイン</button>
+
+      <div class="login-footer">
+        <a href="register.html">新規登録はこちら</a>
+      </div>
     </div>
-    <div class="form-group">
-      <label class="form-label" for="password">パスワード <span class="required">*</span></label>
-      <input type="password" id="password" class="form-control" placeholder="••••••••" autocomplete="current-password">
+
+    <!-- ② パスワード再設定メールの送信（v1.04） -->
+    <div id="view-forgot" hidden>
+      <p class="login-lead">登録しているメールアドレスを入力してください。パスワードを設定し直すためのメールを送ります。</p>
+      <div class="form-group">
+        <label class="form-label" for="forgot-email">メールアドレス <span class="required">*</span></label>
+        <input type="email" id="forgot-email" class="form-control" placeholder="example@mail.com" autocomplete="email">
+      </div>
+      <button class="login-submit" id="forgot-btn" type="button">再設定メールを送る</button>
+      <div class="login-footer"><button type="button" class="to-login">ログイン画面に戻る</button></div>
     </div>
- 
-    <button class="login-submit" id="login-btn" type="button">ログイン</button>
- 
-    <div class="login-footer">
-      <a href="register.html">新規登録はこちら</a>
+
+    <!-- ③ 新しいパスワードの設定（メールのリンクから開いたとき。v1.04） -->
+    <div id="view-reset" hidden>
+      <p class="login-lead" id="reset-lead">新しいパスワードを決めてください（8文字以上）。</p>
+      <div class="form-group">
+        <label class="form-label" for="new-password">新しいパスワード <span class="required">*</span></label>
+        <input type="password" id="new-password" class="form-control" placeholder="8文字以上" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="new-password-confirm">新しいパスワード（確認） <span class="required">*</span></label>
+        <input type="password" id="new-password-confirm" class="form-control" placeholder="もう一度入力" autocomplete="new-password">
+      </div>
+      <button class="login-submit" id="reset-btn" type="button">パスワードを変更する</button>
     </div>
     <p id="app-version" style="text-align:center;margin:var(--space-4) 0 0;font-size:11px;color:rgba(255,255,255,0.35);"></p>
   </div>
@@ -106,15 +155,73 @@
 <script src="../../js/config.js"></script>
 <script src="../../js/supabase.js"></script>
 <script>
+// ── メールのリンクから開かれたときの情報（v1.04） ──
+//   ・新しい形式: ?token_hash=…&type=recovery|email（Supabase のメールテンプレートで指定。リンクを開いただけでは使われない）
+//   ・従来の形式: #access_token=…&type=recovery|signup（テンプレートが既定のままの場合。Supabase クライアントが読み取る）
+//   ・失敗: #error=…&error_code=otp_expired など
+//   Supabase クライアントが URL を書き換える前に、ここで読んでおく
+const _authLink = (() => {
+  const q = new URLSearchParams(location.search);
+  const h = new URLSearchParams(location.hash.replace(/^#/, ''));
+  return {
+    tokenHash:    q.get('token_hash'),
+    type:         q.get('type') || h.get('type') || '',
+    hasHashToken: h.has('access_token'),
+    error:        h.get('error_code') || h.get('error') || q.get('error_code') || q.get('error'),
+  };
+})();
+// メールのリンクの戻り先（このログイン画面。クエリ・ハッシュは付けない）
+const LOGIN_PAGE_URL = location.origin + location.pathname;
+const MIN_PASSWORD_LENGTH = 8; // 新規登録（register.html）と同じ
+
 document.addEventListener('DOMContentLoaded', () => {
   const btn      = document.getElementById('login-btn');
   const errorBox = document.getElementById('error-box');
- 
+  const infoBox  = document.getElementById('info-box');
+  let currentView = 'login';
+
+  const clearMessages = () => {
+    errorBox.classList.remove('show'); errorBox.textContent = '';
+    infoBox.classList.remove('show');  infoBox.textContent = '';
+  };
+  const showError = msg => { errorBox.textContent = msg; errorBox.classList.add('show'); };
+  const showInfo  = msg => { infoBox.textContent = msg;  infoBox.classList.add('show'); };
+
+  const TITLES = { login: 'ログイン', forgot: 'パスワードの再設定', reset: '新しいパスワードの設定' };
+  const setView = name => {
+    currentView = name;
+    ['login', 'forgot', 'reset'].forEach(v => { document.getElementById(`view-${v}`).hidden = (v !== name); });
+    document.getElementById('card-title').textContent = TITLES[name];
+  };
+
+  // ── 確認メールの再送（メール確認が済んでいないままログインしようとしたとき） ──
+  const showResendButton = email => {
+    const wrap = document.createElement('div');
+    wrap.className = 'login-resend';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = '確認メールをもう一度送る';
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      const { error } = await _sb.auth.resend({ type: 'signup', email, options: { emailRedirectTo: LOGIN_PAGE_URL } });
+      clearMessages();
+      if (error) {
+        showError(error.status === 429
+          ? '短い間に何度も送信されています。しばらく待ってからお試しください。'
+          : '確認メールを送れませんでした。しばらく経ってからお試しください。');
+        return;
+      }
+      showInfo(`${email} 宛てに確認メールを送りました。メールのリンクを開いてから、ログインしてください。`);
+    });
+    wrap.appendChild(b);
+    errorBox.appendChild(wrap);
+  };
+
   const doLogin = async () => {
     const email    = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
  
-    errorBox.classList.remove('show');
+    clearMessages();
  
     if (!email || !password) {
       errorBox.textContent = 'メールアドレスとパスワードを入力してください。';
@@ -141,8 +248,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (error) {
       btn.disabled = false;
       btn.textContent = 'ログイン';
-      errorBox.textContent = 'メールアドレスまたはパスワードが正しくありません。';
-      errorBox.classList.add('show');
+      if (error.code === 'email_not_confirmed' || /not confirmed/i.test(error.message || '')) {
+        showError('メールアドレスの確認が済んでいません。登録したときに届いたメールのリンクを開いてから、ログインしてください。');
+        showResendButton(email);
+        return;
+      }
+      showError('メールアドレスまたはパスワードが正しくありません。');
       return;
     }
  
@@ -206,8 +317,133 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch { /* 案内の失敗はログインに影響させない */ }
   })();
 
+  // ── パスワード再設定メールの送信（v1.04） ──
+  const forgotBtn = document.getElementById('forgot-btn');
+  const doForgot = async () => {
+    clearMessages();
+    const email = document.getElementById('forgot-email').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showError('正しいメールアドレスを入力してください。');
+      return;
+    }
+    forgotBtn.disabled = true;
+    forgotBtn.textContent = '送信中…';
+    let error = null;
+    if (_sb) ({ error } = await _sb.auth.resetPasswordForEmail(email, { redirectTo: LOGIN_PAGE_URL }));
+    forgotBtn.disabled = false;
+    forgotBtn.textContent = '再設定メールを送る';
+    // 送信間隔の制限（429）は、登録済みのアドレスでしか起きないため成功と同じ表示にする（登録の有無を推測させない）
+    if (error && error.status !== 429) {
+      showError('メールを送れませんでした。しばらく経ってからお試しください。');
+      return;
+    }
+    // 登録の有無は伝えない（他人のメールアドレスが登録済みかを調べられないように）
+    showInfo(`${email} 宛てに再設定メールを送りました（登録されているメールアドレスの場合のみ届きます）。メールのリンクを開くとこの画面に戻り、新しいパスワードを設定できます。リンクの有効期限は1時間です。届かない場合は迷惑メールのフォルダもご確認ください。`);
+  };
+
+  // ── 新しいパスワードの設定（v1.04） ──
+  const resetBtn = document.getElementById('reset-btn');
+  let recoveryEmail = '';
+  const doReset = async () => {
+    clearMessages();
+    const pw  = document.getElementById('new-password').value;
+    const pw2 = document.getElementById('new-password-confirm').value;
+    if (pw.length < MIN_PASSWORD_LENGTH) { showError(`パスワードは${MIN_PASSWORD_LENGTH}文字以上で設定してください。`); return; }
+    if (pw !== pw2) { showError('確認用のパスワードが一致しません。'); return; }
+    resetBtn.disabled = true;
+    resetBtn.textContent = '変更中…';
+    const { error } = await _sb.auth.updateUser({ password: pw });
+    resetBtn.disabled = false;
+    resetBtn.textContent = 'パスワードを変更する';
+    if (error) {
+      if (error.code === 'same_password') showError('今までと同じパスワードは使えません。別のパスワードにしてください。');
+      else if (error.code === 'weak_password') showError('パスワードが簡単すぎます。別のパスワードにしてください。');
+      else if (error.status === 401 || error.code === 'session_not_found' || error.code === 'session_expired') {
+        showError('時間が経ったため、変更できませんでした。お手数ですが、もう一度再設定メールを送ってください。');
+        setView('forgot');
+      } else showError('パスワードを変更できませんでした。しばらく経ってからお試しください。');
+      return;
+    }
+    // 変更後はいったんログアウトし、新しいパスワードでログインしてもらう。
+    //   全端末のログアウト（他の端末は最長1時間以内＝アクセストークンの期限までに切れる）。
+    //   signOut は失敗しても例外ではなく { error } を返すので、失敗時はこの端末だけでもログアウトして知らせる
+    let signOutFailed = false;
+    try {
+      const { error: soErr } = await _sb.auth.signOut();
+      if (soErr) { signOutFailed = true; await _sb.auth.signOut({ scope: 'local' }); }
+    } catch { signOutFailed = true; try { await _sb.auth.signOut({ scope: 'local' }); } catch { /* 無視 */ } }
+    localStorage.removeItem('hs_user');
+    document.getElementById('new-password').value = '';
+    document.getElementById('new-password-confirm').value = '';
+    setView('login');
+    if (recoveryEmail) document.getElementById('email').value = recoveryEmail;
+    showInfo(signOutFailed
+      ? 'パスワードを変更しました。ただし通信の都合で、ほかの端末のログアウトができなかった可能性があります。心配な場合は、少し時間をおいてもう一度パスワードを変更してください。新しいパスワードでログインしてください。'
+      : 'パスワードを変更しました。新しいパスワードでログインしてください。');
+    document.getElementById('password').focus();
+  };
+
+  // ── メールのリンクから開かれたときの処理（v1.04） ──
+  const handleAuthLink = async () => {
+    const link = _authLink;
+    if (!link.tokenHash && !link.hasHashToken && !link.error) return;
+    const isRecovery = link.type === 'recovery';
+    let session = null, failed = !!link.error;
+    if (_sb && !failed) {
+      if (link.tokenHash) {
+        const { data, error } = await _sb.auth.verifyOtp({ token_hash: link.tokenHash, type: isRecovery ? 'recovery' : 'email' });
+        session = data?.session ?? null; failed = !!error;
+      } else {
+        // 従来の形式：Supabase クライアントが URL から読み取ったログイン状態を待つ
+        const { data, error } = await _sb.auth.getSession();
+        session = data?.session ?? null; failed = !!error;
+      }
+    }
+    // アドレス欄からトークンを消す（再読み込み・ブックマークで使われないように）
+    history.replaceState(null, '', LOGIN_PAGE_URL);
+
+    if (failed || !session) {
+      if (isRecovery || link.error) setView('forgot');
+      showError(isRecovery || link.error
+        ? 'メールのリンクの有効期限が切れているか、すでに使われています。お手数ですが、もう一度再設定メールを送ってください。（新規登録の確認メールの場合は、そのままログインをお試しください）'
+        : 'メールのリンクの有効期限が切れているか、すでに使われています。そのままログインをお試しください。');
+      return;
+    }
+    if (isRecovery) {
+      recoveryEmail = session.user?.email ?? '';
+      setView('reset');
+      if (recoveryEmail) document.getElementById('reset-lead').textContent =
+        `${recoveryEmail} の新しいパスワードを決めてください（${MIN_PASSWORD_LENGTH}文字以上）。ご自分のメールアドレスでない場合は、何もせずにこの画面を閉じてください。`;
+      document.getElementById('new-password').focus();
+      return;
+    }
+    // 新規登録の確認：確認だけ済ませて、ふだんどおりログインしてもらう
+    const email = session.user?.email ?? '';
+    try { await _sb.auth.signOut({ scope: 'local' }); } catch { /* 無視 */ }
+    if (email) document.getElementById('email').value = email;
+    showInfo('メールアドレスの確認が完了しました。登録したメールアドレスとパスワードでログインしてください。');
+    document.getElementById('password').focus();
+  };
+
+  document.getElementById('to-forgot').addEventListener('click', () => {
+    clearMessages();
+    document.getElementById('forgot-email').value = document.getElementById('email').value.trim();
+    setView('forgot');
+    document.getElementById('forgot-email').focus();
+  });
+  document.querySelectorAll('.to-login').forEach(b => b.addEventListener('click', () => { clearMessages(); setView('login'); }));
+
   btn.addEventListener('click', doLogin);
-  document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  forgotBtn.addEventListener('click', doForgot);
+  resetBtn.addEventListener('click', doReset);
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.isComposing) return;
+    if (e.target.closest?.('button, a')) return; // ボタン・リンク上の Enter はその click に任せる
+    if (currentView === 'login') doLogin();
+    else if (currentView === 'forgot') doForgot();
+    else if (currentView === 'reset') doReset();
+  });
+  handleAuthLink();
 });
 </script>
 </body>

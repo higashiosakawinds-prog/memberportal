@@ -90,7 +90,9 @@ async function networkFirst(req) {
   const cache = await caches.open(SHELL_CACHE);
   try {
     const res = await fetchWithTimeout(req, NETWORK_TIMEOUT_MS);
-    if (res && res.ok) cache.put(req, res.clone());
+    // メールのリンクのトークン（?token_hash=…）付きの URL は端末に残さない（v1.04）
+    const hasToken = new URL(req.url).searchParams.has('token_hash');
+    if (res && res.ok && !hasToken) cache.put(req, res.clone());
     return res;
   } catch (err) {
     const cached = await cache.match(req, { ignoreSearch: true });
