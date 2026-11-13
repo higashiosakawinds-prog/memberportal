@@ -13,13 +13,21 @@
  */
 
 // ── 設定値（本番前にここを変更） ──
-// localhost / 127.0.0.1 で開いたときだけ、ローカル Supabase（supabase start）に接続する。
-// それ以外（本番サイト）は従来どおり本番に接続する。
+// 次のときだけ、ローカル Supabase（supabase start）に接続する。それ以外（本番サイト）は従来どおり本番に接続する。
+//   ・localhost / 127.0.0.1 で開いたとき
+//   ・iPhone での確認用トンネル（*.trycloudflare.com）で開いたとき
+//     → 確認用サーバー（01_ポータル開発/開発ツール/phone-preview.js）が /sb/ 以下をローカル Supabase へ中継する
 //   ・ローカル用 anon キーは Supabase CLI 標準のデモ値（公開情報・ローカル専用）
 //   ・service_role キーは絶対にここへ書かない
-const _IS_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+//   ・同じ判定を config.js（GAS の無効化）でも使う。どちらが先に読まれてもよいように window に1つだけ置く
+window._hsDevHost = window._hsDevHost || (() => {
+  const h = location.hostname;
+  const tunnel = /\.trycloudflare\.com$/.test(h);
+  return { local: tunnel || h === 'localhost' || h === '127.0.0.1', tunnel };
+})();
+const _IS_LOCAL = window._hsDevHost.local;
 const SUPABASE_CONFIG = _IS_LOCAL ? {
-  url:     'http://127.0.0.1:54321',
+  url:     window._hsDevHost.tunnel ? `${location.origin}/sb` : 'http://127.0.0.1:54321',
   anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
 } : {
   url:     'https://iaqbkriorspsjldodhjy.supabase.co',

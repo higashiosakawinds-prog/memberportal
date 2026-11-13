@@ -81,6 +81,8 @@
  
   <div class="login-card">
     <h2>ログイン</h2>
+    <!-- 全体メンテナンス中の案内（v1.03）。ログイン自体は止めない（IT委員がログインできるように） -->
+    <div id="maint-notice" role="status" style="display:none;margin-bottom:16px;padding:10px 12px;border-radius:8px;background:#fff7e0;color:#7a5200;border:1px solid #f0d58a;font-size:13px;line-height:1.7;"></div>
     <div class="error-box" id="error-box"></div>
  
     <div class="form-group">
@@ -183,6 +185,26 @@ document.addEventListener('DOMContentLoaded', () => {
  
   const _v = document.getElementById('app-version');
   if (_v && typeof APP_VERSION_LABEL !== 'undefined') _v.textContent = APP_VERSION_LABEL;
+
+  // ── 全体メンテナンス中なら案内だけ出す（読めなければ何も出さない） ──
+  //    ログイン画面は common.js を読まないため、日時の整形は common.js の SiteMaintenance.fmtDateTime と同じ書式をここにも書いている
+  (async () => {
+    try {
+      if (!_sb) return;
+      const { data } = await _sb.rpc('get_maintenance_status');
+      if (!data || !data.active) return;
+      const box = document.getElementById('maint-notice');
+      let text = '現在メンテナンス中です。終了後にご利用ください。';
+      if (data.planned_end) {
+        const d = new Date(data.planned_end);
+        if (!isNaN(d)) {
+          text += `（終了予定: ${new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(d)}）`;
+        }
+      }
+      box.textContent = text;
+      box.style.display = 'block';
+    } catch { /* 案内の失敗はログインに影響させない */ }
+  })();
 
   btn.addEventListener('click', doLogin);
   document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });

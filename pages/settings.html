@@ -76,6 +76,8 @@
       <button class="settings-tab active" data-tab="profile">個人情報</button>
       <button class="settings-tab" data-tab="password">パスワード変更</button>
       <button class="settings-tab" data-tab="notify">通知</button>
+      <!-- IT委員にだけ表示（maintenance-admin.js）。保存は DB 側でも IT委員かを確かめる -->
+      <button class="settings-tab" data-tab="maint" id="tab-maint" style="display:none;">メンテナンス</button>
     </div>
 
     <!-- ── 個人情報パネル ── -->
@@ -314,6 +316,72 @@
   </div>
 </div>
 
+    <!-- ── 全体メンテナンス（IT委員のみ・v1.03） ── -->
+    <div class="settings-panel fade-in fade-in-2" id="panel-maint">
+      <div class="card" style="max-width:560px;">
+        <div class="card__header"><span class="card__title">全体メンテナンス</span><span class="badge badge-navy" style="margin-left:8px;">IT委員のみ</span></div>
+        <div class="card__body">
+          <div id="mt-loading" style="text-align:center;padding:var(--space-6);color:var(--gray-500);">読み込み中…</div>
+          <div id="mt-error" class="alert" style="display:none;background:rgba(192,57,43,0.08);border-color:rgba(192,57,43,0.25);color:var(--danger);margin-bottom:var(--space-4);"></div>
+
+          <div id="mt-form" style="display:none;">
+            <!-- 今の状態と ON/OFF -->
+            <div id="mt-state" style="padding:var(--space-4);border-radius:var(--radius-md);margin-bottom:var(--space-4);text-align:center;font-weight:700;"></div>
+            <button type="button" class="btn btn-lg" id="mt-toggle" style="width:100%;justify-content:center;margin-bottom:var(--space-2);"></button>
+            <p style="font-size:var(--text-xs);color:var(--gray-500);margin-bottom:var(--space-6);">
+              ON にすると、IT委員以外の団員は次に画面を開いた・移った時から案内の画面になります。開いたままの画面は、次に画面を移るまでそのまま表示されます。
+            </p>
+
+            <p class="section-label">メンテナンスの予定</p>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label" for="mt-planned-start">開始</label>
+                <input type="datetime-local" id="mt-planned-start" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="mt-planned-end">終了</label>
+                <input type="datetime-local" id="mt-planned-end" class="form-control">
+              </div>
+            </div>
+
+            <p class="section-label">予告の帯を出す期間</p>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label" for="mt-notice-start">表示の開始</label>
+                <input type="datetime-local" id="mt-notice-start" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="mt-notice-end">表示の終了</label>
+                <input type="datetime-local" id="mt-notice-end" class="form-control">
+              </div>
+            </div>
+            <p style="font-size:var(--text-xs);color:var(--gray-500);margin:-8px 0 var(--space-4);">表示の開始が空なら予告は出ません。表示の終了が空なら、メンテナンスの予定の終了まで出ます（予定の終了も空なら、ON にするまで出続けます）。</p>
+
+            <p class="section-label">団員に見せる文面</p>
+            <div class="form-group">
+              <textarea id="mt-message" class="form-control" rows="3" maxlength="500" placeholder="空欄なら既定の文面になります"></textarea>
+              <p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px;">文面と予定の日時はログイン前の画面にも表示されます（誰でも見られます）。内部の情報は書かないでください。</p>
+              <div style="text-align:right;font-size:var(--text-xs);color:var(--gray-500);"><span id="mt-message-count">0</span> / 500</div>
+            </div>
+
+            <p class="section-label">外部への送信</p>
+            <label style="display:flex;gap:var(--space-3);align-items:flex-start;cursor:pointer;margin-bottom:var(--space-6);">
+              <input type="checkbox" id="mt-block-outbound" style="width:18px;height:18px;margin-top:2px;accent-color:var(--navy-600);">
+              <span><strong style="color:var(--navy-800);">メンテナンス中は GAS への書き込みを止める</strong><br>
+                <small style="color:var(--gray-500);">出欠・団費・出納帳のスプレッドシートへの書き込みと、見学者へのメール送信を止めます。本番で書き込みを確かめるときだけ外してください。見学の申し込みと返信メールの取り込みは止まりません。</small></span>
+            </label>
+
+            <div style="display:flex;justify-content:flex-end;">
+              <button type="button" class="btn btn-gold" id="mt-save">予定・文面を保存する</button>
+            </div>
+
+            <p class="section-label" style="margin-top:var(--space-8);">変更の記録（新しい順・10件）</p>
+            <div id="mt-log" style="font-size:var(--text-xs);color:var(--gray-700);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -321,6 +389,7 @@
 <script src="../js/supabase.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/common.js"></script>
+<script src="../js/maintenance-admin.js"></script>
 <script>
 const KATAKANA_RE = /^[ァ-ヶー　\s]+$/;
 
