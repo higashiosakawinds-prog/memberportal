@@ -1017,12 +1017,186 @@ function renderSidebar() {
         <span>設定</span>
       </a>
       <p class="sidebar-version" style="margin:var(--space-3) 0 0;padding:0 var(--space-4);font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:0.05em;">
-        ひがすいポータル ${typeof APP_VERSION_LABEL !== 'undefined' ? APP_VERSION_LABEL : ''}
+        ${getSessionUser()
+          ? `<button type="button" class="sidebar-version__link" id="sidebar-version-link">ひがすいポータル ${typeof APP_VERSION_LABEL !== 'undefined' ? APP_VERSION_LABEL : ''}<span class="sidebar-version__more">更新内容 ›</span></button>`
+          : `ひがすいポータル ${typeof APP_VERSION_LABEL !== 'undefined' ? APP_VERSION_LABEL : ''}`}
       </p>
     </div>
   `;
 
   sidebar.innerHTML = html;
+  document.getElementById('sidebar-version-link')?.addEventListener('click', () => openReleaseNotes());
+}
+
+// ─────────────────────────────────────────
+// 更新内容（リリースノート・α1.05）
+//   データは js/release-notes.js（押したときに初めて読み込む）。文面は textContent で表示する
+//   最新の版は開いた状態、それより前は版数だけを見せ、押すと詳細が開く（<details>）
+//   大きな版（x.00）のときだけ、ログイン後に1回だけ帯を出す（既読は端末ごとに localStorage）
+//   ログインした団員だけが開ける（サイドバーの版数は未ログインではただの文字）
+// ─────────────────────────────────────────
+const RELEASE_SEEN_KEY = 'higasui_release_seen';
+let _releaseNotesLoading = null;
+
+function _loadReleaseNotes() {
+  if (typeof RELEASE_NOTES !== 'undefined') return Promise.resolve(RELEASE_NOTES);
+  if (_releaseNotesLoading) return _releaseNotesLoading;
+  const isRoot = !window.location.pathname.includes('/pages/');
+  const ver = typeof APP_VERSION !== 'undefined' ? APP_VERSION : '';
+  const src = (isRoot ? '' : '../') + 'js/release-notes.js?v=' + encodeURIComponent(ver);
+  _releaseNotesLoading = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => (typeof RELEASE_NOTES !== 'undefined'
+      ? resolve(RELEASE_NOTES)
+      : reject(new Error('RELEASE_NOTES がありません')));
+    s.onerror = () => { s.remove(); reject(new Error('release-notes.js を読み込めませんでした')); };
+    document.head.appendChild(s);
+  }).catch(err => { _releaseNotesLoading = null; throw err; });
+  return _releaseNotesLoading;
+}
+
+function _markReleaseSeen() {
+  try { localStorage.setItem(RELEASE_SEEN_KEY, typeof APP_VERSION !== 'undefined' ? APP_VERSION : ''); } catch (e) { /* 使えなくても動く */ }
+  document.getElementById('release-banner')?.remove();
+}
+
+function _buildReleaseNotesModal() {
+  const ov = document.createElement('div');
+  ov.className = 'modal-overlay';
+  ov.id = 'modal-release-notes';
+  ov.setAttribute('role', 'dialog');
+  ov.setAttribute('aria-modal', 'true');
+  ov.setAttribute('aria-labelledby', 'release-notes-title');
+
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.style.maxWidth = '520px';
+
+  const header = document.createElement('div');
+  header.className = 'modal__header';
+  const h = document.createElement('h2');
+  h.className = 'modal__title';
+  h.id = 'release-notes-title';
+  h.textContent = '更新内容';
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'modal__close';
+  close.setAttribute('aria-label', '閉じる');
+  // 固定の SVG のみ（文面は入れない）
+  close.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>';
+  close.addEventListener('click', () => closeModal('modal-release-notes'));
+  header.append(h, close);
+
+  const body = document.createElement('div');
+  body.className = 'modal__body release-notes';
+  body.id = 'release-notes-body';
+
+  modal.append(header, body);
+  ov.appendChild(modal);
+  ov.addEventListener('click', e => { if (e.target === ov) closeModal('modal-release-notes'); });
+  document.body.appendChild(ov);
+  return ov;
+}
+
+function _renderReleaseNotes(body, notes) {
+  body.replaceChildren();
+  const stage = typeof APP_STAGE !== 'undefined' ? APP_STAGE + ' ' : '';
+  notes.forEach((n, i) => {
+    const d = document.createElement('details');
+    d.className = 'release-notes__item';
+    if (i === 0) d.open = true;
+
+    const sum = document.createElement('summary');
+    sum.className = 'release-notes__summary';
+    const ver = document.createElement('span');
+    ver.className = 'release-notes__version';
+    ver.textContent = stage + n.version;
+    sum.appendChild(ver);
+    if (i === 0) {
+      const latest = document.createElement('span');
+      latest.className = 'release-notes__latest';
+      latest.textContent = '最新';
+      sum.appendChild(latest);
+    }
+    const date = n.date || (typeof APP_VERSION !== 'undefined' && n.version === APP_VERSION
+      && typeof APP_RELEASED_AT !== 'undefined' ? APP_RELEASED_AT : '');
+    const dt = document.createElement('span');
+    dt.className = 'release-notes__date';
+    dt.textContent = date ? String(date).replace(/-/g, '/') : '';
+    sum.appendChild(dt);
+
+    const title = document.createElement('p');
+    title.className = 'release-notes__title';
+    title.textContent = n.title || '';
+
+    const ul = document.createElement('ul');
+    ul.className = 'release-notes__list';
+    (n.items || []).forEach(it => {
+      const li = document.createElement('li');
+      if (it.kind) {
+        const k = document.createElement('span');
+        k.className = 'release-notes__kind';
+        k.textContent = it.kind;
+        li.appendChild(k);
+      }
+      li.appendChild(document.createTextNode(it.text || ''));
+      ul.appendChild(li);
+    });
+
+    d.append(sum, title, ul);
+    body.appendChild(d);
+  });
+}
+
+async function openReleaseNotes() {
+  if (!document.getElementById('modal-release-notes')) _buildReleaseNotesModal();
+  const body = document.getElementById('release-notes-body');
+  _markReleaseSeen();
+  // スマホでサイドバーが開いていれば閉じる
+  document.getElementById('sidebar')?.classList.remove('mobile-open');
+  document.getElementById('sidebar-overlay')?.classList.remove('active');
+  body.textContent = '読み込み中…';
+  openModal('modal-release-notes');
+  try {
+    const notes = await _loadReleaseNotes();
+    _renderReleaseNotes(body, notes);
+  } catch (e) {
+    console.warn('[HighasuiDX] 更新内容の読み込みに失敗しました', e);
+    body.textContent = '更新内容を読み込めませんでした。通信状態を確認して、もう一度お試しください。';
+  }
+}
+
+// 大きな版（x.00）のときだけ、ログイン後に1回だけ帯を出す
+function showMajorReleaseBanner() {
+  if (!getSessionUser() || isPublicPage()) return;  // ログイン中のみ（ログイン・新規登録・初期設定の画面には出さない）
+  if (typeof APP_VERSION === 'undefined' || !/\.00$/.test(APP_VERSION)) return;
+  let seen = null;
+  try { seen = localStorage.getItem(RELEASE_SEEN_KEY); } catch (e) { return; } // 使えない端末では出さない（毎回出続けるのを防ぐ）
+  if (seen === APP_VERSION || document.getElementById('release-banner')) return;
+
+  const el = document.createElement('div');
+  el.id = 'release-banner';
+  el.className = 'release-banner';
+  el.setAttribute('role', 'status');
+  const msg = document.createElement('span');
+  msg.className = 'release-banner__msg';
+  msg.textContent = `ポータルが新しくなりました（${typeof APP_VERSION_LABEL !== 'undefined' ? APP_VERSION_LABEL : APP_VERSION}）`;
+  const open = document.createElement('button');
+  open.type = 'button';
+  open.className = 'release-banner__open';
+  open.textContent = '更新内容を見る';
+  open.addEventListener('click', () => openReleaseNotes());
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'release-banner__close';
+  close.setAttribute('aria-label', 'この案内を閉じる');
+  close.textContent = '×';
+  close.addEventListener('click', () => _markReleaseSeen());
+  el.append(msg, open, close);
+
+  const host = document.querySelector('.main-content') || document.body;
+  host.insertBefore(el, host.firstChild);
 }
 
 // ─────────────────────────────────────────
@@ -1242,6 +1416,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── メンテナンスチェック ──
   checkMaintenance();          // ページ単位（common.js の設定）
   SiteMaintenance.apply();     // 全体（DB の設定。画面が変わった時だけ読む）
+  showMajorReleaseBanner();    // 大きな版のときだけ1回（α1.05）
 
   // モーダル外クリックで閉じる
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
